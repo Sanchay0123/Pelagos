@@ -2,8 +2,8 @@
 title: Pelagos Documentation Standard
 document_id: DOC-001
 type: documentation_standard
-status: approved
-version: 1.0
+status: under_review
+version: 1.1.0
 created: 2026-10-10
 updated: 2026-10-10
 tags:
@@ -27,7 +27,7 @@ All substantive documents MUST include YAML frontmatter.
 
 **Required Fields:**
 * `title`: The human-readable title of the document.
-* `document_id`: A unique identifier (e.g., `DOC-YYYYMMDD-XXXX`, `ADR-001`, `REQ-001`).
+* `document_id`: A canonical, stable identifier.
 * `type`: The document type (see Permitted Document Types below).
 * `status`: The current lifecycle state (see Permitted Statuses below).
 * `created`: Creation date in `YYYY-MM-DD` format.
@@ -35,16 +35,20 @@ All substantive documents MUST include YAML frontmatter.
 * `tags`: A YAML list of relevant tags for knowledge graph discoverability.
 
 **Conditional Fields:**
-* `version`: Required for specifications, ADRs, and requirements. Uses Semantic Versioning (e.g., `1.0.0`) or simple versioning (e.g., `v1`).
+* `version`: Required for substantive specifications and the documentation standard itself. Uses Semantic Versioning (`MAJOR.MINOR.PATCH`).
+  * `MAJOR` changes when there is a fundamental rewrite or scope change.
+  * `MINOR` changes when new sections or features are added.
+  * `PATCH` changes for corrections and clarifications.
+  * *Note: Document IDs are separate from versions. ADRs should retain stable IDs and record amendments or supersession in their history rather than receiving a new ID for every edit.*
 
 **Example Frontmatter:**
 ```yaml
 ---
 title: Initial Storage Architecture
-document_id: ADR-001
+document_id: ADR-0001
 type: adr
 status: approved
-version: 1.0
+version: 1.0.0
 created: 2026-10-10
 updated: 2026-10-10
 tags:
@@ -55,11 +59,28 @@ tags:
 ```
 
 ### 3.2 Permitted Values
-**Document Types:** `project_overview`, `requirements`, `architecture_spec`, `adr`, `dataset_spec`, `api_spec`, `ml_spec`, `operational_routing`, `security_spec`, `testing_spec`, `runbook`, `research_notes`, `glossary`, `documentation_standard`.
+**Document Types:** `project_overview`, `requirements`, `architecture_spec`, `adr`, `dataset_spec`, `api_spec`, `ml_spec`, `operational_routing`, `security_spec`, `testing_spec`, `runbook`, `research_notes`, `glossary`, `documentation_standard`, `documentation_index`.
 **Statuses:** `planned`, `drafting`, `under_review`, `approved`, `rejected`, `superseded`, `deprecated`, `archived`.
 
 ### 3.3 Filename Conventions
 Filenames must use `kebab-case.md` (e.g., `initial-storage-architecture.md`).
+
+### 3.4 Document ID Conventions
+
+Use one canonical, stable ID format for each document type:
+* **General Documents:** `DOC-001`
+* **Requirements:** `REQ-FR-001`, `REQ-NFR-001`
+* **Architecture Decisions (ADRs):** `ADR-0001`
+* **Architecture Specifications:** `ARCH-001`
+* **Dataset Specifications:** `DATA-001`
+* **API Specifications:** `API-001`
+* **ML Specifications:** `ML-001`
+* **Test Specifications:** `TEST-001`
+
+**Rules:**
+* IDs must be strictly unique across the repository.
+* Document IDs are stable and must be retained when a file is renamed or its content is superseded.
+* *(Note: These are proposed conventions, not existing allocations. Do not allocate IDs to future documents until they are created).*
 
 ## 4. Canonical Document Structure
 
@@ -84,15 +105,15 @@ A baseline document template consists of the following sections. Sections may be
 
 To ensure dual compatibility between Git-based hosting (GitHub) and local knowledge graphs (Obsidian):
 
-* **Markdown Links (Primary):** Standard relative Markdown links are MANDATORY for GitHub-compatible navigation.
+* **Markdown Links (Primary):** Standard relative Markdown links are MANDATORY for GitHub-compatible navigation. Relative links must resolve from the containing Markdown file.
   * Example: `[Architecture Spec](./architecture-spec.md)`
-* **Wikilinks (Supplementary):** Obsidian wikilinks MAY supplement standard Markdown links for knowledge-graph traversal.
+* **Wikilinks (Supplementary):** Obsidian wikilinks MAY supplement standard Markdown links for knowledge-graph traversal. Wikilinks must resolve to existing notes, or be explicitly identified as planned. (Note: Not all wikilinks work natively on GitHub).
   * Example: `[[architecture-spec]]`
-* **Cross-Document Relationships:** Important relationships should use both formats where appropriate to satisfy both platforms.
+* **Cross-Document Relationships:** Important relationships should use both formats where appropriate. Filenames and aliases must follow one documented resolution convention.
 * **No Absolute Local Paths:** Links must never depend on absolute local machine paths (e.g., `/Users/name/...` or `C:\...`). Use relative paths.
 * **Moves and Renames:** Moving or renaming a document requires reference validation across the repository.
 * **Planned Documents:** Documents that do not exist yet must be explicitly identified as "Planned" and not silently treated as existing files in links.
-* **Heading Anchors:** Link to headings using standard GitHub slugification: `[Section](#background-and-context)`.
+* **Heading Anchors:** Link to headings using standard GitHub slugification. Heading links must be validated against actual rendered heading anchors.
 * **Images and Attachments:** Use standard relative markdown embedding: `![System Diagram](./assets/diagram.png)`.
 * **Mermaid Diagrams:** Use standard triple-backtick mermaid blocks compatible with both platforms.
 
@@ -116,6 +137,7 @@ graph TD;
 * **Runbooks:** Actionable operational procedures.
 * **Research Notes:** Experimental findings. *Must explicitly state they are not approved architecture decisions.*
 * **Glossaries:** Domain terminology definitions.
+* **Documentation Index:** Central repository navigation entry point mapping approved sources of truth, planned specifications, and external reference materials.
 
 ## 7. Traceability and Source of Truth
 
@@ -126,11 +148,22 @@ Documents must explicitly link to their justifying sources.
 * Dataset usage must link to **Data Sources and Licenses**.
 * Features must link to **Tests and Implementation Evidence**.
 
-**Authority Hierarchy:**
-If documents conflict, authority flows in this order:
-`Accepted Decisions (ADRs) > Requirements > Architecture Specifications > Implementation Contracts > Operational Documentation > Research Notes`.
+**Domain-Specific Authority and Conflict Resolution:**
 
-Contradictory documents must not coexist without an explicit resolution process (e.g., opening a new ADR to supersede an old one). 
+* **Requirements** are authoritative for required system behavior.
+* **Accepted ADRs** are authoritative records of approved architectural decisions within their stated scope.
+* **Architecture Specifications** explain how requirements and decisions are satisfied.
+* **API and Implementation Contracts** govern their defined interfaces and observable behavior, subject to approved requirements and decisions.
+* **Operational Documentation** governs procedures, not architectural intent.
+* **Research Notes** provide evidence and proposals but do not independently approve decisions.
+
+When a conflict is found:
+1. Record the conflicting documents and affected requirements.
+2. Determine whether an approved decision, requirement, or specification has become outdated.
+3. Propose the appropriate revision.
+4. Use the formal review process and, where architecture changes, an ADR to resolve the issue.
+5. Update affected documents and cross-references.
+6. Do not silently override an approved requirement or decision.
 
 ## 8. Documentation Quality Gates
 
@@ -146,7 +179,13 @@ All documentation is subject to the following policy validation requirements:
 8. **Secret Leakage:** No credentials, tokens, or personal machine paths may be committed.
 9. **Traceability Validation:** Specs and decisions must link to upstream requirements.
 
-*Note: These are policy requirements; automated CI validation tooling implementation is deferred.*
+When reporting validation, explicitly distinguish between:
+* A validation requirement defined by policy.
+* A validation actually executed.
+* A validation that passed.
+* A validation that could not be performed.
+
+Do not claim that Markdown, YAML, links, or Mermaid examples passed automated checks unless those checks were actually executed.
 
 ## 9. Document Lifecycle and Review
 
@@ -172,3 +211,11 @@ This documentation standard operates within the boundaries of the following exis
 * **Storage Technologies:** PostgreSQL and Parquet remain the intended initial storage technologies, subject to their approved architectural boundaries.
 * **Architecture:** The modular-monolith approach should remain separable into services later if justified.
 * **Deployment:** Kubernetes is not part of the initial deployment.
+
+## 11. Change History
+
+| Version | Date | Author | Description |
+|---|---|---|---|
+| 1.0.0 | 2026-10-10 | Agent | Initial draft of documentation standard. |
+| 1.0.1 | 2026-10-10 | Agent | D0-R1 corrections: revised versioning, ID conventions, source-of-truth hierarchy, validation reporting, and cross-platform link clarifications. Changed status to under_review. |
+| 1.1.0 | 2026-10-10 | Agent | Added documentation_index as permitted document type for central documentation index. Kept status under_review. |
