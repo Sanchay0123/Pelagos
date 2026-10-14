@@ -2,10 +2,10 @@
 title: Pelagos Documentation Index
 document_id: DOC-003
 type: documentation_index
-status: under_review
-version: 1.0.2
+status: approved
+version: 1.0.9
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-14
 tags:
   - index
   - navigation
@@ -28,16 +28,17 @@ N/A
 ## 5. Design or Specification (Document Directory)
 
 ### Core Foundations
-* [Documentation Standard](./DOCUMENTATION_STANDARD.md) (Status: Under Review)
-* [Project Overview](./PROJECT_OVERVIEW.md) (Status: Under Review)
+* [Documentation Standard](./DOCUMENTATION_STANDARD.md) (v1.1.1, Status: Approved)
+* [Project Overview](./PROJECT_OVERVIEW.md) (v1.0.3, Status: Approved)
+* [Documentation Index](./INDEX.md) (v1.0.9, Status: Approved)
 
 ### Architecture and Decisions
 * Architecture Specifications (Planned)
 * Architecture Decision Records (ADRs) (Planned)
 
 ### Product and Requirements
-* Functional Requirements (Planned)
-* Nonfunctional Requirements (Planned)
+* [Functional Requirements Specification](./requirements/functional-requirements.md) (v1.0.5, Status: Drafting)
+* [Nonfunctional Requirements Specification](./requirements/nonfunctional-requirements.md) (v1.0.3, Status: Drafting)
 
 ### Data and Intelligence
 * Dataset and Data-Provider Specifications (Planned)
@@ -90,3 +91,10 @@ Links to established, governed documentation within the repository, and maps pla
 | 1.0.0 | 2026-10-10 | Agent | Initial creation of the documentation index. |
 | 1.0.1 | 2026-10-10 | Agent | D1-R1 corrections: Removed unportable external links, updated document type, documented unresolved questions. |
 | 1.0.2 | 2026-10-10 | Agent | D1-R2 corrections: updated document type to documentation_index, refined traceability statement to distinguish established from planned specifications. |
+| 1.0.3 | 2026-10-12 | Project Overseer / Agent | Formal approval following D0/D1 review. Status updated to approved, reflecting final statuses and versions across Core Foundations. |
+| 1.0.4 | 2026-10-12 | Project Agent | Registered Functional Requirements (REQ-FR-001) and Nonfunctional Requirements (REQ-NFR-001) in Product and Requirements catalog under Milestone D2. |
+| 1.0.5 | 2026-10-14 | Project Agent | D2-R1 update: Synchronized requirements specification version references (v1.0.1) following quality review. Kept status approved. |
+| 1.0.6 | 2026-10-14 | Project Agent | D2-R2 update: Synchronized requirements specification version references (v1.0.2) following final requirements audit. Kept status approved. |
+| 1.0.7 | 2026-10-14 | Project Agent | D2 final closure corrections: Synchronized requirements specification version references (v1.0.3) following final closure corrections. Kept status approved. |
+| 1.0.8 | 2026-10-14 | Project Agent | D2 final review update: Synchronized Functional Requirements Specification version reference (v1.0.4) following forecasting evaluation threshold governance resolution. Kept status approved. |
+| 1.0.9 | 2026-10-14 | Project Agent | Final D2 consistency pass: Synchronized Functional Requirements Specification version reference (v1.0.5) following final forecasting requirements reconciliation. Kept status approved. |

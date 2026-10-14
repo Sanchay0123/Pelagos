@@ -2,10 +2,10 @@
 title: Pelagos Project Overview
 document_id: DOC-002
 type: project_overview
-status: under_review
-version: 1.0.2
+status: approved
+version: 1.0.3
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 tags:
   - overview
   - scope
@@ -19,11 +19,11 @@ Pelagos is an intelligent maritime freight forecasting and vessel chartering opt
 
 ## 2. Scope (Users and Decisions)
 **Geographic Scope:** Pelagos is intended to support global maritime routes according to actual data availability and validated route coverage. While an initial regional validation focus may target specific corridors (e.g., East Coast Indian ports), the architecture is not permanently restricted to these routes.
-**Users and Decisions:** Pelagos supports maritime charterers, freight forecasters, and cargo procurement teams. Instead of merely outputting a generic predicted freight rate, the system translates forecasts into actionable decisions (e.g., illustrative examples such as "Wait 6 days, book a Panamax vessel on a 3-voyage contract"). 
+**Users and Decisions:** Pelagos supports maritime charterers, freight forecasters, and cargo procurement teams. Instead of merely outputting a generic predicted freight rate, the system translates forecasts into actionable decisions (e.g., illustrative examples such as "Wait 6 days, book a Panamax vessel on a 3-voyage contract").
 **System Scope:** The planned system encompasses real-time vessel tracking visualization, freight forecasting, cargo demand modeling, and a constraint-based optimization engine. It does not replace official navigation systems and is not a navigation-grade safety system.
 
 ## 3. Background and Context (Capability Maturity)
-Pelagos builds upon the open-source God's Eye View repository as its interactive 3D visual foundation, repurposing it from a general intelligence dashboard into a focused maritime command center. 
+Pelagos builds upon the open-source God's Eye View repository as its interactive 3D visual foundation, repurposing it from a general intelligence dashboard into a focused maritime command center.
 * **Implemented Capabilities:** The God's Eye View frontend foundation and the initial documentation standards exist. This foundation does not yet constitute integrated real-time AIS tracking or validated maritime routing.
 * **Planned/Researched Capabilities:** Integrated real-time AIS tracking, validated operational maritime routing, Freight Forecasting, Cargo Demand Forecasting, Vessel Availability, and an Optimization Engine are planned but not yet implemented.
 
@@ -49,8 +49,8 @@ Operational routes must account for vessel characteristics (draft, LOA), port an
 Forecast eligibility is heavily dependent on actual route-level data coverage and quality. The intended design explicitly distinguishes between `unavailable`, `insufficient-data`, `eligible`, and `available` forecasting states (though these states are not yet implemented). Ordinary forecasts will be distinguished from scenario-based analysis where relevant.
 
 ## 6. Dependencies and Interfaces (Data Strategy)
-The platform relies on a foundation of verifiable, traceable maritime data. 
-* Target data domains include real-world AIS positions, Baltic/Platts freight indices, commodity prices, port capacities, and weather data. 
+The platform relies on a foundation of verifiable, traceable maritime data.
+* Target data domains include real-world AIS positions, Baltic/Platts freight indices, commodity prices, port capacities, and weather data.
 * All datasets must include rigorous licensing, provenance, and coverage metadata. The project will not invent dataset availability or claim global completeness without underlying evidence.
 
 ## 7. Failure Modes and Limitations
@@ -76,3 +76,4 @@ N/A - To be defined in the future Testing Specification.
 | 1.0.0 | 2026-10-10 | Agent | Initial creation of the Pelagos Project Overview. |
 | 1.0.1 | 2026-10-10 | Agent | D1-R1 corrections: clarified maturity, geographic scope, technology decisions, routing integrity, and data integrity. |
 | 1.0.2 | 2026-10-10 | Agent | D1-R2 corrections: reframed SIH 26006 alignment from established conformity claim to project intent. |
+| 1.0.3 | 2026-10-12 | Project Overseer / Agent | Formal approval following D0/D1 review. Status updated to approved. |

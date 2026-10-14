@@ -2,10 +2,10 @@
 title: Pelagos Documentation Standard
 document_id: DOC-001
 type: documentation_standard
-status: under_review
-version: 1.1.0
+status: approved
+version: 1.1.1
 created: 2026-10-10
-updated: 2026-10-10
+updated: 2026-10-12
 tags:
   - standards
   - documentation
@@ -219,3 +219,4 @@ This documentation standard operates within the boundaries of the following exis
 | 1.0.0 | 2026-10-10 | Agent | Initial draft of documentation standard. |
 | 1.0.1 | 2026-10-10 | Agent | D0-R1 corrections: revised versioning, ID conventions, source-of-truth hierarchy, validation reporting, and cross-platform link clarifications. Changed status to under_review. |
 | 1.1.0 | 2026-10-10 | Agent | Added documentation_index as permitted document type for central documentation index. Kept status under_review. |
+| 1.1.1 | 2026-10-12 | Project Overseer / Agent | Formal approval following D0/D1 review. Status updated to approved. |
