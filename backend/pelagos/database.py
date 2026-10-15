@@ -62,6 +62,18 @@ def ensure_schema_compatibility(target_engine=None):
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_quarantined_records_source_partition ON quarantined_records (source_partition)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_quarantined_records_ingestion_run_id ON quarantined_records (ingestion_run_id)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_quarantined_records_mmsi ON quarantined_records (mmsi)"))
+
+        if "parquet_export_tasks" not in table_names:
+            import pelagos.models
+            pelagos.models.ParquetExportTask.__table__.create(conn)
+        else:
+            cols = {c["name"] for c in inspector.get_columns("parquet_export_tasks")}
+            if "published_sha256" not in cols:
+                conn.execute(text("ALTER TABLE parquet_export_tasks ADD COLUMN published_sha256 VARCHAR(64)"))
+            if "cleanup_locked_by" not in cols:
+                conn.execute(text("ALTER TABLE parquet_export_tasks ADD COLUMN cleanup_locked_by VARCHAR(64)"))
+            if "cleanup_locked_expires_at" not in cols:
+                conn.execute(text("ALTER TABLE parquet_export_tasks ADD COLUMN cleanup_locked_expires_at TIMESTAMP"))
         conn.commit()
 
 

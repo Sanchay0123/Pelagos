@@ -199,14 +199,33 @@ Geopolitical risk factors and sanctions are modeled as explicit, explainable fac
 ## 6. Dependencies and Interfaces
 
 * **Internal Persistence Tiers:**
-  * PostGIS operational tables (`vessel_positions`, `vessel_registry`, `port_facilities`, `fairway_graph`, `quarantined_records`, `ingestion_runs`).
-  * Parquet columnar directory hierarchy (`parquet_data/telemetry/`, `parquet_data/freight/`).
+  * PostGIS / SQLite operational tables (`vessel_positions`, `vessel_registry`, `port_facilities`, `fairway_graph`, `quarantined_records`, `ingestion_runs`, `parquet_export_tasks`).
+  * Parquet columnar directory hierarchy (`parquet_data/telemetry/year=YYYY/month=MM/date=YYYY-MM-DD/`, `parquet_data/freight/`).
 * **Ingestion Worker Modules:**
   * `pelagos.ingestion.ais`: Consumes AISStream WebSocket, validates kinematics, flushes to PostGIS & Redis.
   * `pelagos.ingestion.marinecadastre`: Stream-parses remote or sample NOAA MarineCadastre Parquet slices.
-  * `pelagos.ingestion.service`: Orchestrates idempotent batch ingestion, reconciliation metrics, transaction boundaries, and audit logging.
+  * `pelagos.ingestion.service`: Orchestrates idempotent batch ingestion, microsecond UTC idempotency keys, per-record savepoints inside `no_autoflush`, safe typed ORM eviction, reconciliation metrics, transaction boundaries, and outbox staging.
   * `pelagos.ingestion.coverage`: Computes continuous spatial/temporal telemetry footprints with operational honesty disclaimers.
-  * `pelagos.cli`: Operator CLI for sample and partition-bounded remote ingestion (`ingest-sample`, `ingest-remote`, `status`, `coverage`).
+* **Storage and Analytical Subsystem (`pelagos.storage`):**
+  * `pelagos.storage.schema`: PyArrow strict 26-field typed telemetry schema (`TELEMETRY_PARQUET_SCHEMA`) with microsecond UTC timestamps and strict nullabilities.
+  * `pelagos.storage.writer`: Atomic staging writer to `.tmp.{worker_id}` files with streaming SHA-256 integrity verification, byte size, and row count verification.
+  * `pelagos.storage.outbox`: Transactional outbox coordination with generation bump fencing, attempt-UUID worker leasing, atomic completion CAS, publication state isolation, recovery CAS guardrail, and tombstone reconciliation with cleanup mutex leases.
+  * `pelagos.storage.catalog`: Parquet footer metadata extraction with DuckDB row-scan fallback.
+  * `pelagos.storage.analytics`: High-performance analytical queries and vessel track point extraction via DuckDB.
+* **CLI Commands (`pelagos.cli`):**
+  * `ingest-sample`: Ingests bundled sample data with idempotency enforcement.
+  * `ingest-remote`: Stream-parses partition-bounded remote MarineCadastre archives.
+  * `status`: Displays database and ingestion run audit summary.
+  * `coverage`: Computes spatial/temporal coverage metrics.
+  * `parquet-sync`: Claims pending outbox export tasks, exports immutable generation Parquet files, verifies SHA-256, and updates publication status.
+  * `parquet-catalog`: Inspects Parquet partition footers and returns catalog metadata.
+  * `parquet-reconcile`: Runs multi-phase reconciliation and safe tombstone cleanup under exclusive mutex lease.
+  * `analytics-summary`: Executes DuckDB analytical queries over published Parquet partitions.
+* **REST API Endpoints:**
+  * `/api/v1/telemetry/snapshot`: Latest vessel positions for operational UI rendering.
+  * `/api/v1/analytics/summary`: DuckDB-driven fleet aggregations, vessel counts, and speed percentiles over published Parquet files.
+  * `/api/v1/analytics/partitions`: Published and outbox partition status and catalog metadata.
+  * `/api/v1/analytics/vessels/{mmsi}/track`: Trajectory point extraction from Parquet with spatial/temporal bounding.
 
 ---
 
@@ -231,6 +250,7 @@ Geopolitical risk factors and sanctions are modeled as explicit, explainable fac
 * **Schema Validation Tests:** Automated Pydantic schema validation tests running against sample payloads from each domain.
 * **Kinematic Outlier Tests:** Test suites simulating impossible vessel velocities (>30 kts for Capesize) verifying quarantine routing ([REQ-FR-DII-002](../requirements/functional-requirements.md)).
 * **Synthetic Data Prohibition Audit:** Regular CI checks scanning production tables for unlabelled synthetic fixtures ([REQ-NFR-DIP-001](../requirements/nonfunctional-requirements.md)).
+* **Dual-Tier Storage & Concurrency Tests:** Focused test suites verifying worker claim/completion CAS atomicity, generation bump fencing, worker vs. cleanup mutual exclusion, stale cleanup lock recovery, tombstone retention on post-rename boundary loss, recovery CAS guardrail, and publication state reader isolation.
 
 ---
 
@@ -239,7 +259,7 @@ Geopolitical risk factors and sanctions are modeled as explicit, explainable fac
 ### 10.1 Upstream Traceability
 * **Project Overview:** Directly traces to [DOC-002 Section 6 (Dependencies and Interfaces)](../PROJECT_OVERVIEW.md) and Section 4 (Requirements and Constraints).
 * **Functional Requirements:** Traces to [REQ-FR-DII-001 through DII-005](../requirements/functional-requirements.md) (Data Ingestion & Integrity), [REQ-FR-OMR-001](../requirements/functional-requirements.md) (Navigational Feasibility), and [REQ-FR-GDS-001](../requirements/functional-requirements.md) (Disruptions).
-* **Nonfunctional Requirements:** Traces to [REQ-NFR-DIP-001](../requirements/nonfunctional-requirements.md) (Zero Fabricated Observations), [REQ-NFR-DIP-002](../requirements/nonfunctional-requirements.md) (Synthetic Test Segregation), and [REQ-NFR-DIP-003](../requirements/nonfunctional-requirements.md) (Multi-Dimensional ISO 8601 UTC Temporal Consistency).
+* **Nonfunctional Requirements:** Traces to [REQ-NFR-DIP-001](../requirements/nonfunctional-requirements.md) (Zero Fabricated Observations), [REQ-NFR-DIP-002](../requirements/nonfunctional-requirements.md) (Synthetic Test Segregation), [REQ-NFR-DIP-003](../requirements/nonfunctional-requirements.md) (Multi-Dimensional ISO 8601 UTC Temporal Consistency), and [REQ-NFR-ABM-002](../requirements/nonfunctional-requirements.md) (Storage Tier Separation).
 
 ---
 
@@ -256,3 +276,4 @@ Geopolitical risk factors and sanctions are modeled as explicit, explainable fac
 |---|---|---|---|
 | 1.0.0 | 2026-10-14 | Project Agent | Initial draft of Pelagos Data Architecture and Source Strategy (DATA-001) under Milestone D3. Categorizes data domains, distinguishes verified from candidate sources, defines temporal governance, and documents data feasibility risks. Status: drafting. |
 | 1.1.0 | 2026-10-15 | Project Agent | D5 Ingestion Architecture: added CLI workflow, reconciliation equation, partition tracking, schema migration mechanism, and statutory 17 U.S.C. § 105 licensing terms. |
+| 1.2.0 | 2026-10-15 | Project Agent | D6 Storage Foundation: added Dual-Tier storage subsystem (`pelagos.storage`), PyArrow immutable artifacts, transactional outbox with generation/attempt-UUID fencing, DuckDB analytical engine, REST API endpoints, and CLI sync/catalog/reconcile commands. |

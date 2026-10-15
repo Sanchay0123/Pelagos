@@ -4,7 +4,8 @@ import json
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional, Tuple
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, inspect
+from sqlalchemy.exc import IntegrityError, InvalidRequestError
 
 from pelagos.models import VesselPosition, QuarantinedRecord, IngestionRun
 from pelagos.ingestion.schemas import (
@@ -13,6 +14,57 @@ from pelagos.ingestion.schemas import (
     QuarantinedSummary
 )
 from pelagos.ingestion.validator import validate_telemetry_record
+from pelagos.storage.outbox import stage_or_reactivate_outbox_task
+
+
+def _safe_evict_failed_orm_object(db: Session, entity: Any) -> None:
+    """
+    Safely evicts an ORM entity from the Session after a rolled-back savepoint.
+    Uses inspect(..., raiseerr=False) and catches only InvalidRequestError.
+    Does not swallow arbitrary exceptions.
+    """
+    insp = inspect(entity, raiseerr=False)
+    if insp is None or insp.session is not db or insp.detached:
+        return
+
+    try:
+        db.expunge(entity)
+    except InvalidRequestError:
+        pass
+
+
+def is_idempotency_key_violation(exc: IntegrityError, dialect_name: str = "sqlite") -> bool:
+    """
+    Classifies whether an IntegrityError is specifically the idempotency_key
+    uniqueness violation using structured database diagnostics.
+    """
+    orig = getattr(exc, "orig", None)
+    if orig is None:
+        return False
+
+    # 1. PostgreSQL: Structured error codes and diagnostic record
+    if dialect_name == "postgresql" or hasattr(orig, "pgcode"):
+        if getattr(orig, "pgcode", None) != "23505":
+            return False
+        diag = getattr(orig, "diag", None)
+        if diag is not None:
+            cname = getattr(diag, "constraint_name", None)
+            if cname:
+                return cname == "uq_vessel_positions_idempotency_key"
+        return "uq_vessel_positions_idempotency_key" in str(orig)
+
+    # 2. SQLite: Structured error code and qualified column target
+    if dialect_name == "sqlite" or "sqlite" in type(orig).__module__:
+        err_name = getattr(orig, "sqlite_errorname", None)
+        if err_name and err_name not in ("SQLITE_CONSTRAINT_UNIQUE", "SQLITE_CONSTRAINT_PRIMARYKEY"):
+            return False
+        orig_msg = str(orig)
+        return (
+            "unique constraint failed" in orig_msg.lower()
+            and "vessel_positions.idempotency_key" in orig_msg
+        )
+
+    return "uq_vessel_positions_idempotency_key" in str(exc).lower()
 
 
 class IngestionService:
@@ -20,8 +72,9 @@ class IngestionService:
         self.db = db
 
     def generate_idempotency_key(self, record: TelemetryRecord) -> str:
-        """Deterministic idempotency key for deduplication (REQ-NFR-ARG-003)."""
-        obs_str = record.observation_time.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        """Deterministic idempotency key for deduplication with microsecond precision (REQ-NFR-ARG-003)."""
+        dt_utc = record.observation_time.astimezone(timezone.utc)
+        obs_str = dt_utc.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         return f"{record.source_name}:{record.mmsi}:{obs_str}"
 
     def ingest_record(self, raw_data: Dict[str, Any], source_partition: str = "single-record") -> Tuple[bool, Optional[str]]:
@@ -44,7 +97,8 @@ class IngestionService:
         - Validates coordinates, kinematics, timestamps, and provenance.
         - Routes anomalies to quarantine table (REQ-FR-DII-004).
         - Enforces idempotency via deterministic keys (REQ-NFR-ARG-003).
-        - Persists validated records into operational database.
+        - Persists validated records into operational database with per-record savepoints.
+        - Stages or reactivates outbox tasks in the same transaction for Parquet synchronization.
         - Records an IngestionRun audit trail (survives rollback on failure).
         - Dry-run mode validates without writing to DB and does not persist an IngestionRun.
         """
@@ -112,12 +166,12 @@ class IngestionService:
         # Production execution with atomic transaction and rollback survival
         try:
             seen_batch_keys = set()
-            staged_vessels: List[VesselPosition] = []
             staged_quarantine: List[QuarantinedRecord] = []
+            candidates: List[Tuple[TelemetryRecord, str]] = []
 
+            # 1. Pure in-memory pre-loop validation & filtering
             for raw in raw_records:
                 val_res = validate_telemetry_record(raw)
-                
                 if not val_res.is_valid:
                     quarantined += 1
                     mmsi_val = str(raw.get("mmsi") or "")
@@ -158,43 +212,81 @@ class IngestionService:
                     continue
                 seen_batch_keys.add(idempotency_key)
 
-                # Database idempotency check: verify whether this exact observation has already been ingested
+                # Pre-query check against database
                 existing = self.db.query(VesselPosition.id).filter(
                     VesselPosition.idempotency_key == idempotency_key
                 ).first()
-
                 if existing:
                     duplicates += 1
                     continue
 
-                vessel_pos = VesselPosition(
-                    mmsi=rec.mmsi,
-                    imo=rec.imo,
-                    vessel_name=rec.vessel_name,
-                    vessel_type=rec.vessel_type or "Commercial",
-                    vessel_type_code=rec.vessel_type_code,
-                    latitude=rec.latitude,
-                    longitude=rec.longitude,
-                    speed_knots=rec.speed_knots,
-                    course_degrees=rec.course_degrees,
-                    heading_degrees=rec.heading_degrees,
-                    draft_meters=rec.draft_meters,
-                    length_meters=rec.length_meters,
-                    width_meters=rec.width_meters,
-                    destination=rec.destination,
-                    navigational_status=rec.navigational_status,
-                    observation_time=rec.observation_time,
-                    publication_time=rec.publication_time,
-                    ingestion_time=now_utc,
-                    processing_time=now_utc,
-                    source_name=rec.source_name,
-                    source_partition=source_partition,
-                    license_type=rec.license,
-                    raw_record_id=rec.raw_record_id,
-                    idempotency_key=idempotency_key,
-                )
-                staged_vessels.append(vessel_pos)
-                accepted += 1
+                candidates.append((rec, idempotency_key))
+
+            # 2. Per-record isolated savepoints inside no_autoflush boundary
+            accepted_vessels: List[VesselPosition] = []
+            dialect = getattr(self.db.bind.dialect, "name", "sqlite") if self.db.bind else "sqlite"
+
+            with self.db.no_autoflush:
+                for rec, idempotency_key in candidates:
+                    vessel_pos = VesselPosition(
+                        mmsi=rec.mmsi,
+                        imo=rec.imo,
+                        vessel_name=rec.vessel_name,
+                        vessel_type=rec.vessel_type or "Commercial",
+                        vessel_type_code=rec.vessel_type_code,
+                        latitude=rec.latitude,
+                        longitude=rec.longitude,
+                        speed_knots=rec.speed_knots,
+                        course_degrees=rec.course_degrees,
+                        heading_degrees=rec.heading_degrees,
+                        draft_meters=rec.draft_meters,
+                        length_meters=rec.length_meters,
+                        width_meters=rec.width_meters,
+                        destination=rec.destination,
+                        navigational_status=rec.navigational_status,
+                        observation_time=rec.observation_time,
+                        publication_time=rec.publication_time,
+                        ingestion_time=now_utc,
+                        processing_time=now_utc,
+                        source_name=rec.source_name,
+                        source_partition=source_partition,
+                        license_type=rec.license,
+                        raw_record_id=rec.raw_record_id,
+                        idempotency_key=idempotency_key,
+                    )
+
+                    try:
+                        with self.db.begin_nested():
+                            self.db.add(vessel_pos)
+                            self.db.flush()
+                        accepted_vessels.append(vessel_pos)
+                        accepted += 1
+                    except IntegrityError as exc:
+                        _safe_evict_failed_orm_object(self.db, vessel_pos)
+                        if is_idempotency_key_violation(exc, dialect_name=dialect):
+                            duplicates += 1
+                        else:
+                            # Other integrity violation (e.g. NOT NULL, check constraint)
+                            quarantined += 1
+                            q_sum = QuarantinedSummary(
+                                error_code="ANOMALY_INTEGRITY_VIOLATION",
+                                error_details=str(exc),
+                                mmsi=rec.mmsi,
+                                raw_record_id=rec.raw_record_id or "",
+                                source_partition=source_partition,
+                            )
+                            quarantined_summaries.append(q_sum)
+                            q_rec = QuarantinedRecord(
+                                source_name=rec.source_name,
+                                source_partition=source_partition,
+                                mmsi=rec.mmsi,
+                                raw_record_id=rec.raw_record_id,
+                                error_code="ANOMALY_INTEGRITY_VIOLATION",
+                                error_details=str(exc),
+                                raw_payload=json.dumps({"mmsi": rec.mmsi, "key": idempotency_key}),
+                                ingestion_time=now_utc,
+                            )
+                            staged_quarantine.append(q_rec)
 
             completed_at = datetime.now(timezone.utc)
             if unparseable_count > 0:
@@ -231,12 +323,19 @@ class IngestionService:
             self.db.flush()
 
             # Attach run_id to staged entities
-            for v in staged_vessels:
+            for v in accepted_vessels:
                 v.ingestion_run_id = run_record.id
-                self.db.add(v)
             for q in staged_quarantine:
                 q.ingestion_run_id = run_record.id
                 self.db.add(q)
+
+            # 3. Stage or reactivate outbox tasks for affected partition dates in same transaction
+            affected_dates = {
+                v.observation_time.astimezone(timezone.utc).strftime("%Y-%m-%d")
+                for v in accepted_vessels
+            }
+            for pdate_str in affected_dates:
+                stage_or_reactivate_outbox_task(self.db, pdate_str)
 
             self.db.commit()
 

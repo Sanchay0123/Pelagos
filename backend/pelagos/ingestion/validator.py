@@ -247,9 +247,14 @@ def validate_telemetry_record(
             error_details="Mandatory observation_time is missing."
         )
 
+    source_name = str(data.get("source_name") or default_source_name).strip()
+    source_verified = data.get("source_timezone_verified")
+    if source_verified is None:
+        source_verified = "NOAA" in source_name or "MarineCadastre" in source_name or "USCG" in source_name
+
     obs_time, tz_error = parse_and_verify_timestamp(
         raw_obs_time, 
-        source_timezone_verified=data.get("source_timezone_verified", True)
+        source_timezone_verified=bool(source_verified)
     )
     if tz_error:
         return TelemetryValidationResult(
@@ -261,7 +266,7 @@ def validate_telemetry_record(
     pub_time = None
     raw_pub_time = data.get("publication_time")
     if raw_pub_time:
-        pub_time, _ = parse_and_verify_timestamp(raw_pub_time, source_timezone_verified=True)
+        pub_time, _ = parse_and_verify_timestamp(raw_pub_time, source_timezone_verified=bool(source_verified))
 
     # 6. Provenance & licensing metadata (REQ-FR-DII-003)
     source_name = str(data.get("source_name") or default_source_name).strip()

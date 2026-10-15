@@ -41,6 +41,12 @@ class Settings(BaseSettings):
         "Not for live maritime collision avoidance or SOLAS regulatory compliance."
     )
     
+    # Dual-Tier Storage (Parquet & Outbox)
+    parquet_storage_dir: str = os.getenv("PELAGOS_PARQUET_DIR", "./parquet_data")
+    cleanup_grace_seconds: int = int(os.getenv("PELAGOS_CLEANUP_GRACE_SECONDS", "1800"))
+    cleanup_lock_ttl_seconds: int = int(os.getenv("PELAGOS_CLEANUP_LOCK_TTL", "120"))
+    export_lease_ttl_seconds: int = int(os.getenv("PELAGOS_EXPORT_LEASE_TTL", "300"))
+
     model_config = SettingsConfigDict(
         env_prefix="PELAGOS_",
         extra="ignore"

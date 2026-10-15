@@ -1,7 +1,7 @@
 """SQLAlchemy ORM models for operational vessel telemetry and quarantine isolation."""
 
 import datetime
-from sqlalchemy import Column, Integer, Float, String, DateTime, Text, Index
+from sqlalchemy import Column, Integer, BigInteger, Float, String, DateTime, Text, Index, UniqueConstraint
 from pelagos.database import Base
 
 
@@ -50,6 +50,7 @@ class VesselPosition(Base):
     idempotency_key = Column(String(256), unique=True, index=True, nullable=False)
 
     __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_vessel_positions_idempotency_key"),
         Index("idx_vessel_positions_lat_lon", "latitude", "longitude"),
         Index("idx_vessel_positions_obs_time", "observation_time"),
     )
@@ -95,3 +96,50 @@ class IngestionRun(Base):
     error_details = Column(Text, nullable=True)
     started_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     completed_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+
+class ParquetExportTask(Base):
+    """
+    SQL-backed transactional outbox for dual-tier storage synchronization.
+    Separates export-task scheduling lifecycle from analytical reader publication status.
+    Adheres to ADR-0002, REQ-NFR-ABM-002, and REQ-NFR-ARG-003.
+    """
+    __tablename__ = "parquet_export_tasks"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    partition_date = Column(String(32), unique=True, index=True, nullable=False)  # YYYY-MM-DD
+    generation = Column(Integer, nullable=False, default=1)
+    completed_generation = Column(Integer, nullable=True)
+
+    # Export task scheduling lifecycle (outbox worker state)
+    export_status = Column(String(32), nullable=False, default="pending", index=True)  # pending | in_progress | completed | failed
+
+    # Analytical publication state (reader availability state)
+    publication_status = Column(String(32), nullable=False, default="none", index=True)  # none | published | invalidated
+    published_artifact_path = Column(String(512), nullable=True)
+    published_generation = Column(Integer, nullable=True)
+    published_sha256 = Column(String(64), nullable=True)
+    published_record_count = Column(Integer, nullable=True)
+    published_file_size = Column(BigInteger, nullable=True)
+
+    # Worker lease & attempt fencing
+    lease_worker_id = Column(String(64), nullable=True)
+    lease_expires_at = Column(DateTime(timezone=True), nullable=True)
+    active_attempt_uuid = Column(String(36), nullable=True)
+
+    # Maintenance & cleanup mutual exclusion lock
+    cleanup_locked_by = Column(String(64), nullable=True)
+    cleanup_locked_expires_at = Column(DateTime(timezone=True), nullable=True)
+
+    attempt_count = Column(Integer, nullable=False, default=0)
+    priority = Column(Integer, nullable=False, default=0)
+    error_details = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("idx_parquet_export_tasks_export_status", "export_status"),
+        Index("idx_parquet_export_tasks_pub_status", "publication_status"),
+        Index("idx_parquet_export_tasks_lease", "lease_worker_id", "lease_expires_at"),
+    )
