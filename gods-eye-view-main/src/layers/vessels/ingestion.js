@@ -58,6 +58,9 @@ export function createIngestion({
             : new Date(snapshot.observedAtMs).toISOString(),
         silentForMs: snapshot.silentForMs,
         reconnectAttempt: snapshot.reconnectAttempt,
+        dataMode: snapshot.dataMode,
+        isLive: snapshot.isLive,
+        observationDate: snapshot.observationDate,
       });
     } catch (error) {
       if (
@@ -132,6 +135,10 @@ export function createIngestion({
       complete: payload?.complete !== false,
     });
     feed.count = readCount();
+    feed.dataMode = payload?.dataMode || null;
+    feed.isLive = payload?.isLive ?? null;
+    feed.observationDate = payload?.observationDate || null;
+    feed.freshness = payload?.freshness || null;
     feed.stale =
       Boolean(payload?.refreshing) ||
       payload?.freshness === 'stale' ||
@@ -167,6 +174,7 @@ export function createIngestion({
         record.observedAtMs == null
           ? ''
           : new Date(record.observedAtMs).toISOString(),
+      historical: Boolean(record.historical),
     };
   }
   const methods = {
@@ -199,6 +207,10 @@ export function createVesselFeed() {
     count: 0,
     newestPositionAt: null,
     transportStatus: null,
+    dataMode: null,
+    isLive: null,
+    observationDate: null,
+    freshness: null,
     nextAttemptAt: null,
     lastMessageAt: null,
     rawRowCount: 0,

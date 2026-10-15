@@ -1300,6 +1300,8 @@
       .feed-stale,
       .feed-partial,
       .feed-fallback,
+      .feed-historical,
+      .feed-replay,
       .feed-unavailable
     )
   )

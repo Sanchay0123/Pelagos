@@ -28,6 +28,12 @@ export function createBrowserViteConfig({
         'X-Frame-Options': 'DENY',
         'Content-Security-Policy': "frame-ancestors 'none'",
       },
+      proxy: {
+        '/api/v1': {
+          target: process.env.PELAGOS_BACKEND_URL || 'http://127.0.0.1:8000',
+          changeOrigin: true,
+        },
+      },
     },
     define: {
       'import.meta.env.GOOGLE_MAPS_API_KEY': JSON.stringify(googleApiKey),

@@ -3,7 +3,7 @@ title: Pelagos Documentation Index
 document_id: DOC-003
 type: documentation_index
 status: approved
-version: 1.0.9
+version: 1.0.10
 created: 2026-10-10
 updated: 2026-10-14
 tags:
@@ -30,18 +30,23 @@ N/A
 ### Core Foundations
 * [Documentation Standard](./DOCUMENTATION_STANDARD.md) (v1.1.1, Status: Approved)
 * [Project Overview](./PROJECT_OVERVIEW.md) (v1.0.3, Status: Approved)
-* [Documentation Index](./INDEX.md) (v1.0.9, Status: Approved)
+* [Documentation Index](./INDEX.md) (v1.0.10, Status: Approved)
 
 ### Architecture and Decisions
-* Architecture Specifications (Planned)
-* Architecture Decision Records (ADRs) (Planned)
+* [System Architecture Specification](./architecture/system-architecture.md) (v1.0.0, Status: Drafting)
+* Architecture Decision Records (ADRs):
+  * [ADR-0001: Modular Monolith Backend Architecture](./architecture/adr/adr-0001-modular-monolith-architecture.md) (v1.0.0, Status: Drafting)
+  * [ADR-0002: Dual-Tier Storage Strategy](./architecture/adr/adr-0002-dual-tier-storage-strategy.md) (v1.0.0, Status: Drafting)
+  * [ADR-0003: Container Orchestration via Docker Compose](./architecture/adr/adr-0003-container-orchestration-docker-compose.md) (v1.0.0, Status: Drafting)
+  * [ADR-0004: Core Technology Independence & Proprietary API Exclusion](./architecture/adr/adr-0004-core-technology-independence.md) (v1.0.0, Status: Drafting)
+  * [ADR-0005: Frontend Integration and Basemap Decoupling](./architecture/adr/adr-0005-frontend-integration-and-basemap-strategy.md) (v1.0.0, Status: Drafting)
 
 ### Product and Requirements
 * [Functional Requirements Specification](./requirements/functional-requirements.md) (v1.0.5, Status: Drafting)
 * [Nonfunctional Requirements Specification](./requirements/nonfunctional-requirements.md) (v1.0.3, Status: Drafting)
 
 ### Data and Intelligence
-* Dataset and Data-Provider Specifications (Planned)
+* [Data Architecture and Source Strategy](./data/data-architecture.md) (v1.0.0, Status: Drafting)
 * ML and Forecasting Specifications (Planned)
 * Operational Routing Specifications (Planned)
 
@@ -98,3 +103,4 @@ Links to established, governed documentation within the repository, and maps pla
 | 1.0.7 | 2026-10-14 | Project Agent | D2 final closure corrections: Synchronized requirements specification version references (v1.0.3) following final closure corrections. Kept status approved. |
 | 1.0.8 | 2026-10-14 | Project Agent | D2 final review update: Synchronized Functional Requirements Specification version reference (v1.0.4) following forecasting evaluation threshold governance resolution. Kept status approved. |
 | 1.0.9 | 2026-10-14 | Project Agent | Final D2 consistency pass: Synchronized Functional Requirements Specification version reference (v1.0.5) following final forecasting requirements reconciliation. Kept status approved. |
+| 1.0.10 | 2026-10-14 | Project Agent | Milestone D3 launch: Registered System Architecture Specification (ARCH-001), Data Architecture Specification (DATA-001), and initial ADRs (ADR-0001 through ADR-0005). Kept status approved. |

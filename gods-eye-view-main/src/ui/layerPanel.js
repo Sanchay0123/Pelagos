@@ -9,6 +9,8 @@ const FEED_STATE_LABELS = Object.freeze({
   stale: 'STALE',
   partial: 'PARTIAL',
   fallback: 'FALLBACK',
+  historical: 'HISTORICAL',
+  replay: 'REPLAY',
   unavailable: 'UNAVAILABLE',
 });
 
@@ -498,6 +500,17 @@ export class LayerPanel {
           ? stats.loadingLabel.trim()
           : 'loading...';
       return `${source} · ${loadingLabel}`;
+    }
+    if (feedState === 'historical' || feedState === 'replay') {
+      const dateText = stats.observationDate
+        ? `observed ${stats.observationDate}`
+        : stats.newestPositionAt
+          ? `observed ${stats.newestPositionAt.slice(0, 10)}`
+          : 'historical replay';
+      const detail = stats.coverage
+        ? `${dateText} · ${stats.coverage}`
+        : dateText;
+      return `${stateLabel} · ${source} · ${detail}`;
     }
     if (feedState === 'fallback') {
       const detail =

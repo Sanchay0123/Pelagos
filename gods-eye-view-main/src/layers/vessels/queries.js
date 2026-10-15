@@ -514,6 +514,13 @@ export function createQueries({
             ? 'unavailable'
             : undefined,
         transportStatus: state.feed.transportStatus,
+        mode: state.feed.dataMode,
+        dataMode: state.feed.dataMode,
+        isLive: state.feed.isLive,
+        freshness: state.feed.freshness,
+        observationDate: state.feed.observationDate,
+        newestPositionAt: state.feed.newestPositionAt,
+        source: layer.source,
         lastMessageAt: state.feed.lastMessageAt,
         rawRowCount: state.feed.rawRowCount,
         acceptedRowCount: state.feed.acceptedRowCount,

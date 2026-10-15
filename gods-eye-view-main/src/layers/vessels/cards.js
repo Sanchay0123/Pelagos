@@ -166,7 +166,12 @@ export function createCards({
     if (!record.lastPositionUtc) return 'POS: LIVE';
     const date = new Date(record.lastPositionUtc);
     if (Number.isNaN(date.getTime())) return 'POS: LIVE';
-    return `POS: ${date.toISOString().slice(11, 19)}Z`;
+    const timeStr = `${date.toISOString().slice(11, 19)}Z`;
+    if (record.historical) {
+      const dateStr = date.toISOString().slice(0, 10);
+      return `POS: ${dateStr} ${timeStr} (HISTORICAL)`;
+    }
+    return `POS: ${timeStr}`;
   }
   return {
     updateSelectedVesselHud,

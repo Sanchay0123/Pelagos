@@ -1,0 +1,21 @@
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment files
+.env
+.env.local
+
+# Node modules
+node_modules/
+dist/
+.vite/

@@ -23,6 +23,7 @@ export function normalizeVesselObservation(row, reference = null) {
       epoch(row.last_position_epoch, 1000) ??
       epoch(Date.parse(row.last_position_UTC)),
     altitudeDatum: 'sea-surface',
+    historical: Boolean(row.historical),
   };
 }
 
@@ -37,11 +38,21 @@ export function vesselSnapshot(
   if (!Array.isArray(payload?.rows))
     throw new LiveSourceError('malformed', 'Malformed vessel response');
   const rows = payload.rows;
+  const isHistorical =
+    payload?.data_mode === 'historical' ||
+    payload?.mode === 'historical' ||
+    payload?.status === 'historical' ||
+    payload?.status === 'replay' ||
+    payload?.is_live === false ||
+    payload?.freshness === 'historical';
   const records = [],
     ids = new Set();
   for (const row of rows) {
     const record = normalizeVesselObservation(row);
-    if (record) record.reference = referenceFor(row);
+    if (record) {
+      record.reference = referenceFor(row);
+      if (isHistorical) record.historical = true;
+    }
     if (record && !ids.has(record.id)) {
       records.push(record);
       ids.add(record.id);
@@ -54,22 +65,36 @@ export function vesselSnapshot(
       (newest, row) => Math.max(newest || 0, row.observedAtMs || 0) || null,
       null,
     );
+  const freshness = payload?.freshness
+    ? payload.freshness
+    : isHistorical
+      ? 'historical'
+      : payload?.refreshing
+        ? 'stale'
+        : observedAtMs == null
+          ? 'unknown'
+          : 'current';
   return {
     records,
-    source,
-    coverage,
+    source: payload?.source || source,
+    coverage: payload?.coverage || coverage,
     complete: records.length === rows.length && !payload?.refreshing,
     rejectedCount: rows.length - records.length,
     observedAtMs,
-    freshness: payload?.refreshing
-      ? 'stale'
-      : observedAtMs == null
-        ? 'unknown'
-        : 'current',
+    freshness,
     stale: Boolean(payload?.refreshing),
+    dataMode: isHistorical ? 'historical' : 'live',
+    isLive: !isHistorical,
+    observationDate:
+      payload?.observation_date ||
+      (observedAtMs ? new Date(observedAtMs).toISOString().slice(0, 10) : null),
     // Connection state is distinct from receipt of a usable position.
     transportStatus:
-      typeof payload?.status === 'string' ? payload.status : null,
+      typeof payload?.status === 'string'
+        ? payload.status
+        : isHistorical
+          ? 'historical'
+          : null,
     lastMessageAt: payload?.lastMessageAt ?? null,
     nextAttemptAt: finite(payload?.nextAttemptAt),
     silentForMs: finite(payload?.silentForMs),

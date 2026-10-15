@@ -115,7 +115,26 @@ export function aisLiveProxy() {
         );
         const rows = aisStreamRows(maxRows);
 
-        const feed = aisStreamStatusSnapshot();
+        if (!process.env.AISSTREAM_API_KEY) {
+          const pelagosBackendUrl =
+            process.env.PELAGOS_BACKEND_URL || 'http://127.0.0.1:8000';
+          try {
+            const resp = await fetch(
+              `${pelagosBackendUrl}/api/v1/vessels/snapshot?limit=${maxRows}`,
+              { cache: 'no-store' },
+            );
+            if (resp.ok) {
+              const data = await resp.json();
+              res.statusCode = 200;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.setHeader('Cache-Control', 'no-store');
+              res.end(JSON.stringify(data));
+              return;
+            }
+          } catch {
+            // Pelagos backend offline; fall through to honest missing-key failure
+          }
+        }
 
         res.statusCode = process.env.AISSTREAM_API_KEY ? 200 : 503;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');

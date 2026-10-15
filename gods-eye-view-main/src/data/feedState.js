@@ -3,7 +3,7 @@ import { GUIDANCE_STATUSES } from '../loadingFeedback.js';
 /**
  * Normalize heterogeneous layer stats into one honest control-chip state.
  * @param {object|null} stats Layer getStats() result.
- * @returns {'nominal'|'loading'|'degraded'|'stale'|'partial'|'fallback'|'unavailable'} Feed state.
+ * @returns {'nominal'|'loading'|'degraded'|'stale'|'partial'|'fallback'|'historical'|'replay'|'unavailable'} Feed state.
  */
 export function layerFeedState(stats = {}) {
   const state = stats || {};
@@ -32,6 +32,17 @@ export function layerFeedState(stats = {}) {
   // still reads STALE; a guidance prompt alone never reads DEGRADED.
   if (GUIDANCE_STATUSES.includes(status)) {
     return state.stale ? 'stale' : 'nominal';
+  }
+  if (
+    state.mode === 'historical' ||
+    state.mode === 'replay' ||
+    status === 'historical' ||
+    status === 'replay' ||
+    state.transportStatus === 'historical' ||
+    state.transportStatus === 'replay' ||
+    state.freshness === 'historical'
+  ) {
+    return status === 'replay' || state.mode === 'replay' || state.transportStatus === 'replay' ? 'replay' : 'historical';
   }
   if (
     state.fallback === true ||
