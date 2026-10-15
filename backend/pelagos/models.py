@@ -41,6 +41,8 @@ class VesselPosition(Base):
     
     # Source provenance & licensing
     source_name = Column(String(128), nullable=False)
+    source_partition = Column(String(128), nullable=True, index=True)
+    ingestion_run_id = Column(Integer, nullable=True, index=True)
     license_type = Column(String(64), nullable=False)
     raw_record_id = Column(String(128), nullable=True)
     
@@ -62,7 +64,34 @@ class QuarantinedRecord(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     source_name = Column(String(128), nullable=False)
+    source_partition = Column(String(128), nullable=True, index=True)
+    ingestion_run_id = Column(Integer, nullable=True, index=True)
+    mmsi = Column(String(32), index=True, nullable=True)
+    raw_record_id = Column(String(128), nullable=True)
     error_code = Column(String(64), index=True, nullable=False)
     error_details = Column(Text, nullable=False)
     raw_payload = Column(Text, nullable=False)
     ingestion_time = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+
+class IngestionRun(Base):
+    """
+    Auditable execution record for batch and partition ingestion.
+    Records reconciliation counters for data integrity (REQ-NFR-ARG-003).
+    """
+    __tablename__ = "ingestion_runs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    run_type = Column(String(32), nullable=False)            # "bundled" | "remote"
+    source_name = Column(String(128), nullable=False)
+    source_partition = Column(String(128), nullable=False, index=True)
+    records_read = Column(Integer, nullable=False, default=0)
+    accepted_count = Column(Integer, nullable=False, default=0)
+    quarantined_count = Column(Integer, nullable=False, default=0)
+    duplicate_count = Column(Integer, nullable=False, default=0)
+    unparseable_count = Column(Integer, nullable=False, default=0)
+    failed_count = Column(Integer, nullable=False, default=0)
+    status = Column(String(32), nullable=False)              # "completed" | "partial" | "failed"
+    error_details = Column(Text, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    completed_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))

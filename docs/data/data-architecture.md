@@ -72,7 +72,7 @@ AIS (Automatic Identification System) broadcasts dynamic kinematic and static vo
 | Source Name | Source Category | Access Method / Protocol | License / Commercial Terms | Coverage & Resolution | Freshness & Latency | Operational Uncertainties & Risks |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **AISStream.io** | **Verified Source** | WebSocket JSON stream (`wss://stream.aisstream.io/v0/stream`) | Free API tier (Open community access; API key required; non-commercial / research terms apply). | Global coastal stations; sparse open-ocean satellite coverage. | Sub-minute streaming from active receiver stations. | Terrestrial range limited to ~30–50 NM from receiver antennas; open-ocean coverage is highly degraded without satellite uplink; free tier rate limits. |
-| **US Coast Guard / MarineCadastre** | **Verified Source** | Bulk HTTP zip archives (CSV / Geodatabase) | US Public Domain (Unrestricted public use). | US coastal waters and Exclusive Economic Zone (EEZ); historical records from 2009–present. | Static historical archives (annual/monthly batch release). | Strictly limited to US territorial waters; cannot provide live operational tracking for global corridors. |
+| **US Coast Guard / MarineCadastre** | **Verified Source** | Bulk HTTP Parquet / Geodatabase archives | U.S. Government Work / Public Domain (17 U.S.C. § 105; unrestricted public use with attribution). | US coastal waters and EEZ; daily 2024 Parquet partitions and historical archives from 2009–present. | Static historical archives (daily/monthly batch release). | Strictly limited to US coastal/EEZ terrestrial NAIS receiver range (~30–50 NM from coast); open-ocean gaps exist; cannot provide live operational tracking. |
 | **Danish Maritime Authority (DMA)** | **Verified Source** | Bulk HTTP point archives (CSV) | Creative Commons / Danish Open Data (Free public use). | Danish and surrounding Baltic / North Sea waters; high density. | Daily / monthly historical batches. | Limited to Northern European waters; historical analysis only. |
 | **Spire Maritime / ExactEarth** | **Candidate Source** | Commercial REST & WebSocket API | Commercial Enterprise Subscription (Paid commercial license). | Global terrestrial + Satellite AIS constellation (full open-ocean coverage). | Near-real-time (< 5 min latency globally). | Substantial commercial license costs; strict contractual redistribution limits; requires explicit procurement approval. |
 | **MarineTraffic / Kpler** | **Candidate Source** | Commercial REST API | Commercial Pay-per-call / Subscription (Paid commercial license). | Global network of 5,000+ coastal stations + satellite partners. | Polling intervals (typically 5–60 minutes depending on tier). | High recurring API cost; strict usage limits; risk of vendor billing lock-in. |
@@ -108,6 +108,27 @@ AIS (Automatic Identification System) broadcasts dynamic kinematic and static vo
   }
 }
 ```
+
+#### 5.1.1 Historical NOAA AIS Ingestion Engine & Execution Architecture
+To guarantee reproducible offline ingestion independent of operational web API lifecycles, Pelagos implements a decoupled batch ingestion architecture:
+
+* **Operator CLI Entry Point (`pelagos.cli`):**
+  - Sample Seeding: `python -m pelagos.cli ingest-sample [--dry-run]`
+  - Remote Bounded Ingestion: `python -m pelagos.cli ingest-remote --date YYYY-MM-DD [--limit N] [--row-group N] [--dry-run]`
+  - Operational Inspection: `python -m pelagos.cli status` and `python -m pelagos.cli coverage`
+* **FastAPI Startup Isolation:** Normal application startup (`lifespan`) executes strictly zero sample seeding and zero network requests. Schema initialization (`init_db()`) verifies table and column availability via non-destructive additive DDL without blocking on data loading.
+* **Bounded Partition Selection & Range Streaming:**
+  - Ingestion targets daily Parquet partitions hosted on NOAA MarineCadastre (e.g., `AIS_2024_01_01.parquet`).
+  - Specifying `--limit N` limits the number of candidate records parsed from the stream and memory allocated.
+  - *Download Transfer Note:* Because Parquet encodes columnar data across discrete row groups, streaming Parquet over HTTP via byte-range requests requires fetching the footer and the minimum row-group column chunks. Consequently, network transfer size reflects the physical page boundaries (~5–15 MB) rather than an exact byte-per-record fraction.
+* **Transaction Invariants & Counter Reconciliation:**
+  Every ingestion execution calculates and reconciles record processing counters according to the strict conservation equation:
+  $$\text{records\_read} = \text{accepted} + \text{quarantined} + \text{duplicate} + \text{unparseable} + \text{failed}$$
+  - **Dry-Run Mode (`is_dry_run=True`):** In-memory parsing, kinematic validation, and idempotency checks execute without committing any changes to the database. *Audit Exception:* Dry-runs do NOT persist an `IngestionRun` audit row to ensure the audit log reflects strictly genuine database modifications.
+  - **Audit Record Durability upon Failure:** If an unhandled exception or transaction abort occurs during batch persistence, the operational telemetry rows are rolled back. A dedicated, clean transaction immediately records an `IngestionRun` record with `status="failed"`, preserving failure diagnostics and accurate failure counters.
+* **Spatial & Temporal Coverage Footprint:**
+  The `CoverageService` calculates actual bounding box coordinates (`[min_lon, min_lat, max_lon, max_lat]`), earliest and latest observation timestamps, and distinct ingested partition identifiers.
+  *Operational Honesty Disclaimer:* The computed spatial bounding box reflects coordinate extremes and does NOT imply uniform or continuous observation across that geometry. Observations derive from terrestrial receivers with coastal range limits (~30–50 NM), and data reflects historical mode rather than live satellite tracking.
 
 ---
 
@@ -178,12 +199,14 @@ Geopolitical risk factors and sanctions are modeled as explicit, explainable fac
 ## 6. Dependencies and Interfaces
 
 * **Internal Persistence Tiers:**
-  * PostGIS operational tables (`vessel_positions`, `vessel_registry`, `port_facilities`, `fairway_graph`).
+  * PostGIS operational tables (`vessel_positions`, `vessel_registry`, `port_facilities`, `fairway_graph`, `quarantined_records`, `ingestion_runs`).
   * Parquet columnar directory hierarchy (`parquet_data/telemetry/`, `parquet_data/freight/`).
 * **Ingestion Worker Modules:**
   * `pelagos.ingestion.ais`: Consumes AISStream WebSocket, validates kinematics, flushes to PostGIS & Redis.
-  * `pelagos.ingestion.freight`: Ingests market index tables, verifies temporal continuity.
-  * `pelagos.ingestion.quarantine`: Stores anomalous records with structured error tags.
+  * `pelagos.ingestion.marinecadastre`: Stream-parses remote or sample NOAA MarineCadastre Parquet slices.
+  * `pelagos.ingestion.service`: Orchestrates idempotent batch ingestion, reconciliation metrics, transaction boundaries, and audit logging.
+  * `pelagos.ingestion.coverage`: Computes continuous spatial/temporal telemetry footprints with operational honesty disclaimers.
+  * `pelagos.cli`: Operator CLI for sample and partition-bounded remote ingestion (`ingest-sample`, `ingest-remote`, `status`, `coverage`).
 
 ---
 
@@ -197,7 +220,7 @@ Geopolitical risk factors and sanctions are modeled as explicit, explainable fac
 
 ## 8. Security, Privacy and Licensing
 
-* **License Auditing:** Every ingested dataset partition is registered in `dataset_registry` with its canonical SPDX license identifier.
+* **License Auditing & Statutory Terms:** NOAA MarineCadastre data is produced by the U.S. Federal Government (NOAA Office for Coastal Management and U.S. Coast Guard) and is not subject to domestic copyright protection in the United States pursuant to 17 U.S.C. § 105 (U.S. Public Domain). It is provided "as-is" without warranty, subject to attribution guidelines and terrestrial receiver coverage boundaries. CC0 1.0 Universal is not claimed where statutory U.S. Government Work provisions apply.
 * **Credential Protection:** Ingestion API keys (AISStream, weather portals) are stored in server environment variables and never logged in plain text.
 * **Sanctions Compliance:** Automated matching against OFAC/EU SDN lists prevents commercial recommendation of sanctioned vessels ([REQ-NFR-SBL-002](../requirements/nonfunctional-requirements.md)).
 
@@ -232,3 +255,4 @@ Geopolitical risk factors and sanctions are modeled as explicit, explainable fac
 | Version | Date | Author | Description |
 |---|---|---|---|
 | 1.0.0 | 2026-10-14 | Project Agent | Initial draft of Pelagos Data Architecture and Source Strategy (DATA-001) under Milestone D3. Categorizes data domains, distinguishes verified from candidate sources, defines temporal governance, and documents data feasibility risks. Status: drafting. |
+| 1.1.0 | 2026-10-15 | Project Agent | D5 Ingestion Architecture: added CLI workflow, reconciliation equation, partition tracking, schema migration mechanism, and statutory 17 U.S.C. § 105 licensing terms. |

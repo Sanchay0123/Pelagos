@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     
     # Data governance & provenance metadata
     default_source_name: str = "NOAA MarineCadastre / USCG NAIS"
-    default_license: str = "CC0 1.0 Universal"
+    default_source_attribution: str = "Data provided by MarineCadastre.gov, NOAA, BOEM, and the U.S. Coast Guard."
+    default_license: str = "U.S. Government Work / Public Domain (17 U.S.C. § 105)"
     default_coverage: str = "US Coastal and Territorial Waters (Verified Genuine Observations)"
     safety_disclaimer: str = (
         "Pelagos is NOT a navigation-grade safety system. "

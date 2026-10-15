@@ -6,33 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 from pelagos.config import settings
-from pelagos.database import init_db, SessionLocal, get_db
+from pelagos.database import init_db, get_db
 from pelagos.api.routes import health, vessels, ingestion
-from pelagos.ingestion.service import IngestionService
-from pelagos.ingestion.marinecadastre import load_genuine_sample_records
-from pelagos.models import VesselPosition
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize database tables
+    # Initialize database tables and additive schema compatibility; zero network or auto-seeding on startup
     init_db()
-    
-    # Auto-seed verified sample if database is completely empty
-    db = SessionLocal()
-    try:
-        count = db.query(VesselPosition.id).count()
-        if count == 0:
-            print("[Pelagos] Database is empty. Loading genuine NOAA MarineCadastre sample dataset...")
-            sample_records = load_genuine_sample_records()
-            service = IngestionService(db)
-            res = service.ingest_batch(sample_records)
-            print(f"[Pelagos] Seeded {res.accepted_count} authentic vessel observations (0 synthetic).")
-    except Exception as e:
-        print(f"[Pelagos] Auto-seed notice: {e}")
-    finally:
-        db.close()
-        
     yield
 
 

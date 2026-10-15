@@ -63,7 +63,7 @@ def test_empty_snapshot_response(client_and_db):
     assert data["backend_connected"] is True
     assert data["freshness"] == "unknown"
     assert "NOAA MarineCadastre" in data["source"]
-    assert "CC0 1.0 Universal" in data["license"]
+    assert "Public Domain" in data["license"] or "17 U.S.C." in data["license"]
 
 
 def test_snapshot_with_populated_vessels(client_and_db):
@@ -125,7 +125,7 @@ def test_historical_status_and_live_ais_distinction(client_and_db):
 
     # Genuine provenance and timestamps preserved
     assert data["source"] == "NOAA MarineCadastre / USCG NAIS"
-    assert data["license"] == "CC0 1.0 Universal"
+    assert "Public Domain" in data["license"] or "17 U.S.C." in data["license"]
     for r in data["rows"]:
         assert r["last_position_UTC"].startswith("2024-01-01")
         assert r["historical"] is True

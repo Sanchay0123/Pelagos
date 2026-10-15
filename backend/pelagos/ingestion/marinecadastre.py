@@ -4,7 +4,7 @@ import os
 import json
 import struct
 import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 DATA_SAMPLE_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)),
@@ -38,7 +38,24 @@ AIS_TYPE_MAP = {
 }
 
 
-def load_genuine_sample_records() -> List[Dict[str, Any]]:
+class PartitionNotFoundError(Exception):
+    """Raised when target partition does not exist in NOAA storage (e.g. HTTP 404)."""
+    pass
+
+
+class NetworkIngestionError(Exception):
+    """Raised when network connectivity or timeout prevents partition access."""
+    pass
+
+
+class PartitionFormatError(Exception):
+    """Raised when the Parquet container or metadata cannot be read."""
+    pass
+
+
+def load_genuine_sample_records(
+    source_partition: str = "bundled-sample-2024-01-01"
+) -> List[Dict[str, Any]]:
     """
     Load curated authentic observations from NOAA MarineCadastre / USCG NAIS.
     Guarantees 100% genuine observations with zero synthetic data.
@@ -48,47 +65,89 @@ def load_genuine_sample_records() -> List[Dict[str, Any]]:
         
     with open(DATA_SAMPLE_PATH, "r", encoding="utf-8") as f:
         records = json.load(f)
+
+    # Attach partition attribution and verified licensing
+    for r in records:
+        r["source_partition"] = source_partition
+        r["license"] = "U.S. Government Work / Public Domain (17 U.S.C. § 105)"
         
     return records
 
 
 def fetch_remote_noaa_slice(
     date_str: str = "2024-01-01", 
-    max_records: int = 150
-) -> List[Dict[str, Any]]:
+    max_records: int = 150,
+    row_group_index: int = 0,
+    timeout_seconds: int = 30
+) -> Tuple[List[Dict[str, Any]], int]:
     """
     Fetch a real-world telemetry slice directly from NOAA MarineCadastre cloud storage.
-    Enforces verified CC0 1.0 Universal license and US Coast Guard provenance.
+    Enforces statutory U.S. Public Domain license (17 U.S.C. § 105) and USCG NAIS provenance.
+    Returns (records, unparseable_count).
     """
+    import urllib.error
     import pyarrow.parquet as pq
     import fsspec
 
+    # Validate date format and catalog boundaries
+    try:
+        parsed_date = datetime.date.fromisoformat(date_str)
+        if parsed_date.year != 2024:
+            raise ValueError(f"Partition date '{date_str}' is outside verified 2024 catalog.")
+    except ValueError as ve:
+        raise ValueError(f"Invalid partition date '{date_str}': {ve}")
+
     url = f"{NOAA_AZURE_BLOB_BASE}/ais-{date_str}.parquet"
-    
-    with fsspec.open(url, mode="rb") as f:
-        pfile = pq.ParquetFile(f)
-        rg = pfile.read_row_group(0, columns=[
-            "mmsi", "base_date_time", "sog", "cog", "heading",
-            "vessel_name", "imo", "vessel_type", "draft", 
-            "length", "width", "geometry"
-        ])
-        
-        seen_mmsi = set()
-        records: List[Dict[str, Any]] = []
-        
-        for i in range(len(rg)):
+    partition_name = f"ais-{date_str}.parquet"
+
+    try:
+        with fsspec.open(url, mode="rb", timeout=timeout_seconds) as f:
+            pfile = pq.ParquetFile(f)
+
+            if row_group_index < 0 or row_group_index >= pfile.num_row_groups:
+                raise ValueError(
+                    f"Requested row group {row_group_index} out of range; "
+                    f"partition '{partition_name}' has {pfile.num_row_groups} row groups."
+                )
+
+            rg = pfile.read_row_group(row_group_index, columns=[
+                "mmsi", "base_date_time", "sog", "cog", "heading",
+                "vessel_name", "imo", "vessel_type", "draft",
+                "length", "width", "geometry"
+            ])
+    except urllib.error.HTTPError as he:
+        if he.code == 404:
+            raise PartitionNotFoundError(
+                f"NOAA partition for date '{date_str}' not found on remote storage (HTTP 404)."
+            ) from he
+        raise NetworkIngestionError(f"HTTP error fetching NOAA partition '{date_str}': {he}") from he
+    except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as ne:
+        raise NetworkIngestionError(f"Network failure connecting to NOAA storage: {ne}") from ne
+    except Exception as e:
+        if isinstance(e, (PartitionNotFoundError, NetworkIngestionError, ValueError)):
+            raise
+        raise PartitionFormatError(f"Failed to parse Parquet container for partition '{date_str}': {e}") from e
+
+    seen_mmsi = set()
+    records: List[Dict[str, Any]] = []
+    unparseable_count = 0
+
+    for i in range(len(rg)):
+        try:
             mmsi = rg["mmsi"][i].as_py()
             if not mmsi or mmsi in seen_mmsi:
                 continue
                 
             geom = rg["geometry"][i].as_py()
             if not geom or len(geom) < 21:
+                unparseable_count += 1
                 continue
                 
             byte_order = "<" if geom[0] == 1 else ">"
             lon, lat = struct.unpack(byte_order + "dd", geom[5:21])
             
             if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+                unparseable_count += 1
                 continue
                 
             v_name = rg["vessel_name"][i].as_py()
@@ -119,7 +178,8 @@ def fetch_remote_noaa_slice(
             elif hasattr(raw_dt, "isoformat"):
                 dt = raw_dt if raw_dt.tzinfo else raw_dt.replace(tzinfo=datetime.timezone.utc)
             else:
-                dt = datetime.datetime.now(datetime.timezone.utc)
+                unparseable_count += 1
+                continue
 
             rec = {
                 "mmsi": str(mmsi),
@@ -138,7 +198,8 @@ def fetch_remote_noaa_slice(
                 "observation_time": dt.isoformat(),
                 "publication_time": dt.isoformat(),
                 "source_name": "NOAA MarineCadastre / USCG NAIS",
-                "license": "CC0 1.0 Universal",
+                "source_partition": partition_name,
+                "license": "U.S. Government Work / Public Domain (17 U.S.C. § 105)",
                 "raw_record_id": f"mc_{date_str}_{mmsi}"
             }
             records.append(rec)
@@ -146,5 +207,8 @@ def fetch_remote_noaa_slice(
             
             if len(records) >= max_records:
                 break
-                
-        return records
+        except Exception:
+            unparseable_count += 1
+            continue
+
+    return records, unparseable_count

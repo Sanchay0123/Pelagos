@@ -39,7 +39,8 @@ class TelemetryRecord(BaseModel):
     source_timezone_verified: bool = Field(True, description="Whether UTC interpretation is contractually established")
     
     source_name: str = Field("NOAA MarineCadastre / USCG NAIS", description="Source provider name")
-    license: str = Field("CC0 1.0 Universal", description="License identifier")
+    source_partition: Optional[str] = Field(None, description="Partition or source file identifier")
+    license: str = Field("U.S. Government Work / Public Domain (17 U.S.C. § 105)", description="License identifier")
     raw_record_id: Optional[str] = Field(None, description="Upstream raw ID")
 
 
@@ -48,14 +49,74 @@ class QuarantinedSummary(BaseModel):
     error_details: str
     mmsi: Optional[str] = None
     raw_record_id: Optional[str] = None
+    source_partition: Optional[str] = None
 
 
 class IngestionResult(BaseModel):
-    total_received: int
+    source_partition: str = Field("unknown", description="Source partition identifier")
+    total_received: int = Field(0, description="Total candidate rows received/read")
+    records_read: int = Field(0, description="Total candidate rows read from partition")
+    accepted_count: int = Field(0, description="Successfully validated and stored records")
+    quarantined_count: int = Field(0, description="Anomalous records safely isolated")
+    duplicate_count: int = Field(0, description="Identical observations skipped via idempotency")
+    unparseable_count: int = Field(0, description="Corrupted or unreadable raw records")
+    failed_count: int = Field(0, description="Failed operations due to unhandled exceptions")
+    status: str = Field("completed", description="completed | partial | failed | dry_run")
+    is_dry_run: bool = Field(False, description="True if validation-only dry run without DB mutation")
+    run_id: Optional[int] = Field(None, description="IngestionRun database ID if persisted")
+    error_details: Optional[str] = None
+    quarantined_records: List[QuarantinedSummary] = Field(default_factory=list)
+
+
+class CoverageSpatialExtent(BaseModel):
+    min_latitude: float
+    max_latitude: float
+    min_longitude: float
+    max_longitude: float
+    spatial_notice: str = (
+        "Spatial bounding box represents observed ping coordinates only, "
+        "not continuous geographic coverage or unbroken corridor monitoring."
+    )
+
+
+class CoverageTemporalExtent(BaseModel):
+    earliest_observation_utc: Optional[str] = None
+    latest_observation_utc: Optional[str] = None
+    observation_span_hours: Optional[float] = None
+    temporal_mode: str = "historical"
+    last_ingested_at_utc: Optional[str] = None
+    temporal_notice: str = (
+        "Observation time denotes historical AIS radio broadcast time. "
+        "Ingestion time denotes when data was admitted to Pelagos. "
+        "Telemetry is purely historical and must not be used for real-time navigation."
+    )
+
+
+class CoverageSummaryResponse(BaseModel):
+    status: str = "available"  # "empty" | "available"
+    total_observations: int
+    distinct_vessels: int
+    spatial_extent: Optional[CoverageSpatialExtent] = None
+    temporal_extent: Optional[CoverageTemporalExtent] = None
+    partitions_present: List[str] = Field(default_factory=list)
+    disclaimers: Dict[str, str] = Field(default_factory=dict)
+
+
+class IngestionRunSummary(BaseModel):
+    id: int
+    run_type: str
+    source_name: str
+    source_partition: str
+    records_read: int
     accepted_count: int
     quarantined_count: int
     duplicate_count: int
-    quarantined_records: List[QuarantinedSummary] = Field(default_factory=list)
+    unparseable_count: int
+    failed_count: int
+    status: str
+    error_details: Optional[str] = None
+    started_at: str
+    completed_at: str
 
 
 class VesselSnapshotRow(BaseModel):

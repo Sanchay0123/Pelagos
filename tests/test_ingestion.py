@@ -133,6 +133,6 @@ def test_load_genuine_marinecadastre_sample(db_session):
     assert len(vessels) == len(sample_records)
     for v in vessels:
         assert v.source_name == "NOAA MarineCadastre / USCG NAIS"
-        assert v.license_type == "CC0 1.0 Universal"
+        assert "Public Domain" in v.license_type or "17 U.S.C." in v.license_type
         assert -90 <= v.latitude <= 90
         assert -180 <= v.longitude <= 180
