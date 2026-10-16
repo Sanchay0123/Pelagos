@@ -74,6 +74,29 @@ def ensure_schema_compatibility(target_engine=None):
                 conn.execute(text("ALTER TABLE parquet_export_tasks ADD COLUMN cleanup_locked_by VARCHAR(64)"))
             if "cleanup_locked_expires_at" not in cols:
                 conn.execute(text("ALTER TABLE parquet_export_tasks ADD COLUMN cleanup_locked_expires_at TIMESTAMP"))
+
+        if "ingestion_runs" in table_names:
+            cols = {c["name"] for c in inspector.get_columns("ingestion_runs")}
+            if "raw_records_received" not in cols:
+                conn.execute(text("ALTER TABLE ingestion_runs ADD COLUMN raw_records_received INTEGER"))
+            if "error_details" not in cols:
+                conn.execute(text("ALTER TABLE ingestion_runs ADD COLUMN error_details TEXT"))
+
+        if "freight_routes" not in table_names:
+            import pelagos.models
+            pelagos.models.FreightRoute.__table__.create(conn)
+
+        if "freight_observations" not in table_names:
+            import pelagos.models
+            pelagos.models.FreightObservation.__table__.create(conn)
+
+        if "freight_publications" not in table_names:
+            import pelagos.models
+            pelagos.models.FreightPublication.__table__.create(conn)
+        else:
+            cols = {c["name"] for c in inspector.get_columns("freight_publications")}
+            if "snapshot_watermark_id" not in cols:
+                conn.execute(text("ALTER TABLE freight_publications ADD COLUMN snapshot_watermark_id INTEGER"))
         conn.commit()
 
 

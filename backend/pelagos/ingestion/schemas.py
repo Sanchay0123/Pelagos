@@ -107,6 +107,7 @@ class IngestionRunSummary(BaseModel):
     run_type: str
     source_name: str
     source_partition: str
+    raw_records_received: Optional[int] = None
     records_read: int
     accepted_count: int
     quarantined_count: int

@@ -3,6 +3,7 @@
 import sys
 import json
 import argparse
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import create_engine
@@ -310,6 +311,134 @@ def handle_analytics_summary(args):
         db.close()
 
 
+def handle_freight_ingest(args):
+    """Ingests bulk vessel rates from USDA AgTransport."""
+    from pelagos.ingestion.freight_usda import fetch_usda_vessel_rates_remote, load_usda_vessel_rates_sample
+    from pelagos.ingestion.freight_service import FreightIngestionService
+
+    db = get_db_session(args.db_url)
+    try:
+        if args.offline:
+            raw_records = load_usda_vessel_rates_sample()
+            if args.limit:
+                raw_records = raw_records[:args.limit]
+            source_part = "offline-sample"
+        else:
+            raw_records = fetch_usda_vessel_rates_remote(limit=args.limit, since_date=args.since)
+            source_part = "usda-soda-remote"
+
+        service = FreightIngestionService(db)
+        result = service.ingest_usda_batch(
+            raw_records,
+            source_partition=source_part,
+            dry_run=args.dry_run,
+        )
+        print(json.dumps(result.model_dump(), indent=2))
+        return 0 if result.status in ("completed", "partial", "dry_run") else 1
+    except Exception as e:
+        print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
+def handle_freight_sync(args):
+    """Syncs SQL freight observations to immutable yearly Parquet partitions with database CAS fencing."""
+    from pathlib import Path
+    from pelagos.models import FreightObservation, FreightPublication
+    from pelagos.storage.freight_writer import write_freight_partition_parquet, commit_freight_publication
+
+    db = get_db_session(args.db_url)
+    storage_dir = Path(args.storage_dir or settings.parquet_storage_dir)
+
+    try:
+        all_obs = db.query(FreightObservation).order_by(FreightObservation.observation_date.asc(), FreightObservation.id.asc()).all()
+        if not all_obs:
+            print(json.dumps({"status": "completed", "partitions_processed": 0, "partitions": []}, indent=2))
+            return 0
+
+        by_year = {}
+        for o in all_obs:
+            yr = o.observation_date.year
+            by_year.setdefault(yr, []).append(o)
+
+        results = []
+        worker_id = getattr(args, "worker_id", None) or f"freight-cli-{uuid.uuid4().hex[:6]}"
+        for yr, obs_list in sorted(by_year.items()):
+            # 1. Capture snapshot watermark and candidate generation
+            snapshot_max_id = max((o.id for o in obs_list if o.id is not None), default=0)
+            current_pub = db.query(FreightPublication).filter_by(year=yr).first()
+            baseline_gen = current_pub.generation if current_pub else None
+            candidate_gen = (baseline_gen + 1) if baseline_gen else 1
+            attempt_uuid = uuid.uuid4().hex[:8]
+
+            # 2. Write immutable attempt artifact
+            pub_path, rec_count, file_size, sha256_hash = write_freight_partition_parquet(
+                records=obs_list,
+                base_dir=storage_dir,
+                year=yr,
+                generation=candidate_gen,
+                attempt_uuid=attempt_uuid,
+                worker_id=worker_id,
+            )
+
+            # 3. Transactional CAS commit with snapshot freshness fencing
+            committed = commit_freight_publication(
+                db=db,
+                year=yr,
+                claimed_generation=candidate_gen,
+                expected_generation=baseline_gen,
+                published_path=pub_path,
+                record_count=rec_count,
+                file_size_bytes=file_size,
+                content_sha256=sha256_hash,
+                snapshot_watermark_id=snapshot_max_id,
+            )
+
+            # Query authoritative state after commit
+            auth_pub = db.query(FreightPublication).filter_by(year=yr).first()
+            final_gen = auth_pub.generation if auth_pub else candidate_gen
+            final_path = auth_pub.published_artifact_path if auth_pub else str(pub_path.resolve())
+
+            results.append({
+                "year": yr,
+                "generation": final_gen,
+                "attempt_uuid": attempt_uuid,
+                "record_count": rec_count,
+                "file_size_bytes": file_size,
+                "content_sha256": sha256_hash,
+                "artifact_path": final_path,
+                "cas_committed": committed,
+            })
+
+        print(json.dumps({
+            "status": "completed",
+            "partitions_processed": len(results),
+            "partitions": results,
+        }, indent=2))
+        return 0
+    except Exception as e:
+        print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
+def handle_freight_summary(args):
+    """Executes DuckDB analytical aggregations over freight Parquet or SQL."""
+    from pathlib import Path
+    from pelagos.storage.freight_analytics import get_freight_summary
+
+    db = get_db_session(args.db_url)
+    storage_dir = Path(args.storage_dir or settings.parquet_storage_dir) if args.storage_dir else None
+    try:
+        summary = get_freight_summary(db, storage_dir=storage_dir)
+        print(json.dumps(summary, indent=2))
+        return 0
+    finally:
+        db.close()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pelagos",
@@ -434,6 +563,33 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser_analytics.add_argument("--db-url", default=None, help="Optional database connection URL override.")
 
+    # Freight Ingest
+    parser_freight_ingest = subparsers.add_parser(
+        "freight-ingest",
+        help="Ingest ocean bulk vessel rates from USDA AgTransport."
+    )
+    parser_freight_ingest.add_argument("--limit", type=int, default=None, help="Max records to fetch/parse.")
+    parser_freight_ingest.add_argument("--since", default=None, help="Fetch observations on or after date (YYYY-MM-DD).")
+    parser_freight_ingest.add_argument("--offline", action="store_true", help="Load from authentic offline sample fixture.")
+    parser_freight_ingest.add_argument("--dry-run", action="store_true", help="Parse and validate without database commit.")
+    parser_freight_ingest.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
+    # Freight Sync
+    parser_freight_sync = subparsers.add_parser(
+        "freight-sync",
+        help="Sync SQL freight observations to yearly immutable Parquet partitions."
+    )
+    parser_freight_sync.add_argument("--storage-dir", default=None, help="Parquet base directory override.")
+    parser_freight_sync.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
+    # Freight Summary
+    parser_freight_summary = subparsers.add_parser(
+        "freight-summary",
+        help="Execute DuckDB analytical aggregations over freight Parquet partitions."
+    )
+    parser_freight_summary.add_argument("--storage-dir", default=None, help="Parquet base directory override.")
+    parser_freight_summary.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
     return parser
 
 
@@ -461,6 +617,12 @@ def main():
         sys.exit(handle_parquet_reconcile(args))
     elif args.command == "analytics-summary":
         sys.exit(handle_analytics_summary(args))
+    elif args.command == "freight-ingest":
+        sys.exit(handle_freight_ingest(args))
+    elif args.command == "freight-sync":
+        sys.exit(handle_freight_sync(args))
+    elif args.command == "freight-summary":
+        sys.exit(handle_freight_summary(args))
     else:
         parser.print_help()
         sys.exit(1)

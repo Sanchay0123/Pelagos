@@ -1,0 +1,194 @@
+[
+  {
+    "date": "2026-09-01T00:00:00.000",
+    "month": "9",
+    "year": "2026",
+    "gulf_to_japan": "76.38",
+    "pnw_to_japan": "37.31",
+    "gulf_pnw_spread": "39.07"
+  },
+  {
+    "date": "2026-08-01T00:00:00.000",
+    "month": "8",
+    "year": "2026",
+    "gulf_to_japan": "72.94",
+    "pnw_to_japan": "36.75",
+    "gulf_pnw_spread": "36.19"
+  },
+  {
+    "date": "2026-07-01T00:00:00.000",
+    "month": "7",
+    "year": "2026",
+    "gulf_to_japan": "68.95",
+    "pnw_to_japan": "35.95",
+    "gulf_pnw_spread": "33"
+  },
+  {
+    "date": "2026-06-01T00:00:00.000",
+    "month": "6",
+    "year": "2026",
+    "gulf_to_japan": "71.19",
+    "pnw_to_japan": "36.75",
+    "gulf_pnw_spread": "34.44"
+  },
+  {
+    "date": "2026-05-01T00:00:00.000",
+    "month": "5",
+    "year": "2026",
+    "gulf_to_japan": "70.81",
+    "pnw_to_japan": "37",
+    "gulf_pnw_spread": "33.81"
+  },
+  {
+    "date": "2026-04-01T00:00:00.000",
+    "month": "4",
+    "year": "2026",
+    "gulf_to_japan": "65.8",
+    "pnw_to_japan": "35",
+    "gulf_pnw_spread": "30.8"
+  },
+  {
+    "date": "2026-03-01T00:00:00.000",
+    "month": "3",
+    "year": "2026",
+    "gulf_to_japan": "60.44",
+    "pnw_to_japan": "33.75",
+    "gulf_pnw_spread": "26.69"
+  },
+  {
+    "date": "2026-02-01T00:00:00.000",
+    "month": "2",
+    "year": "2026",
+    "gulf_to_japan": "54.19",
+    "pnw_to_japan": "30.5",
+    "gulf_pnw_spread": "23.69"
+  },
+  {
+    "date": "2026-01-01T00:00:00.000",
+    "month": "1",
+    "year": "2026",
+    "gulf_to_japan": "50.15",
+    "pnw_to_japan": "27.8",
+    "gulf_pnw_spread": "22.35"
+  },
+  {
+    "date": "2025-12-01T00:00:00.000",
+    "month": "12",
+    "year": "2025",
+    "gulf_to_japan": "55.75",
+    "pnw_to_japan": "29.08",
+    "gulf_pnw_spread": "26.67"
+  },
+  {
+    "date": "2025-11-01T00:00:00.000",
+    "month": "11",
+    "year": "2025",
+    "gulf_to_japan": "56.5",
+    "pnw_to_japan": "29.15",
+    "gulf_pnw_spread": "27.35"
+  },
+  {
+    "date": "2025-10-01T00:00:00.000",
+    "month": "10",
+    "year": "2025",
+    "gulf_to_japan": "56.8",
+    "pnw_to_japan": "29.65",
+    "gulf_pnw_spread": "27.15"
+  },
+  {
+    "date": "2025-09-01T00:00:00.000",
+    "month": "9",
+    "year": "2025",
+    "gulf_to_japan": "57.13",
+    "pnw_to_japan": "29.63",
+    "gulf_pnw_spread": "27.5"
+  },
+  {
+    "date": "2025-08-01T00:00:00.000",
+    "month": "8",
+    "year": "2025",
+    "gulf_to_japan": "54.19",
+    "pnw_to_japan": "28.81",
+    "gulf_pnw_spread": "25.38"
+  },
+  {
+    "date": "2025-07-01T00:00:00.000",
+    "month": "7",
+    "year": "2025",
+    "gulf_to_japan": "51.75",
+    "pnw_to_japan": "28.8",
+    "gulf_pnw_spread": "22.95"
+  },
+  {
+    "date": "2025-06-01T00:00:00.000",
+    "month": "6",
+    "year": "2025",
+    "gulf_to_japan": "46.88",
+    "pnw_to_japan": "27",
+    "gulf_pnw_spread": "19.88"
+  },
+  {
+    "date": "2025-05-01T00:00:00.000",
+    "month": "5",
+    "year": "2025",
+    "gulf_to_japan": "46.2",
+    "pnw_to_japan": "27.05",
+    "gulf_pnw_spread": "19.15"
+  },
+  {
+    "date": "2025-04-01T00:00:00.000",
+    "month": "4",
+    "year": "2025",
+    "gulf_to_japan": "46.19",
+    "pnw_to_japan": "27.31",
+    "gulf_pnw_spread": "18.88"
+  },
+  {
+    "date": "2025-03-01T00:00:00.000",
+    "month": "3",
+    "year": "2025",
+    "gulf_to_japan": "46.94",
+    "pnw_to_japan": "27.38",
+    "gulf_pnw_spread": "19.56"
+  },
+  {
+    "date": "2025-02-01T00:00:00.000",
+    "month": "2",
+    "year": "2025",
+    "gulf_to_japan": "46.13",
+    "pnw_to_japan": "27.13",
+    "gulf_pnw_spread": "19"
+  },
+  {
+    "date": "2025-01-01T00:00:00.000",
+    "month": "1",
+    "year": "2025",
+    "gulf_to_japan": "45.55",
+    "pnw_to_japan": "26.15",
+    "gulf_pnw_spread": "19.4"
+  },
+  {
+    "date": "2024-12-01T00:00:00.000",
+    "month": "12",
+    "year": "2024",
+    "gulf_to_japan": "46.08",
+    "pnw_to_japan": "27.58",
+    "gulf_pnw_spread": "18.5"
+  },
+  {
+    "date": "2024-11-01T00:00:00.000",
+    "month": "11",
+    "year": "2024",
+    "gulf_to_japan": "49.5",
+    "pnw_to_japan": "29.25",
+    "gulf_pnw_spread": "20.25"
+  },
+  {
+    "date": "2024-10-01T00:00:00.000",
+    "month": "10",
+    "year": "2024",
+    "gulf_to_japan": "53.65",
+    "pnw_to_japan": "30.05",
+    "gulf_pnw_spread": "23.6"
+  }
+]

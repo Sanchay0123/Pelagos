@@ -1,7 +1,7 @@
 """SQLAlchemy ORM models for operational vessel telemetry and quarantine isolation."""
 
 import datetime
-from sqlalchemy import Column, Integer, BigInteger, Float, String, DateTime, Text, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, BigInteger, Float, String, DateTime, Text, Index, UniqueConstraint, Boolean, Date, ForeignKey
 from pelagos.database import Base
 
 
@@ -86,6 +86,7 @@ class IngestionRun(Base):
     run_type = Column(String(32), nullable=False)            # "bundled" | "remote"
     source_name = Column(String(128), nullable=False)
     source_partition = Column(String(128), nullable=False, index=True)
+    raw_records_received = Column(Integer, nullable=True)
     records_read = Column(Integer, nullable=False, default=0)
     accepted_count = Column(Integer, nullable=False, default=0)
     quarantined_count = Column(Integer, nullable=False, default=0)
@@ -143,3 +144,81 @@ class ParquetExportTask(Base):
         Index("idx_parquet_export_tasks_pub_status", "publication_status"),
         Index("idx_parquet_export_tasks_lease", "lease_worker_id", "lease_expires_at"),
     )
+
+
+class FreightRoute(Base):
+    """
+    Standard commercial maritime trade route / corridor definition.
+    Traces to REQ-FR-DII-005, REQ-FR-FRF-001, and DATA-001 Section 5.2.
+    """
+    __tablename__ = "freight_routes"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    route_code = Column(String(64), unique=True, index=True, nullable=False)  # e.g. "USG-JPN-BULK", "PNW-JPN-BULK"
+    route_name = Column(String(256), nullable=False)
+    origin_region = Column(String(128), nullable=False)
+    destination_region = Column(String(128), nullable=False)
+    vessel_class = Column(String(64), nullable=True)  # e.g. "Panamax", "Capesize", "Supramax"
+    cargo_type = Column(String(64), nullable=True)    # e.g. "Grain", "Coking Coal", "Dry Bulk"
+    unit_of_measure = Column(String(32), nullable=False, default="USD/MT")
+    currency = Column(String(8), nullable=False, default="USD")
+    benchmark_distance_nm = Column(Float, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+
+class FreightObservation(Base):
+    """
+    Canonical point-in-time freight market observation or assessed rate.
+    Strictly preserves provenance, observation date, units, and derivation state.
+    Traces to REQ-FR-DII-005, REQ-NFR-DIP-001, and REQ-NFR-DIP-003.
+    """
+    __tablename__ = "freight_observations"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    route_code = Column(String(64), index=True, nullable=False)
+    observation_date = Column(Date, index=True, nullable=False)
+    rate_value = Column(Float, nullable=False)
+    currency = Column(String(8), nullable=False, default="USD")
+    unit_of_measure = Column(String(32), nullable=False, default="USD/MT")
+    is_derived = Column(Boolean, nullable=False, default=False)
+    rate_high = Column(Float, nullable=True)
+    rate_low = Column(Float, nullable=True)
+    observation_period = Column(String(16), nullable=False, default="monthly")  # monthly | weekly | daily
+    source_name = Column(String(128), nullable=False)
+    source_dataset_id = Column(String(64), nullable=True)
+    publication_time = Column(DateTime(timezone=True), nullable=True)
+    ingestion_time = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    processing_time = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    license_type = Column(String(64), nullable=False, default="U.S. Public Domain")
+    raw_payload = Column(Text, nullable=True)
+    idempotency_key = Column(String(256), unique=True, index=True, nullable=False)
+    ingestion_run_id = Column(Integer, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("route_code", "observation_date", name="uq_freight_obs_route_date"),
+        Index("idx_freight_obs_date", "observation_date"),
+        Index("idx_freight_obs_route_code", "route_code"),
+    )
+
+
+class FreightPublication(Base):
+    """
+    Database-backed publication catalog for yearly freight Parquet partitions.
+    Provides generation fencing, CAS publication safety, and reader isolation.
+    Traces to ADR-0002 and REQ-NFR-ABM-002.
+    """
+    __tablename__ = "freight_publications"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    year = Column(Integer, unique=True, index=True, nullable=False)
+    generation = Column(Integer, nullable=False, default=1)
+    published_artifact_path = Column(String(512), nullable=False)
+    published_sha256 = Column(String(64), nullable=False)
+    record_count = Column(Integer, nullable=False)
+    file_size_bytes = Column(BigInteger, nullable=False)
+    snapshot_watermark_id = Column(Integer, nullable=True)
+    published_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+

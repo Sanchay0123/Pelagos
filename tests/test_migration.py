@@ -32,6 +32,7 @@ def test_fresh_database_initialization(tmp_path):
     assert "raw_record_id" in q_cols
 
     r_cols = {c["name"] for c in inspector.get_columns("ingestion_runs")}
+    assert "raw_records_received" in r_cols
     assert "records_read" in r_cols
     assert "accepted_count" in r_cols
     assert "quarantined_count" in r_cols
@@ -39,6 +40,10 @@ def test_fresh_database_initialization(tmp_path):
     assert "unparseable_count" in r_cols
     assert "failed_count" in r_cols
     assert "status" in r_cols
+
+    assert "freight_routes" in tables
+    assert "freight_observations" in tables
+    assert "freight_publications" in tables
 
 
 def test_existing_database_additive_migration(tmp_path):
@@ -99,6 +104,33 @@ def test_existing_database_additive_migration(tmp_path):
             ingestion_time DATETIME NOT NULL
         )
     """)
+    conn.execute("""
+        CREATE TABLE ingestion_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            run_type VARCHAR(32) NOT NULL,
+            source_name VARCHAR(128) NOT NULL,
+            source_partition VARCHAR(128) NOT NULL,
+            records_read INTEGER NOT NULL,
+            accepted_count INTEGER NOT NULL,
+            quarantined_count INTEGER NOT NULL,
+            duplicate_count INTEGER NOT NULL,
+            unparseable_count INTEGER NOT NULL,
+            failed_count INTEGER NOT NULL,
+            status VARCHAR(32) NOT NULL,
+            started_at DATETIME NOT NULL,
+            completed_at DATETIME NOT NULL
+        )
+    """)
+    conn.execute("""
+        INSERT INTO ingestion_runs (
+            run_type, source_name, source_partition, records_read, accepted_count,
+            quarantined_count, duplicate_count, unparseable_count, failed_count,
+            status, started_at, completed_at
+        ) VALUES (
+            'bundled', 'NOAA', 'legacy-part', 10, 10, 0, 0, 0, 0, 'completed',
+            '2024-01-01 00:00:00', '2024-01-01 00:00:05'
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -118,8 +150,14 @@ def test_existing_database_additive_migration(tmp_path):
     assert "mmsi" in q_cols
     assert "raw_record_id" in q_cols
 
+    r_cols = {c["name"] for c in inspector.get_columns("ingestion_runs")}
+    assert "raw_records_received" in r_cols  # Column added additively
+
     tables = inspector.get_table_names()
     assert "ingestion_runs" in tables
+    assert "freight_publications" in tables
+    f_cols = {c["name"] for c in inspector.get_columns("freight_publications")}
+    assert "snapshot_watermark_id" in f_cols
 
     # 4. Verify indexes were created on added columns
     v_indexes = {idx["name"] for idx in inspector.get_indexes("vessel_positions")}
@@ -131,11 +169,16 @@ def test_existing_database_additive_migration(tmp_path):
     assert "ix_quarantined_records_ingestion_run_id" in q_indexes
     assert "ix_quarantined_records_mmsi" in q_indexes
 
-    # Verify existing record was preserved intact
+    # Verify existing records were preserved intact
     TestingSession = sessionmaker(bind=engine)
     session = TestingSession()
     existing_ship = session.query(VesselPosition).filter(VesselPosition.mmsi == "367123456").first()
     assert existing_ship is not None
     assert existing_ship.vessel_name == "LEGACY SHIP"
     assert existing_ship.source_partition is None  # Added column initialized to NULL
+
+    existing_run = session.query(IngestionRun).filter(IngestionRun.source_partition == "legacy-part").first()
+    assert existing_run is not None
+    assert existing_run.records_read == 10
+    assert existing_run.raw_records_received is None  # Added column safely null for legacy records
     session.close()
