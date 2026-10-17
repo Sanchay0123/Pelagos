@@ -3,7 +3,7 @@ title: Pelagos Documentation Index
 document_id: DOC-003
 type: documentation_index
 status: approved
-version: 1.0.11
+version: 1.0.12
 created: 2026-10-10
 updated: 2026-10-17
 tags:
@@ -30,7 +30,7 @@ N/A
 ### Core Foundations
 * [Documentation Standard](./DOCUMENTATION_STANDARD.md) (v1.1.1, Status: Approved)
 * [Project Overview](./PROJECT_OVERVIEW.md) (v1.0.3, Status: Approved)
-* [Documentation Index](./INDEX.md) (v1.0.11, Status: Approved)
+* [Documentation Index](./INDEX.md) (v1.0.12, Status: Approved)
 
 ### Architecture and Decisions
 * [System Architecture Specification](./architecture/system-architecture.md) (v1.0.0, Status: Drafting)
@@ -48,7 +48,7 @@ N/A
 ### Data and Intelligence
 * [Data Architecture and Source Strategy](./data/data-architecture.md) (v1.0.0, Status: Drafting)
 * [Freight Index Specification and Baseline Forecasting Feasibility Assessment (ML-001)](./forecasting/freight-index-and-forecasting-specification.md) (v1.3.0, Status: Approved)
-* Operational Routing Specifications (Planned)
+* [Operational Maritime Routing Readiness Assessment (ROUT-001)](./routing/operational-maritime-routing-readiness.md) (v1.1.0, Status: Drafting)
 
 ### Engineering and Operations
 * API Specifications (Planned)
@@ -105,3 +105,4 @@ Links to established, governed documentation within the repository, and maps pla
 | 1.0.9 | 2026-10-14 | Project Agent | Final D2 consistency pass: Synchronized Functional Requirements Specification version reference (v1.0.5) following final forecasting requirements reconciliation. Kept status approved. |
 | 1.0.10 | 2026-10-14 | Project Agent | Milestone D3 launch: Registered System Architecture Specification (ARCH-001), Data Architecture Specification (DATA-001), and initial ADRs (ADR-0001 through ADR-0005). Kept status approved. |
 | 1.0.11 | 2026-10-17 | Project Agent | D8.6 audit: Registered Freight Index Specification and Baseline Forecasting Feasibility Assessment (ML-001) as approved deliverable. |
+| 1.0.12 | 2026-10-17 | Project Agent | Milestone D9.1 launch: Registered Operational Maritime Routing Readiness Assessment (ROUT-001) under drafting status. Kept status approved. |

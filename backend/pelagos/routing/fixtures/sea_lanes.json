@@ -1,0 +1,1478 @@
+{
+  "$schema": "pelagos-sea-lanes-prototype-test-v1",
+  "version": "1.0.0-prototype",
+  "fixture_type": "synthetic_corridor_test_fixture",
+  "is_upstream_extracted": false,
+  "description": "Prototype test sea-lane network graph containing 57 manually defined nodes and 58 edges calibrated to approximate NGA Pub. 151 commercial corridors for D9.2 algorithm validation. NOT programmatically extracted from Eurostat marnet.gpkg.",
+  "crs": "EPSG:4326",
+  "nodes": {
+    "usmsy_fairway": {
+      "name": "New Orleans SW Pass Fairway",
+      "coords": [
+        -89.43,
+        28.9
+      ],
+      "type": "fairway_gate"
+    },
+    "gom_central": {
+      "name": "Central Gulf of Mexico",
+      "coords": [
+        -88.0,
+        26.5
+      ],
+      "type": "junction"
+    },
+    "yucatan_channel": {
+      "name": "Yucatan Channel",
+      "coords": [
+        -85.5,
+        21.8
+      ],
+      "type": "strait"
+    },
+    "caribbean_west": {
+      "name": "Western Caribbean",
+      "coords": [
+        -82.0,
+        16.0
+      ],
+      "type": "junction"
+    },
+    "panama_atlantic": {
+      "name": "Panama Cristobal Approach",
+      "coords": [
+        -79.92,
+        9.38
+      ],
+      "type": "canal_gate"
+    },
+    "panama_pacific": {
+      "name": "Panama Balboa Approach",
+      "coords": [
+        -79.52,
+        8.85
+      ],
+      "type": "canal_gate"
+    },
+    "florida_straits": {
+      "name": "Florida Straits",
+      "coords": [
+        -80.5,
+        24.5
+      ],
+      "type": "strait"
+    },
+    "atlantic_subtropical": {
+      "name": "Subtropical North Atlantic",
+      "coords": [
+        -75.0,
+        26.0
+      ],
+      "type": "junction"
+    },
+    "pac_cent_am": {
+      "name": "Pacific off Central America",
+      "coords": [
+        -85.0,
+        9.5
+      ],
+      "type": "junction"
+    },
+    "pac_mex_south": {
+      "name": "Pacific off Southern Mexico",
+      "coords": [
+        -100.0,
+        15.0
+      ],
+      "type": "junction"
+    },
+    "pac_mex_baja": {
+      "name": "Pacific off Baja California",
+      "coords": [
+        -115.0,
+        21.0
+      ],
+      "type": "junction"
+    },
+    "pac_mid_east": {
+      "name": "Mid-Pacific East",
+      "coords": [
+        -135.0,
+        26.0
+      ],
+      "type": "junction"
+    },
+    "pac_hawaii_north": {
+      "name": "North of Hawaii",
+      "coords": [
+        -155.0,
+        28.0
+      ],
+      "type": "junction"
+    },
+    "pac_mid_west": {
+      "name": "Mid-Pacific West",
+      "coords": [
+        -175.0,
+        31.0
+      ],
+      "type": "junction"
+    },
+    "pac_nw_basin": {
+      "name": "Northwest Pacific Basin",
+      "coords": [
+        165.0,
+        33.5
+      ],
+      "type": "junction"
+    },
+    "japan_approach_east": {
+      "name": "Japan Eastern Approach",
+      "coords": [
+        150.0,
+        34.0
+      ],
+      "type": "junction"
+    },
+    "jpyok_fairway": {
+      "name": "Yokohama Tokyo Bay Fairway",
+      "coords": [
+        139.73,
+        35.15
+      ],
+      "type": "fairway_gate"
+    },
+    "ussea_fairway": {
+      "name": "Seattle Juan de Fuca Fairway",
+      "coords": [
+        -124.75,
+        48.5
+      ],
+      "type": "fairway_gate"
+    },
+    "pnw_offshore": {
+      "name": "PNW Offshore Approach",
+      "coords": [
+        -128.0,
+        48.0
+      ],
+      "type": "junction"
+    },
+    "npac_lane_1": {
+      "name": "North Pacific Lane 1",
+      "coords": [
+        -142.0,
+        46.5
+      ],
+      "type": "junction"
+    },
+    "npac_lane_2": {
+      "name": "North Pacific Lane 2",
+      "coords": [
+        -158.0,
+        44.5
+      ],
+      "type": "junction"
+    },
+    "npac_lane_3": {
+      "name": "North Pacific Lane 3",
+      "coords": [
+        -174.0,
+        42.5
+      ],
+      "type": "junction"
+    },
+    "npac_lane_4": {
+      "name": "North Pacific Lane 4",
+      "coords": [
+        170.0,
+        40.5
+      ],
+      "type": "junction"
+    },
+    "npac_lane_5": {
+      "name": "North Pacific Lane 5",
+      "coords": [
+        155.0,
+        38.0
+      ],
+      "type": "junction"
+    },
+    "atl_equatorial_west": {
+      "name": "Equatorial West Atlantic",
+      "coords": [
+        -45.0,
+        10.0
+      ],
+      "type": "junction"
+    },
+    "atl_brazil_basin": {
+      "name": "Brazil Basin",
+      "coords": [
+        -30.0,
+        -8.0
+      ],
+      "type": "junction"
+    },
+    "atl_south_central": {
+      "name": "South Atlantic Central",
+      "coords": [
+        -10.0,
+        -25.0
+      ],
+      "type": "junction"
+    },
+    "atl_cape_approach": {
+      "name": "Cape Approach",
+      "coords": [
+        10.0,
+        -34.0
+      ],
+      "type": "junction"
+    },
+    "cape_good_hope": {
+      "name": "Cape of Good Hope",
+      "coords": [
+        18.5,
+        -35.0
+      ],
+      "type": "chokepoint"
+    },
+    "ind_southwest": {
+      "name": "Southwest Indian Ocean",
+      "coords": [
+        35.0,
+        -33.0
+      ],
+      "type": "junction"
+    },
+    "ind_central": {
+      "name": "Central Indian Ocean",
+      "coords": [
+        65.0,
+        -18.0
+      ],
+      "type": "junction"
+    },
+    "ind_equatorial_east": {
+      "name": "Eastern Equatorial Indian Ocean",
+      "coords": [
+        88.0,
+        -3.0
+      ],
+      "type": "junction"
+    },
+    "sunda_approach": {
+      "name": "Sunda Strait Approach",
+      "coords": [
+        102.0,
+        -4.5
+      ],
+      "type": "junction"
+    },
+    "malacca_west": {
+      "name": "Malacca Strait West Approach",
+      "coords": [
+        95.5,
+        5.8
+      ],
+      "type": "strait"
+    },
+    "malacca_central": {
+      "name": "Malacca Strait Central",
+      "coords": [
+        100.0,
+        2.5
+      ],
+      "type": "strait"
+    },
+    "sgsin_fairway": {
+      "name": "Singapore Western Fairway",
+      "coords": [
+        103.65,
+        1.22
+      ],
+      "type": "fairway_gate"
+    },
+    "scs_south": {
+      "name": "South China Sea South",
+      "coords": [
+        106.0,
+        3.5
+      ],
+      "type": "junction"
+    },
+    "scs_central": {
+      "name": "South China Sea Central",
+      "coords": [
+        114.0,
+        13.0
+      ],
+      "type": "junction"
+    },
+    "luzon_strait": {
+      "name": "Luzon Strait",
+      "coords": [
+        121.0,
+        20.5
+      ],
+      "type": "strait"
+    },
+    "philippine_sea_north": {
+      "name": "North Philippine Sea",
+      "coords": [
+        133.0,
+        28.0
+      ],
+      "type": "junction"
+    },
+    "nlrtm_fairway": {
+      "name": "Rotterdam Maas Center Fairway",
+      "coords": [
+        3.85,
+        52.0
+      ],
+      "type": "fairway_gate"
+    },
+    "eng_channel_east": {
+      "name": "Dover Strait / English Channel East",
+      "coords": [
+        1.5,
+        50.8
+      ],
+      "type": "strait"
+    },
+    "eng_channel_west": {
+      "name": "English Channel West",
+      "coords": [
+        -5.0,
+        49.5
+      ],
+      "type": "junction"
+    },
+    "biscay_west": {
+      "name": "Bay of Biscay West",
+      "coords": [
+        -9.5,
+        44.0
+      ],
+      "type": "junction"
+    },
+    "gibraltar_west": {
+      "name": "Gibraltar West Approach",
+      "coords": [
+        -7.0,
+        36.0
+      ],
+      "type": "junction"
+    },
+    "gibraltar_strait": {
+      "name": "Strait of Gibraltar",
+      "coords": [
+        -5.35,
+        35.95
+      ],
+      "type": "strait"
+    },
+    "med_west": {
+      "name": "Western Mediterranean",
+      "coords": [
+        3.0,
+        37.5
+      ],
+      "type": "junction"
+    },
+    "med_central": {
+      "name": "Central Mediterranean (Malta Channel)",
+      "coords": [
+        15.0,
+        35.5
+      ],
+      "type": "junction"
+    },
+    "med_east": {
+      "name": "Eastern Mediterranean",
+      "coords": [
+        28.0,
+        33.5
+      ],
+      "type": "junction"
+    },
+    "egpsd_fairway": {
+      "name": "Port Said Fairway Approach",
+      "coords": [
+        32.35,
+        31.4
+      ],
+      "type": "fairway_gate"
+    },
+    "suez_south": {
+      "name": "Port Tewfik / Gulf of Suez",
+      "coords": [
+        32.55,
+        29.85
+      ],
+      "type": "canal_gate"
+    },
+    "red_sea_north": {
+      "name": "Northern Red Sea",
+      "coords": [
+        34.0,
+        27.5
+      ],
+      "type": "junction"
+    },
+    "red_sea_central": {
+      "name": "Central Red Sea",
+      "coords": [
+        38.0,
+        21.0
+      ],
+      "type": "junction"
+    },
+    "bab_el_mandeb": {
+      "name": "Strait of Bab-el-Mandeb",
+      "coords": [
+        43.4,
+        12.6
+      ],
+      "type": "strait"
+    },
+    "gulf_of_aden": {
+      "name": "Gulf of Aden",
+      "coords": [
+        48.0,
+        12.5
+      ],
+      "type": "junction"
+    },
+    "arabian_sea_west": {
+      "name": "Western Arabian Sea",
+      "coords": [
+        58.0,
+        14.0
+      ],
+      "type": "junction"
+    },
+    "casp_test_node": {
+      "name": "Baku / Caspian Test Basin",
+      "coords": [
+        49.8333,
+        40.3667
+      ],
+      "type": "disconnected_water"
+    }
+  },
+  "edges": [
+    {
+      "u": "usmsy_fairway",
+      "v": "gom_central",
+      "name": "Southwest Pass Approach",
+      "distance_nm": 162.544,
+      "geometry": [
+        [
+          -89.43,
+          28.9
+        ],
+        [
+          -88.0,
+          26.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "gom_central",
+      "v": "yucatan_channel",
+      "name": "Gulf to Yucatan Channel",
+      "distance_nm": 312.755,
+      "geometry": [
+        [
+          -88.0,
+          26.5
+        ],
+        [
+          -85.5,
+          21.8
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "gom_central",
+      "v": "florida_straits",
+      "name": "Gulf to Florida Straits",
+      "distance_nm": 424.272,
+      "geometry": [
+        [
+          -88.0,
+          26.5
+        ],
+        [
+          -80.5,
+          24.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "yucatan_channel",
+      "v": "caribbean_west",
+      "name": "Yucatan to Western Caribbean",
+      "distance_nm": 399.71,
+      "geometry": [
+        [
+          -85.5,
+          21.8
+        ],
+        [
+          -82.0,
+          16.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "caribbean_west",
+      "v": "panama_atlantic",
+      "name": "Western Caribbean to Colon",
+      "distance_nm": 413.81,
+      "geometry": [
+        [
+          -82.0,
+          16.0
+        ],
+        [
+          -79.92,
+          9.38
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "panama_atlantic",
+      "v": "panama_pacific",
+      "name": "Panama Canal Transit",
+      "distance_nm": 50.0,
+      "geometry": [
+        [
+          -79.92,
+          9.38
+        ],
+        [
+          -79.9,
+          9.27
+        ],
+        [
+          -79.8,
+          9.15
+        ],
+        [
+          -79.68,
+          9.03
+        ],
+        [
+          -79.59,
+          8.97
+        ],
+        [
+          -79.52,
+          8.85
+        ]
+      ],
+      "canal": "panama"
+    },
+    {
+      "u": "panama_pacific",
+      "v": "pac_cent_am",
+      "name": "Panama to Central America",
+      "distance_nm": 327.507,
+      "geometry": [
+        [
+          -79.52,
+          8.85
+        ],
+        [
+          -85.0,
+          9.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "pac_cent_am",
+      "v": "pac_mex_south",
+      "name": "Central America to South Mexico",
+      "distance_nm": 940.0,
+      "geometry": [
+        [
+          -85.0,
+          9.5
+        ],
+        [
+          -100.0,
+          15.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "pac_mex_south",
+      "v": "pac_mex_baja",
+      "name": "South Mexico to Baja",
+      "distance_nm": 929.003,
+      "geometry": [
+        [
+          -100.0,
+          15.0
+        ],
+        [
+          -115.0,
+          21.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "pac_mex_baja",
+      "v": "pac_mid_east",
+      "name": "Baja to Mid-Pacific East",
+      "distance_nm": 1141.444,
+      "geometry": [
+        [
+          -115.0,
+          21.0
+        ],
+        [
+          -135.0,
+          26.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "pac_mid_east",
+      "v": "pac_hawaii_north",
+      "name": "Mid-Pacific East to North Hawaii",
+      "distance_nm": 1077.304,
+      "geometry": [
+        [
+          -135.0,
+          26.0
+        ],
+        [
+          -155.0,
+          28.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "pac_hawaii_north",
+      "v": "pac_mid_west",
+      "name": "North Hawaii to Mid-Pacific West",
+      "distance_nm": 1060.921,
+      "geometry": [
+        [
+          -155.0,
+          28.0
+        ],
+        [
+          -175.0,
+          31.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "pac_mid_west",
+      "v": "pac_nw_basin",
+      "name": "Mid-Pacific West to NW Basin",
+      "distance_nm": 1026.972,
+      "geometry": [
+        [
+          -175.0,
+          31.0
+        ],
+        [
+          165.0,
+          33.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "pac_nw_basin",
+      "v": "japan_approach_east",
+      "name": "NW Basin to Japan East Approach",
+      "distance_nm": 750.37,
+      "geometry": [
+        [
+          165.0,
+          33.5
+        ],
+        [
+          150.0,
+          34.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "japan_approach_east",
+      "v": "jpyok_fairway",
+      "name": "Japan East Approach to Uraga Channel",
+      "distance_nm": 513.232,
+      "geometry": [
+        [
+          150.0,
+          34.0
+        ],
+        [
+          139.73,
+          35.15
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "ussea_fairway",
+      "v": "pnw_offshore",
+      "name": "Juan de Fuca to Offshore",
+      "distance_nm": 133.725,
+      "geometry": [
+        [
+          -124.75,
+          48.5
+        ],
+        [
+          -128.0,
+          48.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "pnw_offshore",
+      "v": "npac_lane_1",
+      "name": "Offshore to North Pacific Lane 1",
+      "distance_nm": 578.458,
+      "geometry": [
+        [
+          -128.0,
+          48.0
+        ],
+        [
+          -142.0,
+          46.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "npac_lane_1",
+      "v": "npac_lane_2",
+      "name": "North Pacific Lane 1 to 2",
+      "distance_nm": 684.574,
+      "geometry": [
+        [
+          -142.0,
+          46.5
+        ],
+        [
+          -158.0,
+          44.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "npac_lane_2",
+      "v": "npac_lane_3",
+      "name": "North Pacific Lane 2 to 3",
+      "distance_nm": 707.751,
+      "geometry": [
+        [
+          -158.0,
+          44.5
+        ],
+        [
+          -174.0,
+          42.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "npac_lane_3",
+      "v": "npac_lane_4",
+      "name": "North Pacific Lane 3 to 4",
+      "distance_nm": 730.112,
+      "geometry": [
+        [
+          -174.0,
+          42.5
+        ],
+        [
+          170.0,
+          40.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "npac_lane_4",
+      "v": "npac_lane_5",
+      "name": "North Pacific Lane 4 to 5",
+      "distance_nm": 714.076,
+      "geometry": [
+        [
+          170.0,
+          40.5
+        ],
+        [
+          155.0,
+          38.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "npac_lane_5",
+      "v": "japan_approach_east",
+      "name": "North Pacific Lane 5 to Japan East",
+      "distance_nm": 341.486,
+      "geometry": [
+        [
+          155.0,
+          38.0
+        ],
+        [
+          150.0,
+          34.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "florida_straits",
+      "v": "atlantic_subtropical",
+      "name": "Florida Straits to Subtropical Atlantic",
+      "distance_nm": 312.318,
+      "geometry": [
+        [
+          -80.5,
+          24.5
+        ],
+        [
+          -75.0,
+          26.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "atlantic_subtropical",
+      "v": "atl_equatorial_west",
+      "name": "Subtropical to Equatorial Atlantic",
+      "distance_nm": 1955.899,
+      "geometry": [
+        [
+          -75.0,
+          26.0
+        ],
+        [
+          -45.0,
+          10.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "atl_equatorial_west",
+      "v": "atl_brazil_basin",
+      "name": "Equatorial to Brazil Basin",
+      "distance_nm": 1400.417,
+      "geometry": [
+        [
+          -45.0,
+          10.0
+        ],
+        [
+          -30.0,
+          -8.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "atl_brazil_basin",
+      "v": "atl_south_central",
+      "name": "Brazil Basin to South Atlantic Central",
+      "distance_nm": 1532.279,
+      "geometry": [
+        [
+          -30.0,
+          -8.0
+        ],
+        [
+          -10.0,
+          -25.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "atl_south_central",
+      "v": "atl_cape_approach",
+      "name": "South Atlantic to Cape Approach",
+      "distance_nm": 1174.534,
+      "geometry": [
+        [
+          -10.0,
+          -25.0
+        ],
+        [
+          10.0,
+          -34.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "atl_cape_approach",
+      "v": "cape_good_hope",
+      "name": "Cape Approach to Cape of Good Hope",
+      "distance_nm": 425.611,
+      "geometry": [
+        [
+          10.0,
+          -34.0
+        ],
+        [
+          18.5,
+          -35.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "cape_good_hope",
+      "v": "ind_southwest",
+      "name": "Cape of Good Hope to SW Indian Ocean",
+      "distance_nm": 830.771,
+      "geometry": [
+        [
+          18.5,
+          -35.0
+        ],
+        [
+          35.0,
+          -33.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "ind_southwest",
+      "v": "ind_central",
+      "name": "SW Indian Ocean to Central Indian Ocean",
+      "distance_nm": 1849.39,
+      "geometry": [
+        [
+          35.0,
+          -33.0
+        ],
+        [
+          65.0,
+          -18.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "ind_central",
+      "v": "ind_equatorial_east",
+      "name": "Central Indian Ocean to East Equatorial",
+      "distance_nm": 1624.313,
+      "geometry": [
+        [
+          65.0,
+          -18.0
+        ],
+        [
+          88.0,
+          -3.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "ind_equatorial_east",
+      "v": "sunda_approach",
+      "name": "East Equatorial to Sunda Approach",
+      "distance_nm": 844.448,
+      "geometry": [
+        [
+          88.0,
+          -3.0
+        ],
+        [
+          102.0,
+          -4.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "ind_equatorial_east",
+      "v": "malacca_west",
+      "name": "East Equatorial to Malacca West",
+      "distance_nm": 691.936,
+      "geometry": [
+        [
+          88.0,
+          -3.0
+        ],
+        [
+          95.5,
+          5.8
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "malacca_west",
+      "v": "malacca_central",
+      "name": "Malacca West to Central",
+      "distance_nm": 334.043,
+      "geometry": [
+        [
+          95.5,
+          5.8
+        ],
+        [
+          100.0,
+          2.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "malacca_central",
+      "v": "sgsin_fairway",
+      "name": "Malacca Central to Singapore Fairway",
+      "distance_nm": 232.21,
+      "geometry": [
+        [
+          100.0,
+          2.5
+        ],
+        [
+          103.65,
+          1.22
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "sunda_approach",
+      "v": "scs_south",
+      "name": "Sunda Approach to South China Sea",
+      "distance_nm": 534.658,
+      "geometry": [
+        [
+          102.0,
+          -4.5
+        ],
+        [
+          106.0,
+          3.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "sgsin_fairway",
+      "v": "scs_south",
+      "name": "Singapore to South China Sea South",
+      "distance_nm": 196.081,
+      "geometry": [
+        [
+          103.65,
+          1.22
+        ],
+        [
+          106.0,
+          3.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "scs_south",
+      "v": "scs_central",
+      "name": "South China Sea South to Central",
+      "distance_nm": 740.139,
+      "geometry": [
+        [
+          106.0,
+          3.5
+        ],
+        [
+          114.0,
+          13.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "scs_central",
+      "v": "luzon_strait",
+      "name": "South China Sea Central to Luzon Strait",
+      "distance_nm": 602.466,
+      "geometry": [
+        [
+          114.0,
+          13.0
+        ],
+        [
+          121.0,
+          20.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "luzon_strait",
+      "v": "philippine_sea_north",
+      "name": "Luzon Strait to North Philippine Sea",
+      "distance_nm": 795.567,
+      "geometry": [
+        [
+          121.0,
+          20.5
+        ],
+        [
+          133.0,
+          28.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "philippine_sea_north",
+      "v": "japan_approach_east",
+      "name": "North Philippine Sea to Japan Approach East",
+      "distance_nm": 945.821,
+      "geometry": [
+        [
+          133.0,
+          28.0
+        ],
+        [
+          150.0,
+          34.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "nlrtm_fairway",
+      "v": "eng_channel_east",
+      "name": "Maas Center to Dover Strait",
+      "distance_nm": 113.984,
+      "geometry": [
+        [
+          3.85,
+          52.0
+        ],
+        [
+          1.5,
+          50.8
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "eng_channel_east",
+      "v": "eng_channel_west",
+      "name": "Dover Strait to English Channel West",
+      "distance_nm": 262.616,
+      "geometry": [
+        [
+          1.5,
+          50.8
+        ],
+        [
+          -5.0,
+          49.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "eng_channel_west",
+      "v": "biscay_west",
+      "name": "English Channel West to Biscay West",
+      "distance_nm": 378.595,
+      "geometry": [
+        [
+          -5.0,
+          49.5
+        ],
+        [
+          -9.5,
+          44.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "biscay_west",
+      "v": "gibraltar_west",
+      "name": "Biscay West to Gibraltar West",
+      "distance_nm": 493.221,
+      "geometry": [
+        [
+          -9.5,
+          44.0
+        ],
+        [
+          -7.0,
+          36.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "gibraltar_west",
+      "v": "gibraltar_strait",
+      "name": "Gibraltar West to Strait of Gibraltar",
+      "distance_nm": 80.41,
+      "geometry": [
+        [
+          -7.0,
+          36.0
+        ],
+        [
+          -5.35,
+          35.95
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "gibraltar_strait",
+      "v": "med_west",
+      "name": "Strait of Gibraltar to Western Med",
+      "distance_nm": 413.176,
+      "geometry": [
+        [
+          -5.35,
+          35.95
+        ],
+        [
+          3.0,
+          37.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "med_west",
+      "v": "med_central",
+      "name": "Western Med to Central Med",
+      "distance_nm": 592.299,
+      "geometry": [
+        [
+          3.0,
+          37.5
+        ],
+        [
+          15.0,
+          35.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "med_central",
+      "v": "med_east",
+      "name": "Central Med to Eastern Med",
+      "distance_nm": 655.186,
+      "geometry": [
+        [
+          15.0,
+          35.5
+        ],
+        [
+          28.0,
+          33.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "med_east",
+      "v": "egpsd_fairway",
+      "name": "Eastern Med to Port Said Fairway",
+      "distance_nm": 254.107,
+      "geometry": [
+        [
+          28.0,
+          33.5
+        ],
+        [
+          32.35,
+          31.4
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "egpsd_fairway",
+      "v": "suez_south",
+      "name": "Suez Canal Transit",
+      "distance_nm": 104.0,
+      "geometry": [
+        [
+          32.35,
+          31.4
+        ],
+        [
+          32.32,
+          31.25
+        ],
+        [
+          32.33,
+          30.7
+        ],
+        [
+          32.55,
+          29.85
+        ]
+      ],
+      "canal": "suez"
+    },
+    {
+      "u": "suez_south",
+      "v": "red_sea_north",
+      "name": "Suez South to Northern Red Sea",
+      "distance_nm": 160.1,
+      "geometry": [
+        [
+          32.55,
+          29.85
+        ],
+        [
+          34.0,
+          27.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "red_sea_north",
+      "v": "red_sea_central",
+      "name": "Northern to Central Red Sea",
+      "distance_nm": 446.259,
+      "geometry": [
+        [
+          34.0,
+          27.5
+        ],
+        [
+          38.0,
+          21.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "red_sea_central",
+      "v": "bab_el_mandeb",
+      "name": "Central Red Sea to Bab-el-Mandeb",
+      "distance_nm": 590.201,
+      "geometry": [
+        [
+          38.0,
+          21.0
+        ],
+        [
+          43.4,
+          12.6
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "bab_el_mandeb",
+      "v": "gulf_of_aden",
+      "name": "Bab-el-Mandeb to Gulf of Aden",
+      "distance_nm": 269.994,
+      "geometry": [
+        [
+          43.4,
+          12.6
+        ],
+        [
+          48.0,
+          12.5
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "gulf_of_aden",
+      "v": "arabian_sea_west",
+      "name": "Gulf of Aden to Western Arabian Sea",
+      "distance_nm": 591.942,
+      "geometry": [
+        [
+          48.0,
+          12.5
+        ],
+        [
+          58.0,
+          14.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "arabian_sea_west",
+      "v": "ind_equatorial_east",
+      "name": "Arabian Sea to East Equatorial Indian Ocean",
+      "distance_nm": 2056.093,
+      "geometry": [
+        [
+          58.0,
+          14.0
+        ],
+        [
+          88.0,
+          -3.0
+        ]
+      ],
+      "canal": null
+    },
+    {
+      "u": "arabian_sea_west",
+      "v": "malacca_west",
+      "name": "Arabian Sea to Malacca West",
+      "distance_nm": 2270.833,
+      "geometry": [
+        [
+          58.0,
+          14.0
+        ],
+        [
+          95.5,
+          5.8
+        ]
+      ],
+      "canal": null
+    }
+  ]
+}

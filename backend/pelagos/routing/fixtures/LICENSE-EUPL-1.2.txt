@@ -1,0 +1,111 @@
+================================================================================
+REFERENCE DOCUMENTATION NOTICE — NOT APPLICABLE TO SYNTHETIC PROTOTYPE FIXTURES
+================================================================================
+This EUPL-1.2 license text is stored strictly as reference documentation for the
+upstream Eurostat SeaRoute (MARNET) dataset (github.com/eurostat/searoute), which
+is an unresolved prerequisite for future production routing (D9.3+).
+
+The current D9.2 local prototype routing engine and synthetic test fixtures
+(sea_lanes.json, ports.json) are NOT extracted from Eurostat MARNET and are
+NOT governed by EUPL-1.2. They are original project test artifacts created
+within the workspace. No repository-root LICENSE file is currently committed
+(the MIT license in gods-eye-view-main/LICENSE covers the frontend application
+only); the synthetic fixture is NOT governed by EUPL-1.2.
+================================================================================
+
+European Union Public Licence
+V. 1.2
+EUPL © European Union 2007, 2016
+
+This European Union Public Licence (the 'EUPL') applies to the Work (as defined
+below) which is provided under the terms of this Licence. Any use of the Work,
+other than as authorised under this Licence is prohibited (to the extent such use
+is covered by a right of the copyright holder of the Work).
+
+The Work is provided under the terms of this Licence when the Licensor (as defined
+below) has placed the following notice immediately following the copyright notice
+for the Work:
+
+        Licensed under the EUPL
+
+or has expressed by any other means his intention to license under the EUPL.
+
+1. Definitions
+In this Licence, the following terms have the following meaning:
+- 'The Licence': this Licence.
+- 'The Original Work': the work or software distributed or communicated by the
+  Licensor under this Licence, available as Source Code and also as Executable Code
+  as the case may be.
+- 'Derivative Works': the works or software that could be created by the Licensee,
+  based upon the Original Work or modifications thereof. This Licence does not
+  define the extent of modification or dependence on the Original Work required to
+  constitute a Derivative Work; this extent is determined by copyright law applicable
+  in the country mentioned in Article 15.
+- 'The Work': the Original Work and/or its Derivative Works.
+- 'The Source Code': the human-readable form of the Work which is the most convenient
+  for people to study or modify.
+- 'The Executable Code': any code which has generally been compiled and which is
+  meant to be interpreted by a computer as a program.
+- 'The Licensor': the natural or legal person that distributes or communicates the
+  Work under the Licence.
+- 'The Licensee': any natural or legal person who makes any use of the Work under
+  the terms of the Licence.
+- 'Distribution' or 'Communication': any act of selling, giving, lending, renting,
+  distributing, communicating, transmitting, or otherwise making available, on-line
+  or off-line, the Original Work or Derivative Works.
+
+2. Scope of the rights granted by the Licence
+The Licensor hereby grants the Licensee a world-wide, royalty-free, non-exclusive,
+sublicensable licence to do the following, for the duration of copyright vested in
+the Original Work:
+- use the Work in any circumstance and for all usage,
+- reproduce the Work,
+- modify the Work, and make Derivative Works based upon the Work,
+- communicate to the public, including the right to display or perform the Work or
+  Derivative Works to the public and in all forms of media,
+- distribute the Work and Derivative Works,
+- lend and rent the Work and Derivative Works,
+- sublicense rights in the Work or Derivative Works.
+
+Those rights can be exercised on any media, now known or later invented.
+
+3. Communication of the Source Code
+When the Work is distributed as Executable Code, the Licensor shall provide a machine-
+readable copy of the Source Code with each copy of the Work he distributes or indicate
+a repository where the Source Code is publicly and freely accessible.
+
+4. Limitations of copyright
+Nothing in this Licence is intended to deprive the Licensee of the benefit of any
+exception to the exclusive rights of the rights owners provided for by copyright
+legislation.
+
+5. Compatibility Clause
+If the Licensee Distributes or Communicates Derivative Works or copies thereof based
+upon both the Work and another work licensed under a Compatible Licence, this
+Distribution or Communication may be done under the terms of this Compatible Licence.
+For the purpose of this Article, 'Compatible Licence' refers to the licences listed
+in the Appendix to this Licence.
+
+6. Attribution right
+The Licensee shall keep intact all copyright, patent or trademarks notices and all
+notices that refer to the Licence and to the disclaimer of warranties. The Licensee
+must include a copy of such notices and a copy of the Licence with each copy of the
+Work he Distributes or Communicates. The Licensee must cause any Derivative Work to
+carry prominent notices stating that the Work has been modified and the date of
+modification.
+
+7. Disclaimer of warranty
+The Work is provided under the Licence on an 'as is' basis and without warranties of
+any kind, including without limitation regarding merchantability, fitness for a
+particular purpose, absence of defects or errors, accuracy, non-infringement of
+intellectual property rights.
+
+8. Disclaimer of liability
+Except in the cases of wilful misconduct or damages directly caused to natural
+persons, the Licensor will in no event be liable for any direct or indirect, material
+or moral, damages of any kind, arising out of the Licence or of the use of the Work.
+
+Applicable to the maritime shipping lane network dataset derived from Eurostat SeaRoute:
+- Original Work: Eurostat SeaRoute / MARNET (modules/marnet/marnet.gpkg)
+- Maintainer: European Commission, Eurostat / Julien Gaffuri
+- URL: https://github.com/eurostat/searoute

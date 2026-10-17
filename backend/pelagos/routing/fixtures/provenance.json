@@ -1,0 +1,188 @@
+{
+  "dataset_name": "Pelagos Prototype Maritime Routing Network and Port Reference Fixture",
+  "version": "1.0.2-prototype",
+  "created_at": "2026-10-17",
+  "milestone": "D9.2",
+  "provenance_status": "prototype_test_fixture",
+  "sea_lane_graph": {
+    "fixture_type": "synthetic_prototype_corridor_fixture",
+    "is_upstream_extracted": false,
+    "applicable_license": "Internal project test fixture (unspecified repository-level license; no repository-root LICENSE file currently committed; frontend MIT license in gods-eye-view-main/LICENSE does not govern backend; NOT governed by EUPL-1.2)",
+    "creation_method": "Manually defined macro navigational waypoint coordinates (57 nodes, 58 edges) calibrated to approximate NGA Pub. 151 corridors for D9.2 algorithm validation and canal bypass testing. NOT programmatically extracted from Eurostat marnet.gpkg.",
+    "upstream_reference_target": {
+      "upstream_repository": "https://github.com/eurostat/searoute",
+      "upstream_maintainer": "European Commission, Eurostat / Julien Gaffuri (jgaffuri)",
+      "upstream_release": "searoute-2.0 / Maven artifact eu.europa.ec.eurostat:searoute-marnet:3.6",
+      "upstream_data_file": "modules/marnet/marnet.gpkg (marnet_plus_5km.gpkg)",
+      "applicable_license": "European Union Public License, version 1.2 (EUPL-1.2)",
+      "license_file": "LICENSE-EUPL-1.2.txt (stored as upstream reference documentation only)",
+      "base_network_origin": "Oak Ridge National Laboratory (ORNL) CTA Global Shipping Lane Network (2000, U.S. Federal Government Public Domain under 17 U.S.C. § 105)",
+      "ingestion_status": "unresolved_prerequisite",
+      "blocker_details": "Direct extraction of the multi-megabyte binary GeoPackage marnet.gpkg was not performed in D9.2 to adhere to project constraints prohibiting unvetted large binary downloads and requiring dedicated GeoPackage parsing tooling not present in the current runtime. Upstream MARNET extraction is deferred to D9.3.",
+      "wrapper_licensing_note": "Gent Halili's searoute-py wrapper declares Apache-2.0 on Python wrapper code, but embedded GeoJSON derives from Eurostat EUPL-1.2 MARNET data. Under EUPL-1.2 Article 5, derivative spatial datasets remain subject to EUPL-1.2 copyleft provisions."
+    }
+  },
+  "port_fixture_sources": [
+    {
+      "port_id": "USMSY",
+      "source": "USCG Light List Volume IV (Gulf Coast), 2024 Ed., LLNR 0425 / NOAA Nautical Chart 11361",
+      "authority": "United States Coast Guard (USCG) / NOAA",
+      "license": "U.S. Federal Government Public Domain (17 U.S.C. § 105)",
+      "coordinate_type": "approximate_marine_access_point",
+      "coordinates": [-89.4300, 28.9000],
+      "source_url": "https://www.navcen.uscg.gov/light-list-annual-publication",
+      "reference_coordinates": [-89.428611, 28.905833],
+      "reproducible_geodesic_offset_m": 660.6,
+      "reproducible_geodesic_offset_nm": 0.357,
+      "description": "Stored prototype test coordinate [-89.4300, 28.9000] approximates published Southwest Pass Entrance Lighted Horn Buoy SW (28°54'21\"N, 89°25'43\"W; -89.428611, 28.905833). Geodesic offset: 660.6 m (0.357 NM). Prototype test input; not certified for navigation."
+    },
+    {
+      "port_id": "JPYOK",
+      "source": "Japan Coast Guard (JCG) Hydrographic Dept Chart W1062 / Tokyo Wan Traffic Route Guide (cited secondary source)",
+      "authority": "Japan Coast Guard",
+      "license": "Official Navigational Notice (Japan Coast Guard; Japanese State Copyright / public safety terms; NOT U.S. Public Domain)",
+      "coordinate_type": "unverified_marine_access_point",
+      "coordinates": [139.7300, 35.1500],
+      "source_url": "https://www.kaiho.mlit.go.jp/e/index_e.html",
+      "reference_coordinates": [139.733333, 35.158333],
+      "reproducible_geodesic_offset_m": 973.1,
+      "reproducible_geodesic_offset_nm": 0.525,
+      "description": "Stored prototype test coordinate [139.7300, 35.1500] approximates claimed Uraga Suido Traffic Separation Scheme southern entry gate (35°09.5'N, 139°44.0'E; 139.733333, 35.158333) with a geodesic offset of 973.1 m (0.525 NM). The cited JCG URL is a general portal and does not directly retrieve a public coordinate record online; source coordinate is therefore classified as unverified. Prototype test input; not certified for navigation."
+    },
+    {
+      "port_id": "USSEA",
+      "source": "NOAA Nautical Chart 18480 / Coast Pilot 7 / USCG Light List Vol VI",
+      "authority": "National Oceanic and Atmospheric Administration (NOAA) / USCG",
+      "license": "U.S. Federal Government Public Domain (17 U.S.C. § 105)",
+      "coordinate_type": "approximate_marine_access_point",
+      "coordinates": [-124.7500, 48.5000],
+      "source_url": "https://charts.noaa.gov/OnLineViewer/18480.shtml",
+      "reference_coordinates": [-124.750000, 48.500000],
+      "reproducible_geodesic_offset_m": 0.0,
+      "reproducible_geodesic_offset_nm": 0.0,
+      "description": "Stored prototype test coordinate [-124.7500, 48.5000] matches the published Cape Flattery entrance junction for Strait of Juan de Fuca (48°30.0'N, 124°45.0'W) exactly (0.0 m offset). However, this point represents the outer ocean entrance of the Strait of Juan de Fuca at Cape Flattery, which is 125 NM away from Seattle terminal berths in Elliott Bay; it is classified as an approximate macro approach gate, not a verified terminal access point for Seattle."
+    },
+    {
+      "port_id": "SGSIN",
+      "source": "Maritime and Port Authority of Singapore (MPA) Port Marine Circulars (cited secondary reference)",
+      "authority": "Maritime and Port Authority of Singapore (MPA)",
+      "license": "Official Port Notice (Maritime and Port Authority of Singapore; Singapore State Copyright; NOT U.S. Public Domain)",
+      "coordinate_type": "unverified_marine_access_point",
+      "coordinates": [103.6500, 1.2200],
+      "source_url": "https://www.mpa.gov.sg/port-offshore/port-operations/marine-services/pilotage-services",
+      "reference_coordinates": [103.633333, 1.218333],
+      "reproducible_geodesic_offset_m": 1864.0,
+      "reproducible_geodesic_offset_nm": 1.007,
+      "description": "Stored prototype test coordinate [103.6500, 1.2200] approximates claimed Western Pilot Boarding Ground A (01°13.1'N, 103°38.0'E; 103.633333, 1.218333) with a geodesic offset of 1864.0 m (1.007 NM). The cited MPA URL is a general pilotage landing page and does not directly retrieve an authoritative coordinate record online; source coordinate is therefore classified as unverified. Prototype test input; not certified for navigation."
+    },
+    {
+      "port_id": "NLRTM",
+      "source": "Netherlands Hydrographic Service Nautical Chart 122 (Mond van de Maas) (cited secondary reference)",
+      "authority": "Royal Netherlands Navy Hydrographic Service",
+      "license": "Official Navigational Chart (Netherlands Hydrographic Service / Royal Netherlands Navy; Dutch State Copyright; NOT U.S. Public Domain)",
+      "coordinate_type": "unverified_marine_access_point",
+      "coordinates": [3.8500, 52.0000],
+      "source_url": "https://publicatie.rijkswaterstaat.nl/",
+      "reference_coordinates": [3.885000, 52.028333],
+      "reproducible_geodesic_offset_m": 3964.0,
+      "reproducible_geodesic_offset_nm": 2.140,
+      "description": "Stored prototype test coordinate [3.8500, 52.0000] approximates claimed Maas Center Light Buoy (52°01'42\"N, 003°53'06\"E; 3.885000, 52.028333) with a geodesic offset of 3964.0 m (2.140 NM). The cited Rijkswaterstaat URL is a general search portal and does not directly retrieve Chart 122 coordinates; source coordinate is therefore classified as unverified. Prototype test input; not certified for navigation."
+    },
+    {
+      "port_id": "PAPAC",
+      "source": "Autoridad del Canal de Panamá (ACP) Navigation Regulations (OP Notice N-1-2024) (cited secondary reference)",
+      "authority": "Panama Canal Authority",
+      "license": "Official Maritime Regulation (Autoridad del Canal de Panamá; Panamanian Public Regulation; NOT U.S. Public Domain)",
+      "coordinate_type": "unverified_marine_access_point",
+      "coordinates": [-79.5167, 8.8500],
+      "source_url": "https://pancanal.com/en/maritime-services/rules-and-regulations/",
+      "reference_coordinates": [-79.519167, 8.884167],
+      "reproducible_geodesic_offset_m": 3788.6,
+      "reproducible_geodesic_offset_nm": 2.046,
+      "description": "Stored prototype test coordinate [-79.5167, 8.8500] approximates claimed Pacific Sea Buoy 1/2 (08°53.05'N, 079°31.15'W; -79.519167, 8.884167) with a geodesic offset of 3788.6 m (2.046 NM). The cited ACP regulations portal does not directly retrieve a coordinate record online; source coordinate is therefore classified as unverified. Prototype test input; not certified for navigation."
+    },
+    {
+      "port_id": "EGPSD",
+      "source": "Suez Canal Authority (SCA) Rules of Navigation (Dec 2020 Ed.) (cited secondary reference)",
+      "authority": "Suez Canal Authority",
+      "license": "Official Navigation Rules (Suez Canal Authority; Egyptian Regulatory Notice; NOT U.S. Public Domain)",
+      "coordinate_type": "unverified_marine_access_point",
+      "coordinates": [32.3500, 31.4000],
+      "source_url": "https://www.suezcanal.gov.eg/English/Navigation/NavigationRules/Pages/RulesOfNavigation.aspx",
+      "reference_coordinates": [32.346667, 31.356111],
+      "reproducible_geodesic_offset_m": 4876.5,
+      "reproducible_geodesic_offset_nm": 2.633,
+      "description": "Stored prototype test coordinate [32.3500, 31.4000] approximates claimed Port Said Fairway Light Buoy (31°21'22\"N, 032°20'48\"E; 32.346667, 31.356111) with a geodesic offset of 4876.5 m (2.633 NM). The cited SCA URL is a general landing page and does not directly retrieve an official coordinate table online; source coordinate is therefore classified as unverified. Prototype test input; not certified for navigation."
+    },
+    {
+      "port_id": "CASP_TEST",
+      "source": "UN/LOCODE 2024-1 Port Directory",
+      "authority": "UNECE / UN/CEFACT",
+      "license": "Open UN Terms of Use (UNECE UN/LOCODE Directory)",
+      "coordinate_type": "port_point",
+      "coordinates": [49.8333, 40.3667],
+      "source_url": "https://unece.org/trade/cefact/unlocode-code-list-country-and-territory",
+      "reference_coordinates": [49.833333, 40.366667],
+      "reproducible_geodesic_offset_m": 4.7,
+      "reproducible_geodesic_offset_nm": 0.003,
+      "description": "Baku, Azerbaijan UN/LOCODE 2024-1 Port Directory centroid (40°22'N, 49°50'E). Stored prototype test coordinate [49.8333, 40.3667] has a geodesic offset of 4.7 m (0.003 NM) from the published minute centroid. Prototype test input used exclusively as a disconnected inland water body test; explicitly disclaimed as non-oceanic."
+    }
+  ],
+  "independent_hydrographic_references": {
+    "publication": "NGA Pub. 151: Distances Between Ports (12th Edition, 2019 / 2024 digital update)",
+    "authority": "National Geospatial-Intelligence Agency (NGA)",
+    "license": "U.S. Federal Government Public Domain (17 U.S.C. § 105)",
+    "retrievable_urls": [
+      "https://msi.nga.mil/Publications/WPI",
+      "https://msi.nga.mil"
+    ],
+    "published_corridor_distances": [
+      {
+        "route": "New Orleans, LA (Southwest Pass) to Yokohama, Japan via Panama Canal",
+        "reference_type": "unverified_reconstructed_component_sum",
+        "substantiation_status": "Unverified reconstructed component sum. NGA Pub. 151 does NOT publish a single direct port-to-port table row for New Orleans Southwest Pass fairway to Yokohama. The 9,131 NM, 9,125 NM, and 9,190 NM figures are arithmetic sums reconstructed across intermediate tables whose specific source input distances and matching fairway endpoints are not independently substantiated as a published whole.",
+        "component_arithmetic": {
+          "sw_pass_to_cristobal_fairway_claim_nm": 1399.0,
+          "city_berth_to_cristobal_claim_nm": 1458.0,
+          "panama_canal_fairway_transit_claim_nm": 50.0,
+          "panama_canal_lock_transit_claim_nm": 44.0,
+          "balboa_to_yokohama_gc_claim_nm": 7682.0,
+          "reconstructed_fairway_sum_formula": "1399 + 50 + 7682 = 9131 NM (unverified reconstructed component sum)",
+          "reconstructed_lock_sum_formula": "1399 + 44 + 7682 = 9125 NM (unverified reconstructed component sum)",
+          "reconstructed_city_berth_sum_formula": "1458 + 50 + 7682 = 9190 NM (unverified reconstructed component sum)"
+        },
+        "discrepancy_explanation": "Arithmetic correctness of the component addition (1399 + 50 + 7682 = 9131 vs 1399 + 44 + 7682 = 9125, explaining the 6 NM difference between 50 NM canal fairway transit and 44 NM lock channel) is distinct from verification of the input distances themselves. The input values and fairway endpoints are not independently verified against specific page/table records in NGA Pub. 151.",
+        "unverified_reconstructed_distance_fairway_nm": 9131.0,
+        "unverified_reconstructed_distance_locks_nm": 9125.0,
+        "unverified_reconstructed_distance_city_berth_nm": 9190.0,
+        "pelagos_freight_corridor_benchmark_nm": 9150.0,
+        "benchmark_source": "USDA AMS AgTransport commercial bulk grain corridor benchmark (USG-JPN-BULK)",
+        "computed_prototype_distance_nm": 9105.57,
+        "distinction_note": "The 9,131 NM, 9,125 NM, and 9,190 NM totals are unverified reconstructed component sums, NOT authoritative published fairway distances. Pelagos FreightRoute benchmark (9,150.0 NM) models broader commercial Mississippi River grain elevator loading ranges to Tokyo Bay discharge berths. Computed prototype distance (9,105.57 NM) is the deterministic mathematical output of the 19 calibrated synthetic test waypoints on the prototype graph. It serves as a regression check of pathfinding and geodesic summation, NOT an empirical validation of real-world navigational accuracy."
+      },
+      {
+        "route": "Seattle, WA (Strait of Juan de Fuca) to Yokohama, Japan",
+        "nga_table_reference": "Table 2 (Seattle, Wash. to Yokohama, Japan)",
+        "nga_published_distance_gc_nm": 4312.0,
+        "nga_published_rhumb_line_nm": 4797.0,
+        "unverified_commercial_estimate_note": "The previously cited 4,536 NM figure represents an unverified commercial winter route estimate south of the Aleutians; it is NOT an official published table row in NGA Pub. 151. NGA Pub. 151 publishes 4,312 NM (Great Circle) and 4,797 NM (Rhumb line).",
+        "endpoint_divergence_note": "NGA Pub. 151 published distance (4,312 NM) originates from Seattle inner harbor through Puget Sound. The prototype fixture coordinate for USSEA is at Cape Flattery (48°30'N, 124°45'W), which is 125 NM west of Seattle at the oceanic boundary of the Strait of Juan de Fuca. Because endpoints do not match, published values do not constitute direct validation.",
+        "pelagos_freight_corridor_benchmark_nm": 4520.0,
+        "benchmark_source": "USDA AMS AgTransport commercial bulk grain corridor benchmark (PNW-JPN-BULK)",
+        "computed_prototype_distance_nm": 4403.41,
+        "distinction_note": "Reflects deterministic pathfinding across the 9 prototype test fixture waypoints tracking along 40-48 degrees North latitude. It tests deterministic solver execution, not empirical real-world passage accuracy."
+      },
+      {
+        "route": "Rotterdam, Netherlands to Singapore via Suez Canal",
+        "nga_table_reference": "Table 1 & Table 2 composite segment sum (Unverified reconstructed reference; NOT an authoritative single-entry published table value)",
+        "nga_published_inner_berths_nm": 8387.0,
+        "unverified_composite_fairway_sum_nm": 8288.0,
+        "component_breakdown": "Rotterdam (Maas) to Gibraltar (1,845 NM) + Gibraltar to Port Said (1,925 NM) + Suez Canal fairway transit (104 NM) + Suez to Bab-el-Mandeb (1,308 NM) + Bab-el-Mandeb to Singapore Western Fairway (3,106 NM) = 8,288 NM composite sum.",
+        "substantiation_status": "Unverified composite reference. NGA Pub. 151 publishes inner berth distances (~8,387 NM); the 8,288 NM figure is a reconstructed sum across multiple intermediate junction tables with approximate fairway endpoints, not an independently verifiable direct table row.",
+        "computed_prototype_distance_nm": 8243.18,
+        "distinction_note": "Validates multi-chokepoint pathfinding (English Channel, Gibraltar, Suez 104 NM transit, Bab-el-Mandeb, Malacca Strait) on the prototype graph. It verifies algorithm determinism and canal transit inclusion logic, not real-world hydrographic accuracy."
+      }
+    ]
+  },
+  "navigational_safety_disclaimer": "Coastline boundary checks and sea-lane graph paths reflect macro topological routing only. They do NOT establish that a path is navigationally safe, deep enough for vessel draft, or compliant with international maritime regulations (COLREGS). Pelagos is NOT an ECDIS or passage planning system."
+}
