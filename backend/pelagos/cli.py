@@ -439,6 +439,146 @@ def handle_freight_summary(args):
         db.close()
 
 
+def handle_freight_index(args):
+    """Computes and displays the Pelagos Experimental Grain Index (PEGI-USJPN)."""
+    from pathlib import Path
+    from datetime import date
+    from pelagos.forecasting.service import get_freight_index
+
+    db = get_db_session(args.db_url)
+    storage_dir = Path(args.storage_dir or settings.parquet_storage_dir) if args.storage_dir else None
+    start_d = date.fromisoformat(args.since) if getattr(args, "since", None) else None
+
+    try:
+        data = get_freight_index(db, storage_dir=storage_dir, start_date=start_d)
+        if getattr(args, "format", "table") == "json":
+            print(json.dumps(data, indent=2))
+        else:
+            base_info = data["base_period"]
+            print("=========================================================================================")
+            print(f" {data['index_name']} ({data['index_code']})")
+            print(f" Primary: {data['primary_metric']}")
+            print(f" Relative: {data['relative_index']} (Base: {base_info['date']} = 100.00 pts)")
+            print(f" Scenario: {data['distance_weighted_scenario']['formula']} ({data['distance_weighted_scenario']['status']})")
+            print(f" Spread: {data['spread_metric']}")
+            print("=========================================================================================")
+            header = f"{'Date':10s} | {'USG ($/MT)':10s} | {'PNW ($/MT)':10s} | {'PEGI ($/MT)':11s} | {'PEGI Pts':9s} | {'Spread ($)':10s} | {'Dist. Scen.':11s} | {'Status':12s}"
+            print(header)
+            print("-" * len(header))
+            obs_list = data["observations"]
+            if getattr(args, "limit", None):
+                obs_list = obs_list[-args.limit:]
+            for r in obs_list:
+                u_str = f"{r['usg_rate']:.2f}" if r['usg_rate'] is not None else "-"
+                p_str = f"{r['pnw_rate']:.2f}" if r['pnw_rate'] is not None else "-"
+                pegi_u = f"{r['pegi_usd_mt']:.4f}" if r['pegi_usd_mt'] is not None else "-"
+                pegi_p = f"{r['pegi_points']:.2f}" if r['pegi_points'] is not None else "-"
+                sp_str = f"{r['spread_usd_mt']:.2f}" if r['spread_usd_mt'] is not None else "-"
+                dist_str = f"{r['pegi_distance_weighted_usd_mt']:.4f}" if r['pegi_distance_weighted_usd_mt'] is not None else "-"
+                print(f"{r['observation_date']:10s} | {u_str:10s} | {p_str:10s} | {pegi_u:11s} | {pegi_p:9s} | {sp_str:10s} | {dist_str:11s} | {r['status']:12s}")
+            print(f"Total Periods: {data['records_count']} (Calculated: {data['calculated_count']}, Insufficient Data: {data['insufficient_data_count']})")
+        return 0
+    except Exception as exc:
+        print(json.dumps({"status": "failed", "error": str(exc)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
+def handle_freight_forecast_baseline(args):
+    """Generates and displays experimental point forecasts for freight corridors."""
+    from pathlib import Path
+    from datetime import date
+    from pelagos.forecasting.schemas import (
+        SUPPORTED_DIRECT_ROUTES,
+        DISALLOWED_DERIVED_ROUTES,
+        SUPPORTED_BASELINE_MODELS,
+    )
+    from pelagos.forecasting.service import forecast_next_route_rate
+
+    db = get_db_session(args.db_url)
+    storage_dir = Path(args.storage_dir or settings.parquet_storage_dir) if args.storage_dir else None
+
+    try:
+        route_code = (args.route_code or "").strip()
+        if route_code in DISALLOWED_DERIVED_ROUTES:
+            raise ValueError(
+                f"Route '{route_code}' is a derived rate difference indicator and cannot be forecast directly as a corridor rate."
+            )
+        if route_code not in SUPPORTED_DIRECT_ROUTES:
+            raise ValueError(
+                f"Unsupported route code '{route_code}'. Supported direct routes: {list(SUPPORTED_DIRECT_ROUTES)}"
+            )
+
+        model_type = args.model
+        if model_type is not None:
+            normalized_model = model_type.lower().strip()
+            if normalized_model not in SUPPORTED_BASELINE_MODELS:
+                raise ValueError(
+                    f"Unsupported baseline model '{model_type}'. Supported models: {list(SUPPORTED_BASELINE_MODELS)}"
+                )
+            model_type = normalized_model
+
+        horizon_months = getattr(args, "horizon_months", 1)
+        if horizon_months is None:
+            horizon_months = 1
+        if not isinstance(horizon_months, int) or horizon_months < 1 or horizon_months > 6:
+            raise ValueError(f"Forecast horizon must be between 1 and 6 months: got {horizon_months}")
+
+        origin_d = None
+        if getattr(args, "origin_date", None):
+            try:
+                origin_d = date.fromisoformat(args.origin_date)
+            except ValueError:
+                raise ValueError(f"Invalid origin date format '{args.origin_date}'. Expected YYYY-MM-DD.")
+
+        data = forecast_next_route_rate(
+            db=db,
+            route_code=route_code,
+            model_type=model_type,
+            origin_date=origin_d,
+            horizon_months=horizon_months,
+            storage_dir=storage_dir,
+        )
+
+        if getattr(args, "format", "table") == "json":
+            print(json.dumps(data, indent=2))
+        else:
+            pred_val = data["predicted_value"]
+            uom = data["unit_of_measure"]
+            pred_str = f"{pred_val:.4f} {uom}" if pred_val is not None else "N/A"
+            flags_str = ", ".join(data.get("flags", [])) if data.get("flags") else "None"
+            notes_str = data.get("notes") or "None"
+            default_str = " (default)" if data.get("default_model_applied") else ""
+
+            print("=========================================================================================")
+            print(f" Pelagos Experimental Freight Forecast Baseline")
+            print(f" Route: {data['route_code']} | Model: {data['model_type']}{default_str}")
+            print("=========================================================================================")
+            print(f" Forecast Status : {data['status']}")
+            print(f" Predicted Rate  : {pred_str}")
+            print(f" Origin Date     : {data['origin_date']}")
+            print(f" Target Date     : {data['target_date']} (Horizon: {data['horizon_months']} month(s))")
+            print(f" History Count   : {data['history_count_observed']} observation(s) at origin")
+            print(f" Data Source     : {data['source']}")
+            print(f" Flags           : {flags_str}")
+            if data["status"] == "insufficient_history":
+                print(f" Limitations     : {notes_str}")
+            elif data.get("notes"):
+                print(f" Notes           : {notes_str}")
+            print("=========================================================================================")
+        return 0
+    except Exception as exc:
+        if getattr(args, "format", "table") == "json":
+            print(json.dumps({"status": "failed", "error": str(exc)}, indent=2), file=sys.stderr)
+        else:
+            print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pelagos",
@@ -590,6 +730,60 @@ def build_parser() -> argparse.ArgumentParser:
     parser_freight_summary.add_argument("--storage-dir", default=None, help="Parquet base directory override.")
     parser_freight_summary.add_argument("--db-url", default=None, help="Optional database connection URL override.")
 
+    # Freight Index
+    parser_freight_index = subparsers.add_parser(
+        "freight-index",
+        help="Compute and display the Pelagos Experimental Grain Index (PEGI-USJPN)."
+    )
+    parser_freight_index.add_argument("--since", default=None, help="Show observations on or after date (YYYY-MM-DD).")
+    parser_freight_index.add_argument("--limit", type=int, default=None, help="Limit number of output rows.")
+    parser_freight_index.add_argument("--format", choices=["table", "json"], default="table", help="Output format.")
+    parser_freight_index.add_argument("--storage-dir", default=None, help="Parquet base directory override.")
+    parser_freight_index.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
+    # Freight Forecast Baseline
+    parser_freight_forecast = subparsers.add_parser(
+        "freight-forecast-baseline",
+        help="Generate experimental point forecasts for freight corridors using baseline models."
+    )
+    parser_freight_forecast.add_argument(
+        "--route-code",
+        required=True,
+        help="Corridor route code (USG-JPN-BULK or PNW-JPN-BULK)."
+    )
+    parser_freight_forecast.add_argument(
+        "--model",
+        default=None,
+        help="Baseline model type (default: persistence). Options: persistence, rolling_ma_3, rolling_ma_6, linear_trend_6."
+    )
+    parser_freight_forecast.add_argument(
+        "--origin-date",
+        default=None,
+        help="Forecast origin date in YYYY-MM-DD format (default: latest observed month)."
+    )
+    parser_freight_forecast.add_argument(
+        "--horizon-months",
+        type=int,
+        default=1,
+        help="Forecast horizon in months (1-6, default: 1)."
+    )
+    parser_freight_forecast.add_argument(
+        "--format",
+        choices=["table", "json"],
+        default="table",
+        help="Output format."
+    )
+    parser_freight_forecast.add_argument(
+        "--storage-dir",
+        default=None,
+        help="Parquet base directory override."
+    )
+    parser_freight_forecast.add_argument(
+        "--db-url",
+        default=None,
+        help="Optional database connection URL override."
+    )
+
     return parser
 
 
@@ -623,6 +817,10 @@ def main():
         sys.exit(handle_freight_sync(args))
     elif args.command == "freight-summary":
         sys.exit(handle_freight_summary(args))
+    elif args.command == "freight-index":
+        sys.exit(handle_freight_index(args))
+    elif args.command == "freight-forecast-baseline":
+        sys.exit(handle_freight_forecast_baseline(args))
     else:
         parser.print_help()
         sys.exit(1)

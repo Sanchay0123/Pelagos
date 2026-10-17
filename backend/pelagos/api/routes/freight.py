@@ -104,3 +104,115 @@ def get_route_history_endpoint(
         "observations_count": len(history),
         "history": history,
     }
+
+
+@router.get("/index")
+def get_freight_index_endpoint(
+    start_date: Optional[date] = Query(None, description="Start observation date (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="End observation date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns the Pelagos Experimental Grain Index (U.S.–Japan) (PEGI-USJPN) series,
+    incorporating the primary arithmetic mean rate, base-100 normalized index points,
+    USG-minus-PNW spread indicator, and exploratory distance-weighted scenario.
+    """
+    from pelagos.forecasting.service import get_freight_index
+    return get_freight_index(db=db, start_date=start_date, end_date=end_date)
+
+
+@router.get("/forecast")
+@router.get("/forecast/baseline")
+def get_freight_forecast_endpoint(
+    route_code: str = Query(..., description="Corridor route code (USG-JPN-BULK or PNW-JPN-BULK)"),
+    model_type: Optional[str] = Query(None, description="Baseline model type (default: persistence). Options: persistence, rolling_ma_3, rolling_ma_6, linear_trend_6"),
+    origin_date: Optional[date] = Query(None, description="Forecast origin date (default: latest observed month)"),
+    horizon_months: int = Query(1, ge=1, le=6, description="Discrete forecast horizon in months (default: 1)"),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns an experimental point forecast for a directly observed maritime corridor.
+    Employs deterministic, explainable baseline models (Persistence, MA-3, MA-6, Trend-6).
+    If model_type is omitted, defaults to 'persistence' (primary naive benchmark).
+    If origin_date is specified, history is strictly fenced to observations on or before origin.
+    """
+    from pelagos.forecasting.schemas import (
+        SUPPORTED_DIRECT_ROUTES,
+        DISALLOWED_DERIVED_ROUTES,
+        SUPPORTED_BASELINE_MODELS,
+    )
+    from pelagos.forecasting.service import forecast_next_route_rate
+
+    # Validate route conditioning
+    if route_code in DISALLOWED_DERIVED_ROUTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Route '{route_code}' is a derived spread indicator and cannot be forecast directly as a corridor rate."
+        )
+
+    if route_code not in SUPPORTED_DIRECT_ROUTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported route code '{route_code}'. Supported direct routes: {list(SUPPORTED_DIRECT_ROUTES)}"
+        )
+
+    # Validate model type if provided
+    if model_type is not None:
+        normalized_model = model_type.lower().strip()
+        if normalized_model not in SUPPORTED_BASELINE_MODELS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported baseline model '{model_type}'. Supported models: {list(SUPPORTED_BASELINE_MODELS)}"
+            )
+
+    try:
+        return forecast_next_route_rate(
+            db=db,
+            route_code=route_code,
+            model_type=model_type,
+            origin_date=origin_date,
+            horizon_months=horizon_months,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/forecast/evaluate")
+def get_freight_forecast_evaluation_endpoint(
+    route_code: str = Query(..., description="Corridor route code (USG-JPN-BULK or PNW-JPN-BULK)"),
+    burn_in_months: int = Query(12, ge=6, description="Burn-in warm-up training period in months (default: 12)"),
+    include_steps: bool = Query(False, description="Whether to include step-by-step out-of-sample comparisons"),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns chronological out-of-sample walk-forward evaluation metrics (MAE, RMSE, MAPE)
+    across all baseline models for a directly observed freight corridor.
+    Includes persistence-relative comparative ratios and mandatory preliminary disclaimers.
+    """
+    from pelagos.forecasting.schemas import (
+        SUPPORTED_DIRECT_ROUTES,
+        DISALLOWED_DERIVED_ROUTES,
+    )
+    from pelagos.forecasting.service import evaluate_route_baseline_models
+
+    if route_code in DISALLOWED_DERIVED_ROUTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Route '{route_code}' is a derived spread indicator and cannot be evaluated directly as a corridor rate."
+        )
+
+    if route_code not in SUPPORTED_DIRECT_ROUTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported route code '{route_code}'. Supported direct routes: {list(SUPPORTED_DIRECT_ROUTES)}"
+        )
+
+    try:
+        return evaluate_route_baseline_models(
+            db=db,
+            route_code=route_code,
+            burn_in_months=burn_in_months,
+            include_steps=include_steps,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
