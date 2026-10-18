@@ -20,3 +20,7 @@ htmlcov/
 node_modules/
 dist/
 .vite/
+
+# Routing local cache and external datasets (D9.4)
+.cache/
+data/routing/
