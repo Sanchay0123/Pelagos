@@ -668,8 +668,18 @@ def export_graph_artifact(graph_data: Dict[str, Any], output_path: Path) -> Path
 
 def write_manifest(cache_dir: Path, metadata: Dict[str, Any]) -> Path:
     """Write an auditable manifest.json to the local cache directory."""
+    manifest_dict = dict(metadata)
+    network_artifact = cache_dir / "marnet_network.json"
+    if network_artifact.exists():
+        manifest_dict["compiled_artifacts"] = {
+            "marnet_network_json": {
+                "filename": "marnet_network.json",
+                "sha256": compute_sha256(network_artifact),
+                "size_bytes": network_artifact.stat().st_size,
+            }
+        }
     manifest_path = cache_dir / "manifest.json"
     with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, indent=2, sort_keys=True)
+        json.dump(manifest_dict, f, indent=2, sort_keys=True)
     logger.info("Wrote manifest to %s", manifest_path)
     return manifest_path
