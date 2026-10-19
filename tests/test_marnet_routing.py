@@ -701,6 +701,38 @@ class TestMarnetRoutingIntegration:
         # Zero-weight bridge: distance is 400 + 0 + 400 = 800 NM
         assert res_segmented.summary.graph_distance_nm == 800.0
 
+        # 14c. Reverse direction West -> East (West -> East antimeridian bridge traversal)
+        # Verifies that bridge edge orientation does not invert entry/exit coordinates
+        req_w2e = RoutingRequest(
+            origin=PortIdentifierOrCoords(coordinates=[-170.0, 50.0]),
+            destination=PortIdentifierOrCoords(coordinates=[170.0, 50.0]),
+            routing_mode="marnet",
+            supports_segments=True,
+        )
+        res_w2e = engine.calculate_route(req_w2e)
+        assert res_w2e.status == RoutingStatus.CALCULATED
+        assert res_w2e.geometry == []
+        assert len(res_w2e.geometry_segments) == 2
+
+        w2e_seg1 = res_w2e.geometry_segments[0]
+        w2e_seg2 = res_w2e.geometry_segments[1]
+        # Segment 1 is in Western hemisphere (ends at -180.0)
+        assert w2e_seg1[0][0] == -170.0
+        assert w2e_seg1[-1][0] == -180.0
+        # Segment 2 is in Eastern hemisphere (starts at +180.0)
+        assert w2e_seg2[0][0] == 180.0
+        assert w2e_seg2[-1][0] == 170.0
+
+        # Assert no segment in either direction contains an intra-segment antimeridian discontinuity (|lon[i+1] - lon[i]| > 180)
+        for s_idx, seg in enumerate(res_w2e.geometry_segments):
+            for i in range(len(seg) - 1):
+                d_lon = abs(seg[i + 1][0] - seg[i][0])
+                assert d_lon <= 180.0, f"Discontinuity in w2e seg {s_idx} between {seg[i]} and {seg[i+1]}"
+        for s_idx, seg in enumerate(res_segmented.geometry_segments):
+            for i in range(len(seg) - 1):
+                d_lon = abs(seg[i + 1][0] - seg[i][0])
+                assert d_lon <= 180.0, f"Discontinuity in e2w seg {s_idx} between {seg[i]} and {seg[i+1]}"
+
     def test_15_deterministic_output_identical_inputs(self) -> None:
         """15. Deterministic output for identical inputs and graph artifacts."""
         data = create_synthetic_marnet_data()
@@ -920,4 +952,42 @@ class TestMarnetRealDatasetIntegration:
         )
         assert res_segmented.status == RoutingStatus.CALCULATED
         assert res_segmented.geometry == []
-        assert len(res_segmented.geometry_segments) >= 2
+        assert len(res_segmented.geometry_segments) == 2
+
+        # West-to-East (Seattle -> Yokohama):
+        # Segment 0 must be in Western hemisphere (negative longitudes, ending at -180.0)
+        seg0 = res_segmented.geometry_segments[0]
+        assert seg0[-1][0] == -180.0
+        assert all(pt[0] <= 0.0 for pt in seg0)
+
+        # Segment 1 must be in Eastern hemisphere (positive longitudes, starting at +180.0)
+        seg1 = res_segmented.geometry_segments[1]
+        assert seg1[0][0] == 180.0
+        assert all(pt[0] >= 0.0 for pt in seg1)
+
+        # Zero intra-segment antimeridian jumps across all segments
+        for s_idx, seg in enumerate(res_segmented.geometry_segments):
+            for i in range(len(seg) - 1):
+                d_lon = abs(seg[i + 1][0] - seg[i][0])
+                assert d_lon <= 180.0, f"Discontinuity in Seattle->Yokohama seg {s_idx} at {i}: {seg[i]} -> {seg[i+1]}"
+
+        # Reverse direction East-to-West (Yokohama -> Seattle):
+        res_rev = engine.calculate_route(
+            RoutingRequest(origin="JPYOK", destination="USSEA", routing_mode="marnet", supports_segments=True)
+        )
+        assert res_rev.status == RoutingStatus.CALCULATED
+        assert res_rev.geometry == []
+        assert len(res_rev.geometry_segments) == 2
+
+        rev_seg0 = res_rev.geometry_segments[0]
+        assert rev_seg0[-1][0] == 180.0
+        assert all(pt[0] >= 0.0 for pt in rev_seg0)
+
+        rev_seg1 = res_rev.geometry_segments[1]
+        assert rev_seg1[0][0] == -180.0
+        assert all(pt[0] <= 0.0 for pt in rev_seg1)
+
+        for s_idx, seg in enumerate(res_rev.geometry_segments):
+            for i in range(len(seg) - 1):
+                d_lon = abs(seg[i + 1][0] - seg[i][0])
+                assert d_lon <= 180.0, f"Discontinuity in Yokohama->Seattle seg {s_idx} at {i}: {seg[i]} -> {seg[i+1]}"

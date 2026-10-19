@@ -247,8 +247,8 @@ class MaritimeGraph:
 
             # If the geometry starts closer to v_node than u_node, reverse it
             first_pt = edge_geom[0]
-            d_u_first = geodesic_distance_nm(u_coords[0], u_coords[1], first_pt[0], first_pt[1])
-            d_v_first = geodesic_distance_nm(v_coords[0], v_coords[1], first_pt[0], first_pt[1])
+            d_u_first = (u_coords[0] - first_pt[0]) ** 2 + (u_coords[1] - first_pt[1]) ** 2
+            d_v_first = (v_coords[0] - first_pt[0]) ** 2 + (v_coords[1] - first_pt[1]) ** 2
 
             segment_pts = list(edge_geom)
             if d_v_first < d_u_first:
@@ -493,8 +493,8 @@ class MarnetMaritimeGraph:
             u_coords = self.nodes_data[u_node]
             v_coords = self.nodes_data[v_node]
 
-            d_u_first = geodesic_distance_nm(u_coords[0], u_coords[1], edge_geom[0][0], edge_geom[0][1])
-            d_v_first = geodesic_distance_nm(v_coords[0], v_coords[1], edge_geom[0][0], edge_geom[0][1])
+            d_u_first = (u_coords[0] - edge_geom[0][0]) ** 2 + (u_coords[1] - edge_geom[0][1]) ** 2
+            d_v_first = (v_coords[0] - edge_geom[0][0]) ** 2 + (v_coords[1] - edge_geom[0][1]) ** 2
 
             segment_pts = list(edge_geom)
             if d_v_first < d_u_first:
@@ -510,13 +510,13 @@ class MarnetMaritimeGraph:
 
             if is_bridge:
                 has_antimeridian_crossing = True
-                entry_pt = [float(segment_pts[0][0]), float(segment_pts[0][1])]
+                entry_pt = [float(u_coords[0]), float(u_coords[1])]
                 if not geometry_segments[-1] or geometry_segments[-1][-1] != entry_pt:
                     geometry_segments[-1].append(entry_pt)
                 if not flat_polyline or flat_polyline[-1] != entry_pt:
                     flat_polyline.append(entry_pt)
 
-                exit_pt = [float(segment_pts[1][0]), float(segment_pts[1][1])]
+                exit_pt = [float(v_coords[0]), float(v_coords[1])]
                 geometry_segments.append([exit_pt])
                 flat_polyline.append(exit_pt)
             else:
