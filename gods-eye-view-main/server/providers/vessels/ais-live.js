@@ -119,8 +119,9 @@ export function aisLiveProxy() {
           const pelagosBackendUrl =
             process.env.PELAGOS_BACKEND_URL || 'http://127.0.0.1:8000';
           try {
+            const fallbackLimit = Math.min(maxRows, 5000);
             const resp = await fetch(
-              `${pelagosBackendUrl}/api/v1/vessels/snapshot?limit=${maxRows}`,
+              `${pelagosBackendUrl}/api/v1/vessels/snapshot?limit=${fallbackLimit}`,
               { cache: 'no-store' },
             );
             if (resp.ok) {
@@ -136,6 +137,7 @@ export function aisLiveProxy() {
           }
         }
 
+        const feed = aisStreamStatusSnapshot();
         res.statusCode = process.env.AISSTREAM_API_KEY ? 200 : 503;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.setHeader('Cache-Control', 'no-store');

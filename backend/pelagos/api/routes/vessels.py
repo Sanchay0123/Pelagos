@@ -19,7 +19,7 @@ router = APIRouter(tags=["Vessels"])
 
 @router.get("/vessels/snapshot", response_model=VesselSnapshotResponse)
 def get_vessels_snapshot(
-    limit: int = Query(500, ge=1, le=5000, description="Maximum vessel entities to return"),
+    limit: int = Query(500, ge=1, le=50000, description="Maximum vessel entities to return"),
     vessel_type: Optional[str] = Query(None, description="Filter by vessel category (Cargo, Tanker, Tug, etc.)"),
     min_lat: Optional[float] = Query(None, description="South bounding box latitude"),
     max_lat: Optional[float] = Query(None, description="North bounding box latitude"),
