@@ -161,6 +161,8 @@ export function normalizeLiveVesselItem(
  * - Proximity measures physical geometric distance (≤50 NM) to the generalized sea lane.
  * - It does NOT imply the vessel is traveling on that specific route or toward the destination port.
  * - It does NOT establish commercial charter availability or open-tonnage status.
+ * - Local equirectangular projection is computationally efficient for interactive globe
+ *   filtering, with minor distance distortion at high polar latitudes (>75°).
  *
  * @param {number} lat - Vessel latitude.
  * @param {number} lon - Vessel longitude.
@@ -311,14 +313,26 @@ export function deduplicateAndFilterVessels(rawRows, options = {}) {
     }
   }
 
-  // 3. Sort: near-corridor vessels first, then by display name
+  // 3. Sort: near-corridor vessels first, then by distance, then by name, then deterministic tie-breaker by MMSI
   allVessels.sort((a, b) => {
     if (a.isNearRoute && !b.isNearRoute) return -1;
     if (!a.isNearRoute && b.isNearRoute) return 1;
+
     if (a.distanceToRouteNm !== null && b.distanceToRouteNm !== null) {
-      return a.distanceToRouteNm - b.distanceToRouteNm;
+      const distDiff = a.distanceToRouteNm - b.distanceToRouteNm;
+      if (Math.abs(distDiff) > 1e-6) {
+        return distDiff;
+      }
     }
-    return a.displayName.localeCompare(b.displayName);
+
+    const nameDiff = String(a.displayName || '').localeCompare(
+      String(b.displayName || ''),
+    );
+    if (nameDiff !== 0) {
+      return nameDiff;
+    }
+
+    return String(a.mmsi || '').localeCompare(String(b.mmsi || ''));
   });
 
   // 4. Filter by tab

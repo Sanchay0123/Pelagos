@@ -231,3 +231,85 @@ test('deduplicateAndFilterVessels deduplicates duplicate MMSI entries and calcul
   assert.equal(empty.totalCount, 0);
   assert.equal(empty.vessels.length, 0);
 });
+
+test('deduplicateAndFilterVessels handles equal sort keys deterministically using distance, name, and MMSI tie-breakers', () => {
+  const route = {
+    geometrySegments: [
+      [
+        [0.0, 0.0],
+        [10.0, 0.0],
+      ],
+    ],
+  };
+
+  // Case 1: Equal distance (~12 NM at lat 0.2), different display names
+  // 'ALPHA CARRIER' vs 'ZULU CARRIER'
+  const rowsEqualDistance = [
+    {
+      mmsi: '200',
+      name: 'ZULU CARRIER',
+      lat: 0.2,
+      lon: 5.0,
+      last_position_epoch: 1000,
+    },
+    {
+      mmsi: '100',
+      name: 'ALPHA CARRIER',
+      lat: 0.2,
+      lon: 5.0,
+      last_position_epoch: 1000,
+    },
+  ];
+
+  const sortedByName = deduplicateAndFilterVessels(rowsEqualDistance, {
+    activeRoute: route,
+  }).vessels;
+  assert.equal(
+    sortedByName[0].mmsi,
+    '100',
+    'ALPHA should precede ZULU when distances are equal',
+  );
+  assert.equal(sortedByName[1].mmsi, '200');
+
+  // Case 2: Equal distance AND identical display names -> tie-broken by MMSI
+  const rowsIdenticalName = [
+    {
+      mmsi: '999888777',
+      name: 'PACIFIC TRADER',
+      lat: 0.2,
+      lon: 5.0,
+      last_position_epoch: 1000,
+    },
+    {
+      mmsi: '111222333',
+      name: 'PACIFIC TRADER',
+      lat: 0.2,
+      lon: 5.0,
+      last_position_epoch: 1000,
+    },
+  ];
+
+  const sortedByMmsi1 = deduplicateAndFilterVessels(rowsIdenticalName, {
+    activeRoute: route,
+  }).vessels;
+  assert.equal(
+    sortedByMmsi1[0].mmsi,
+    '111222333',
+    'MMSI 111222333 should precede 999888777 as tie-breaker',
+  );
+  assert.equal(sortedByMmsi1[1].mmsi, '999888777');
+
+  // Verify stability regardless of input ordering
+  const sortedByMmsi2 = deduplicateAndFilterVessels(
+    [...rowsIdenticalName].reverse(),
+    {
+      activeRoute: route,
+    },
+  ).vessels;
+  assert.equal(
+    sortedByMmsi2[0].mmsi,
+    '111222333',
+    'Order must be deterministic regardless of input array ordering',
+  );
+  assert.equal(sortedByMmsi2[1].mmsi, '999888777');
+});
