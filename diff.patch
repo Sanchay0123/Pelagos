@@ -1,0 +1,2685 @@
+diff --git a/gods-eye-view-main/src/ui/pelagosPanel.js b/gods-eye-view-main/src/ui/pelagosPanel.js
+index 299490d..d8c9536 100644
+--- a/gods-eye-view-main/src/ui/pelagosPanel.js
++++ b/gods-eye-view-main/src/ui/pelagosPanel.js
+@@ -18,6 +18,14 @@ import {
+   DIRECTIONS_ROUTE_COLOR,
+   normalizeRoutePayload,
+ } from '../layers/directions/index.js';
++import {
++  CORRIDOR_PROXIMITY_NM,
++  normalizeLiveVesselItem,
++  calculateDistanceToRouteNm,
++  deduplicateAndFilterVessels,
++  formatVesselCoords,
++  formatRelativeAge,
++} from './pelagosVessels.js';
+
+ /** Verified hydrographic ports fallback dataset from backend/pelagos/routing/fixtures/ports.json */
+ export const VERIFIED_HYDROGRAPHIC_PORTS = Object.freeze([
+@@ -108,6 +116,14 @@ export class PelagosPanelController {
+     this._abortController = null;
+     this._boundListeners = [];
+
++    // AIS Vessel Intelligence state
++    this.vesselsRaw = [];
++    this.vesselsNormalized = [];
++    this.selectedMmsi = null;
++    this.vesselFilterTab = 'all'; // 'all' | 'corridor'
++    this.vesselSearchQuery = '';
++    this._windowListeners = [];
++
+     this._resolveElements();
+   }
+
+@@ -176,6 +192,39 @@ export class PelagosPanelController {
+       fleetText: d.getElementById('pelagos-fleet-text'),
+       fleetDesc: d.getElementById('pelagos-fleet-desc'),
+
++      // Vessel Intelligence Controls & Inspector
++      vesselMetrics: d.getElementById('pelagos-vessel-metrics'),
++      globalVesselCount: d.getElementById('pelagos-global-vessel-count'),
++      routeVesselCount: d.getElementById('pelagos-route-vessel-count'),
++      vesselFilterBar: d.getElementById('pelagos-vessel-filter-bar'),
++      vesselSearch: d.getElementById('pelagos-vessel-search'),
++      tabAllBtn: d.getElementById('pelagos-tab-all'),
++      tabAllCount: d.getElementById('pelagos-tab-all-count'),
++      tabCorridorBtn: d.getElementById('pelagos-tab-corridor'),
++      tabCorridorCount: d.getElementById('pelagos-tab-corridor-count'),
++      selectedVesselCard: d.getElementById('pelagos-selected-vessel-card'),
++      selectedVesselName: d.getElementById('pelagos-selected-vessel-name'),
++      selectedVesselClose: d.getElementById('pelagos-selected-vessel-close'),
++      selectedVesselMmsi: d.getElementById('pelagos-selected-vessel-mmsi'),
++      selectedVesselImo: d.getElementById('pelagos-selected-vessel-imo'),
++      selectedVesselType: d.getElementById('pelagos-selected-vessel-type'),
++      selectedVesselDest: d.getElementById('pelagos-selected-vessel-dest'),
++      selectedVesselCoords: d.getElementById('pelagos-selected-vessel-coords'),
++      selectedVesselMotion: d.getElementById('pelagos-selected-vessel-motion'),
++      selectedVesselHeading: d.getElementById(
++        'pelagos-selected-vessel-heading',
++      ),
++      selectedVesselNav: d.getElementById('pelagos-selected-vessel-nav'),
++      selectedVesselTime: d.getElementById('pelagos-selected-vessel-time'),
++      selectedCorridorRow: d.getElementById('pelagos-selected-corridor-row'),
++      selectedVesselCorridor: d.getElementById(
++        'pelagos-selected-vessel-corridor',
++      ),
++      selectedVesselFocus: d.getElementById('pelagos-selected-vessel-focus'),
++      vesselListContainer: d.getElementById('pelagos-vessel-list-container'),
++      vesselList: d.getElementById('pelagos-vessel-list'),
++      vesselEmpty: d.getElementById('pelagos-vessel-empty'),
++
+       // Limitations
+       limitationsList: d.getElementById('pelagos-limitations-list'),
+     };
+@@ -187,6 +236,7 @@ export class PelagosPanelController {
+     if (!this.elements.panel) return;
+
+     this._bindEvents();
++    this._initGlobeEventListeners();
+     await this.loadPorts();
+   }
+
+@@ -196,6 +246,39 @@ export class PelagosPanelController {
+     this._boundListeners.push({ element, event, handler });
+   }
+
++  _initGlobeEventListeners() {
++    if (typeof window === 'undefined' || !window.addEventListener) return;
++
++    const onEntitySelected = (e) => {
++      const record = e?.detail;
++      if (record?.layerId === 'ais-live-vessels') {
++        const mmsi =
++          record?.properties?.mmsi ??
++          record?.entity?.mmsi ??
++          (typeof record?.id === 'string' && record.id.startsWith('ais-')
++            ? record.id.slice(4)
++            : null);
++        if (mmsi) {
++          this.selectVessel(mmsi, { syncGlobe: false, flyCamera: false });
++        }
++      }
++    };
++
++    const onEntityCleared = (e) => {
++      if (!e?.detail?.layerId || e.detail.layerId === 'ais-live-vessels') {
++        this.clearSelectedVessel({ syncGlobe: false });
++      }
++    };
++
++    window.addEventListener('gev:entity-selected', onEntitySelected);
++    window.addEventListener('gev:entity-selection-cleared', onEntityCleared);
++
++    this._windowListeners.push(
++      { event: 'gev:entity-selected', handler: onEntitySelected },
++      { event: 'gev:entity-selection-cleared', handler: onEntityCleared },
++    );
++  }
++
+   _bindEvents() {
+     const el = this.elements;
+
+@@ -234,6 +317,39 @@ export class PelagosPanelController {
+     this._bind(el.destFilter, 'input', (e) => {
+       this.filterPortOptions(el.destSelect, e.target.value);
+     });
++
++    if (el.vesselSearch) {
++      this._bind(el.vesselSearch, 'input', (e) => {
++        this.vesselSearchQuery = e.target.value || '';
++        this.refreshVesselData();
++      });
++    }
++
++    if (el.tabAllBtn) {
++      this._bind(el.tabAllBtn, 'click', () => {
++        this.setVesselTab('all');
++      });
++    }
++
++    if (el.tabCorridorBtn) {
++      this._bind(el.tabCorridorBtn, 'click', () => {
++        this.setVesselTab('corridor');
++      });
++    }
++
++    if (el.selectedVesselClose) {
++      this._bind(el.selectedVesselClose, 'click', () => {
++        this.clearSelectedVessel({ syncGlobe: true });
++      });
++    }
++
++    if (el.selectedVesselFocus) {
++      this._bind(el.selectedVesselFocus, 'click', () => {
++        if (this.selectedMmsi) {
++          this.focusVesselOnGlobe(this.selectedMmsi);
++        }
++      });
++    }
+   }
+
+   /** Retrieve registered port records from the backend API, falling back to fixture data. */
+@@ -350,7 +466,9 @@ export class PelagosPanelController {
+     const dest = el.destSelect?.value;
+
+     if (!origin || !dest) {
+-      this.showValidationMessage('Please select both an origin and destination port.');
++      this.showValidationMessage(
++        'Please select both an origin and destination port.',
++      );
+       return false;
+     }
+
+@@ -783,14 +901,14 @@ export class PelagosPanelController {
+       if (el.rateEmpty) el.rateEmpty.style.display = 'none';
+       if (el.observedTag) el.observedTag.style.display = 'inline-block';
+
+-      if (el.rateVal) el.rateVal.textContent = Number(obs.rate_value).toFixed(2);
++      if (el.rateVal)
++        el.rateVal.textContent = Number(obs.rate_value).toFixed(2);
+       if (el.rateUnit)
+         el.rateUnit.textContent = `${obs.currency || 'USD'}/${obs.unit?.split('/')[1] || 'MT'}`;
+       if (el.rateDate) el.rateDate.textContent = obs.observation_date || '—';
+       if (el.rateSource)
+         el.rateSource.textContent =
+-          obs.source_name ||
+-          "USDA AMS / O'Neil Commodity Consulting";
++          obs.source_name || "USDA AMS / O'Neil Commodity Consulting";
+       if (el.rateType) {
+         el.rateType.textContent = obs.is_derived
+           ? 'Derived Analytical Estimate'
+@@ -866,34 +984,78 @@ export class PelagosPanelController {
+     if (!el.fleetCard) return;
+
+     try {
+-      const resp = await fetch('/api/ais-live?maxRows=1', { cache: 'no-store' });
++      const resp = await fetch('/api/ais-live?maxRows=200', {
++        cache: 'no-store',
++      });
+       if (resp.ok) {
+         const liveData = await resp.json();
+         const status = liveData?.status;
+-        const count = Array.isArray(liveData?.rows) ? liveData.rows.length : 0;
++        const rows = Array.isArray(liveData?.rows) ? liveData.rows : [];
++        const count = rows.length;
+         const totalLive = liveData?.rawRowCount || count;
++        this.totalLiveCount = totalLive;
+
+-        if (status === 'live' && count > 0) {
+-          if (el.fleetTag) {
+-            el.fleetTag.className = 'pelagos-tag tag-ready';
+-            el.fleetTag.textContent = 'TELEMETRY LIVE';
+-          }
+-          if (el.fleetDot) el.fleetDot.className = 'status-indicator-dot dot-active';
+-          if (el.fleetText) el.fleetText.textContent = `Active — Live AIS Telemetry Connected (${totalLive.toLocaleString()} vessels tracked)`;
+-          if (el.fleetDesc) {
+-            el.fleetDesc.textContent =
+-              'Live AIS position stream is connected. Real-time fleet tracking is active across monitored sea lanes. Notice: Commercial open-tonnage fixture lists remain unconnected (AIS telemetry alone does not establish commercial vessel charter availability).';
++        if (
++          (status === 'live' || status === 'sample' || rows.length > 0) &&
++          count > 0
++        ) {
++          this.vesselsRaw = rows;
++          const isSample =
++            status === 'sample' || rows.some((r) => r.historical);
++
++          if (isSample) {
++            if (el.fleetTag) {
++              el.fleetTag.className = 'pelagos-tag tag-warning';
++              el.fleetTag.textContent = 'SAMPLE FEED';
++            }
++            if (el.fleetDot)
++              el.fleetDot.className = 'status-indicator-dot dot-warning';
++            if (el.fleetText) {
++              el.fleetText.textContent = `Historical Sample — 120 Coastal Vessel Tracks (${count} loaded)`;
++            }
++            if (el.fleetDesc) {
++              el.fleetDesc.textContent =
++                'Displaying historical coastal vessel sample. Notice: This is not live telemetry and does not reflect current sea positions or commercial vessel charter availability.';
++            }
++          } else {
++            if (el.fleetTag) {
++              el.fleetTag.className = 'pelagos-tag tag-ready';
++              el.fleetTag.textContent = 'TELEMETRY LIVE';
++            }
++            if (el.fleetDot)
++              el.fleetDot.className = 'status-indicator-dot dot-active';
++            if (el.fleetText) {
++              el.fleetText.textContent = `Active — Live AIS Telemetry Connected (${totalLive.toLocaleString()} vessels tracked)`;
++            }
++            if (el.fleetDesc) {
++              el.fleetDesc.textContent =
++                'Live AIS position stream is connected. Real-time fleet tracking is active across monitored sea lanes. Notice: Commercial open-tonnage fixture lists remain unconnected (AIS telemetry alone does not establish commercial vessel charter availability).';
++            }
+           }
++
++          // Reveal vessel intelligence UI sections
++          if (el.vesselMetrics) el.vesselMetrics.style.display = 'grid';
++          if (el.vesselFilterBar) el.vesselFilterBar.style.display = 'flex';
++          if (el.vesselListContainer)
++            el.vesselListContainer.style.display = 'block';
++
++          this.refreshVesselData();
+           return;
+         }
+
++        // Handle offline / non-active statuses
++        this._hideVesselControls();
++
+         if (status === 'connecting' || status === 'idle') {
+           if (el.fleetTag) {
+             el.fleetTag.className = 'pelagos-tag tag-loading';
+             el.fleetTag.textContent = 'CONNECTING';
+           }
+-          if (el.fleetDot) el.fleetDot.className = 'status-indicator-dot dot-pending';
+-          if (el.fleetText) el.fleetText.textContent = 'Connecting — Establishing AISStream WebSocket…';
++          if (el.fleetDot)
++            el.fleetDot.className = 'status-indicator-dot dot-pending';
++          if (el.fleetText)
++            el.fleetText.textContent =
++              'Connecting — Establishing AISStream WebSocket…';
+           if (el.fleetDesc) {
+             el.fleetDesc.textContent =
+               'WebSocket connection to stream.aisstream.io is in progress. Awaiting initial valid AIS envelope reception.';
+@@ -906,8 +1068,11 @@ export class PelagosPanelController {
+             el.fleetTag.className = 'pelagos-tag tag-offline';
+             el.fleetTag.textContent = 'UNCONFIGURED';
+           }
+-          if (el.fleetDot) el.fleetDot.className = 'status-indicator-dot dot-inactive';
+-          if (el.fleetText) el.fleetText.textContent = 'Unavailable — AISSTREAM_API_KEY is not configured';
++          if (el.fleetDot)
++            el.fleetDot.className = 'status-indicator-dot dot-inactive';
++          if (el.fleetText)
++            el.fleetText.textContent =
++              'Unavailable — AISSTREAM_API_KEY is not configured';
+           if (el.fleetDesc) {
+             el.fleetDesc.textContent =
+               'No AISStream key configured. Add AISSTREAM_API_KEY to Provider Settings (bottom right POWER UP panel) or .env to enable live fleet telemetry.';
+@@ -920,8 +1085,11 @@ export class PelagosPanelController {
+             el.fleetTag.className = 'pelagos-tag tag-offline';
+             el.fleetTag.textContent = 'AUTH FAILED';
+           }
+-          if (el.fleetDot) el.fleetDot.className = 'status-indicator-dot dot-inactive';
+-          if (el.fleetText) el.fleetText.textContent = 'Unavailable — AISStream API key rejected';
++          if (el.fleetDot)
++            el.fleetDot.className = 'status-indicator-dot dot-inactive';
++          if (el.fleetText)
++            el.fleetText.textContent =
++              'Unavailable — AISStream API key rejected';
+           if (el.fleetDesc) {
+             el.fleetDesc.textContent =
+               'The configured AISStream credential was rejected by the upstream gateway. Please verify your AISSTREAM_API_KEY.';
+@@ -933,12 +1101,17 @@ export class PelagosPanelController {
+       /* Fallback to freight endpoint data or default offline state */
+     }
+
++    this._hideVesselControls();
++
+     if (el.fleetTag) {
+       el.fleetTag.className = 'pelagos-tag tag-offline';
+       el.fleetTag.textContent = 'UNCONNECTED';
+     }
+-    if (el.fleetDot) el.fleetDot.className = 'status-indicator-dot dot-inactive';
+-    if (el.fleetText) el.fleetText.textContent = 'Unavailable — live vessel availability data is not connected';
++    if (el.fleetDot)
++      el.fleetDot.className = 'status-indicator-dot dot-inactive';
++    if (el.fleetText)
++      el.fleetText.textContent =
++        'Unavailable — live vessel availability data is not connected';
+     if (el.fleetDesc) {
+       el.fleetDesc.textContent =
+         freight?.vessel_availability?.reason ||
+@@ -946,6 +1119,357 @@ export class PelagosPanelController {
+     }
+   }
+
++  _hideVesselControls() {
++    this.vesselsRaw = [];
++    this.vesselsNormalized = [];
++    this.clearSelectedVessel({ syncGlobe: false });
++    if (this.elements.vesselMetrics)
++      this.elements.vesselMetrics.style.display = 'none';
++    if (this.elements.vesselFilterBar)
++      this.elements.vesselFilterBar.style.display = 'none';
++    if (this.elements.vesselListContainer)
++      this.elements.vesselListContainer.style.display = 'none';
++    if (this.elements.selectedVesselCard)
++      this.elements.selectedVesselCard.style.display = 'none';
++  }
++
++  /** Switch between All Tracked and Near Corridor filter tabs */
++  setVesselTab(tab) {
++    if (this.vesselFilterTab === tab) return;
++    this.vesselFilterTab = tab;
++    if (this.elements.tabAllBtn) {
++      this.elements.tabAllBtn.classList.toggle('active', tab === 'all');
++    }
++    if (this.elements.tabCorridorBtn) {
++      this.elements.tabCorridorBtn.classList.toggle(
++        'active',
++        tab === 'corridor',
++      );
++    }
++    this.refreshVesselData();
++  }
++
++  /** Refresh vessel deduplication, route proximity, metrics, and list rendering */
++  refreshVesselData() {
++    if (!this.vesselsRaw || this.vesselsRaw.length === 0) return;
++
++    const { vessels, totalCount, corridorCount } = deduplicateAndFilterVessels(
++      this.vesselsRaw,
++      {
++        activeRoute: this.currentRoute,
++        searchQuery: this.vesselSearchQuery,
++        tab: this.vesselFilterTab,
++      },
++    );
++    this.vesselsNormalized = vessels;
++
++    if (this.elements.globalVesselCount) {
++      this.elements.globalVesselCount.textContent = (
++        this.totalLiveCount ||
++        totalCount ||
++        this.vesselsRaw.length
++      ).toLocaleString();
++    }
++    if (this.elements.routeVesselCount) {
++      this.elements.routeVesselCount.textContent = this.currentRoute
++        ? corridorCount.toLocaleString()
++        : '—';
++    }
++    if (this.elements.tabAllCount) {
++      this.elements.tabAllCount.textContent = String(totalCount);
++    }
++    if (this.elements.tabCorridorCount) {
++      this.elements.tabCorridorCount.textContent = this.currentRoute
++        ? String(corridorCount)
++        : '—';
++    }
++
++    this.renderVesselList();
++
++    if (this.selectedMmsi) {
++      const stillExists = this.vesselsNormalized.some(
++        (v) => String(v.mmsi) === String(this.selectedMmsi),
++      );
++      if (stillExists) {
++        this.renderSelectedVesselCard();
++      } else {
++        const allVessels = deduplicateAndFilterVessels(this.vesselsRaw, {
++          activeRoute: this.currentRoute,
++        }).vessels;
++        const existsInRaw = allVessels.find(
++          (v) => String(v.mmsi) === String(this.selectedMmsi),
++        );
++        if (existsInRaw) {
++          this.renderSelectedVesselCard(existsInRaw);
++        } else {
++          // Vessel aged out or disappeared from live cache
++          this.clearSelectedVessel({ syncGlobe: false });
++        }
++      }
++    }
++  }
++
++  /** Render the scrollable vessel list with rich telemetry items */
++  renderVesselList() {
++    const el = this.elements;
++    if (!el.vesselList) return;
++    el.vesselList.innerHTML = '';
++
++    const list = this.vesselsNormalized || [];
++    if (list.length === 0) {
++      if (el.vesselEmpty) {
++        el.vesselEmpty.style.display = 'block';
++        if (this.vesselFilterTab === 'corridor' && !this.currentRoute) {
++          el.vesselEmpty.textContent =
++            'Calculate a route first to identify vessels operating near the corridor.';
++        } else if (this.vesselFilterTab === 'corridor') {
++          el.vesselEmpty.textContent =
++            'No live vessels detected within 50 NM of the active route corridor.';
++        } else if (this.vesselSearchQuery) {
++          el.vesselEmpty.textContent = `No tracked vessels match "${this.vesselSearchQuery}".`;
++        } else {
++          el.vesselEmpty.textContent =
++            'No tracked vessels currently available.';
++        }
++      }
++      return;
++    }
++
++    if (el.vesselEmpty) el.vesselEmpty.style.display = 'none';
++
++    list.forEach((v) => {
++      const item = this.doc.createElement('div');
++      item.className = 'pelagos-vessel-item';
++      if (this.selectedMmsi && String(v.mmsi) === String(this.selectedMmsi)) {
++        item.classList.add('selected');
++        item.classList.add('is-selected');
++      }
++      if (!item.dataset) item.dataset = {};
++      item.dataset.mmsi = String(v.mmsi);
++
++      // Top row: name and type tag
++      const topRow = this.doc.createElement('div');
++      topRow.className = 'vessel-item-top';
++
++      const nameEl = this.doc.createElement('span');
++      nameEl.className = 'vessel-name';
++      nameEl.textContent = v.displayName;
++      topRow.appendChild(nameEl);
++
++      const typeTag = this.doc.createElement('span');
++      typeTag.className = 'vessel-tag';
++      typeTag.textContent = v.displayType;
++      topRow.appendChild(typeTag);
++      item.appendChild(topRow);
++
++      // Sub row: MMSI and relative age
++      const subRow = this.doc.createElement('div');
++      subRow.className = 'vessel-item-sub';
++
++      const mmsiEl = this.doc.createElement('span');
++      mmsiEl.className = 'vessel-mmsi';
++      mmsiEl.textContent = `MMSI: ${v.mmsi}`;
++      subRow.appendChild(mmsiEl);
++
++      const ageEl = this.doc.createElement('span');
++      ageEl.className = `vessel-age ${v.isStale ? 'stale' : ''}`;
++      ageEl.textContent = v.ageFormatted;
++      subRow.appendChild(ageEl);
++      item.appendChild(subRow);
++
++      // Detail row: Motion & Proximity
++      const detailRow = this.doc.createElement('div');
++      detailRow.className = 'vessel-item-detail';
++
++      const motionEl = this.doc.createElement('span');
++      motionEl.className = 'vessel-motion';
++      motionEl.textContent = `${v.speedFormatted} · ${v.courseFormatted}`;
++      detailRow.appendChild(motionEl);
++
++      if (v.isNearCorridor && v.distanceToRouteNm !== null) {
++        const proxEl = this.doc.createElement('span');
++        proxEl.className = 'vessel-proximity';
++        proxEl.textContent = `⟵ ${v.distanceToRouteNm.toFixed(1)} NM`;
++        detailRow.appendChild(proxEl);
++      }
++      item.appendChild(detailRow);
++
++      item.addEventListener('click', () => {
++        this.selectVessel(v.mmsi, { syncGlobe: true, flyCamera: true });
++      });
++
++      el.vesselList.appendChild(item);
++    });
++  }
++
++  /** Select a vessel by MMSI, update the inspector card, and sync with Cesium globe */
++  selectVessel(mmsi, { syncGlobe = true, flyCamera = true } = {}) {
++    if (!mmsi) return;
++    this.selectedMmsi = String(mmsi);
++
++    let vessel = this.vesselsNormalized.find(
++      (v) => String(v.mmsi) === this.selectedMmsi,
++    );
++    if (!vessel && this.vesselsRaw?.length > 0) {
++      const all = deduplicateAndFilterVessels(this.vesselsRaw, {
++        activeRoute: this.currentRoute,
++      }).vessels;
++      vessel = all.find((v) => String(v.mmsi) === this.selectedMmsi);
++    }
++
++    if (!vessel) return;
++
++    if (this.elements.vesselList) {
++      const items = this.elements.vesselList.querySelectorAll
++        ? this.elements.vesselList.querySelectorAll('.pelagos-vessel-item')
++        : [];
++      for (const item of items) {
++        const isSelected = item.dataset?.mmsi === this.selectedMmsi;
++        if (item.classList?.toggle) {
++          item.classList.toggle('selected', isSelected);
++          item.classList.toggle('is-selected', isSelected);
++        }
++      }
++    }
++
++    this.renderSelectedVesselCard(vessel);
++
++    if (syncGlobe) {
++      this.services.aisLiveVesselsLayer?.selectById?.(vessel.mmsi);
++      if (flyCamera) {
++        this.focusVesselOnGlobe(vessel.mmsi);
++      }
++    }
++  }
++
++  /** Clear selected vessel state and deselect on Cesium layer */
++  clearSelectedVessel({ syncGlobe = true } = {}) {
++    this.selectedMmsi = null;
++
++    if (this.elements.selectedVesselCard) {
++      this.elements.selectedVesselCard.style.display = 'none';
++    }
++
++    if (this.elements.vesselList) {
++      const items = this.elements.vesselList.querySelectorAll
++        ? this.elements.vesselList.querySelectorAll('.pelagos-vessel-item')
++        : [];
++      for (const item of items) {
++        if (item.classList?.remove) {
++          item.classList.remove('selected');
++          item.classList.remove('is-selected');
++        }
++      }
++    }
++
++    if (syncGlobe) {
++      this.services.aisLiveVesselsLayer?.clearSelection?.();
++    }
++  }
++
++  /** Focus the Cesium globe camera onto a tracked vessel */
++  focusVesselOnGlobe(mmsi) {
++    if (!mmsi) return;
++    const targetMmsi = String(mmsi);
++    let vessel = this.vesselsNormalized.find(
++      (v) => String(v.mmsi) === targetMmsi,
++    );
++    if (!vessel && this.vesselsRaw?.length > 0) {
++      const all = deduplicateAndFilterVessels(this.vesselsRaw, {
++        activeRoute: this.currentRoute,
++      }).vessels;
++      vessel = all.find((v) => String(v.mmsi) === targetMmsi);
++    }
++    if (!vessel) return;
++
++    if (this.services.worldFocus?.requestWorldFocus) {
++      this.services.worldFocus.requestWorldFocus({
++        kind: 'vessel',
++        id: vessel.mmsi,
++        label: vessel.displayName,
++        position: {
++          latitude: vessel.lat,
++          longitude: vessel.lon,
++          altitude: 25000,
++        },
++      });
++    }
++
++    if (
++      this.viewer?.camera?.flyTo &&
++      Number.isFinite(vessel.lat) &&
++      Number.isFinite(vessel.lon)
++    ) {
++      try {
++        this.viewer.camera.flyTo({
++          destination: Cesium.Cartesian3.fromDegrees(
++            vessel.lon,
++            vessel.lat,
++            25000,
++          ),
++          duration: 1.5,
++        });
++      } catch {
++        /* best effort */
++      }
++    }
++  }
++
++  /** Render the Selected Vessel inspector card with complete telemetry fields */
++  renderSelectedVesselCard(vesselRecord = null) {
++    const el = this.elements;
++    if (!el.selectedVesselCard) return;
++
++    const v =
++      vesselRecord ||
++      this.vesselsNormalized.find(
++        (item) => String(item.mmsi) === String(this.selectedMmsi),
++      );
++
++    if (!v) {
++      el.selectedVesselCard.style.display = 'none';
++      return;
++    }
++
++    el.selectedVesselCard.style.display = 'block';
++
++    if (el.selectedVesselName)
++      el.selectedVesselName.textContent = v.displayName;
++    if (el.selectedVesselMmsi) el.selectedVesselMmsi.textContent = v.mmsi;
++    if (el.selectedVesselImo) el.selectedVesselImo.textContent = v.imo;
++    if (el.selectedVesselType)
++      el.selectedVesselType.textContent = v.type || 'Not reported';
++    if (el.selectedVesselDest)
++      el.selectedVesselDest.textContent = v.destination;
++    if (el.selectedVesselCoords)
++      el.selectedVesselCoords.textContent = formatVesselCoords(v.lat, v.lon);
++    if (el.selectedVesselMotion)
++      el.selectedVesselMotion.textContent = `${v.speedFormatted} · ${v.courseFormatted}`;
++    if (el.selectedVesselHeading)
++      el.selectedVesselHeading.textContent = v.headingFormatted;
++    if (el.selectedVesselNav) el.selectedVesselNav.textContent = v.navStatus;
++    if (el.selectedVesselTime) {
++      if (v.lastPositionUtc && v.lastPositionUtc !== 'Not reported') {
++        el.selectedVesselTime.textContent = `${v.lastPositionUtc} (${v.ageFormatted})`;
++      } else if (v.ageFormatted && v.ageFormatted !== 'Not reported') {
++        el.selectedVesselTime.textContent = v.ageFormatted;
++      } else {
++        el.selectedVesselTime.textContent = 'Not reported';
++      }
++    }
++
++    if (el.selectedCorridorRow && el.selectedVesselCorridor) {
++      if (v.distanceToRouteNm !== null && this.currentRoute) {
++        el.selectedCorridorRow.style.display = 'flex';
++        el.selectedVesselCorridor.textContent = `${v.distanceToRouteNm.toFixed(1)} NM ${
++          v.isNearCorridor ? '(Within 50 NM Corridor)' : '(Outside Corridor)'
++        }`;
++      } else {
++        el.selectedCorridorRow.style.display = 'none';
++      }
++    }
++  }
++
+   /** Remove route entities from Cesium globe. */
+   clearGlobeGraphics() {
+     if (this.viewer?.entities) {
+@@ -981,6 +1505,11 @@ export class PelagosPanelController {
+
+     this.filterPortOptions(this.elements.originSelect, '');
+     this.filterPortOptions(this.elements.destSelect, '');
++
++    // Refresh vessel corridor proximity calculations without active route
++    if (this.vesselsRaw && this.vesselsRaw.length > 0) {
++      this.refreshVesselData();
++    }
+   }
+
+   /** Teardown all event listeners, graphics, and abort pending requests. */
+@@ -996,5 +1525,20 @@ export class PelagosPanelController {
+       }
+     }
+     this._boundListeners = [];
++
++    for (const { event, handler } of this._windowListeners) {
++      try {
++        if (typeof window !== 'undefined' && window.removeEventListener) {
++          window.removeEventListener(event, handler);
++        }
++      } catch {
++        /* listener cleanup is best effort */
++      }
++    }
++    this._windowListeners = [];
++
++    this.clearSelectedVessel({ syncGlobe: true });
++    this.vesselsRaw = [];
++    this.vesselsNormalized = [];
+   }
+ }
+diff --git a/gods-eye-view-main/src/ui/pelagosPanel.test.mjs b/gods-eye-view-main/src/ui/pelagosPanel.test.mjs
+index f2822ae..0fe0e33 100644
+--- a/gods-eye-view-main/src/ui/pelagosPanel.test.mjs
++++ b/gods-eye-view-main/src/ui/pelagosPanel.test.mjs
+@@ -12,15 +12,25 @@ function createMockDom() {
+     const listeners = new Map();
+     const children = [];
+     const classes = new Set();
++    let _innerHTML = '';
+     const el = {
+       id,
+       tagName: tag.toUpperCase(),
+       value: '',
+       textContent: '',
+-      innerHTML: '',
++      get innerHTML() {
++        return _innerHTML;
++      },
++      set innerHTML(val) {
++        _innerHTML = val;
++        if (val === '') {
++          children.length = 0;
++        }
++      },
+       style: {},
+       disabled: false,
+       children,
++      dataset: {},
+       classList: {
+         add: (...names) => names.forEach((n) => classes.add(n)),
+         remove: (...names) => names.forEach((n) => classes.delete(n)),
+@@ -53,6 +63,25 @@ function createMockDom() {
+         }
+         return null;
+       },
++      querySelectorAll: (selector) => {
++        const results = [];
++        const match = (elem) => {
++          if (selector.startsWith('.')) {
++            const cls = selector.slice(1);
++            if (
++              elem.classList?.contains?.(cls) ||
++              elem.className?.includes?.(cls)
++            ) {
++              results.push(elem);
++            }
++          }
++          if (elem.children) {
++            elem.children.forEach(match);
++          }
++        };
++        children.forEach(match);
++        return results;
++      },
+       addEventListener: (event, handler) => {
+         if (!listeners.has(event)) listeners.set(event, []);
+         listeners.get(event).push(handler);
+@@ -125,6 +154,35 @@ function createMockDom() {
+     'pelagos-fleet-desc',
+     'pelagos-scope-card',
+     'pelagos-limitations-list',
++
++    // Vessel intelligence elements
++    'pelagos-vessel-metrics',
++    'pelagos-global-vessel-count',
++    'pelagos-route-vessel-count',
++    'pelagos-vessel-filter-bar',
++    'pelagos-vessel-search',
++    'pelagos-tab-all',
++    'pelagos-tab-all-count',
++    'pelagos-tab-corridor',
++    'pelagos-tab-corridor-count',
++    'pelagos-selected-vessel-card',
++    'pelagos-selected-vessel-name',
++    'pelagos-selected-vessel-close',
++    'pelagos-selected-vessel-mmsi',
++    'pelagos-selected-vessel-imo',
++    'pelagos-selected-vessel-type',
++    'pelagos-selected-vessel-dest',
++    'pelagos-selected-vessel-coords',
++    'pelagos-selected-vessel-motion',
++    'pelagos-selected-vessel-heading',
++    'pelagos-selected-vessel-nav',
++    'pelagos-selected-vessel-time',
++    'pelagos-selected-corridor-row',
++    'pelagos-selected-vessel-corridor',
++    'pelagos-selected-vessel-focus',
++    'pelagos-vessel-list-container',
++    'pelagos-vessel-list',
++    'pelagos-vessel-empty',
+   ];
+
+   for (const id of ids) {
+@@ -263,8 +321,16 @@ test('Test A: Seattle -> Yokohama renders MARNET segments and populates monitore
+     routing_mode: 'marnet',
+     geometry: [],
+     geometry_segments: [
+-      [[-124.75, 48.5], [-170.0, 52.0], [-180.0, 52.5]],
+-      [[180.0, 52.5], [160.0, 48.0], [139.73, 35.15]],
++      [
++        [-124.75, 48.5],
++        [-170.0, 52.0],
++        [-180.0, 52.5],
++      ],
++      [
++        [180.0, 52.5],
++        [160.0, 48.0],
++        [139.73, 35.15],
++      ],
+     ],
+     waypoints: [
+       { name: 'Seattle Access', longitude: -124.75, latitude: 48.5 },
+@@ -290,14 +356,19 @@ test('Test A: Seattle -> Yokohama renders MARNET segments and populates monitore
+       cargo_type: 'Grain / Dry Bulk',
+       vessel_class: 'Panamax / Supramax',
+     },
+-    origin_port: { port_id: 'USSEA', name: 'Seattle', region: 'U.S. Pacific Northwest' },
++    origin_port: {
++      port_id: 'USSEA',
++      name: 'Seattle',
++      region: 'U.S. Pacific Northwest',
++    },
+     destination_port: { port_id: 'JPYOK', name: 'Yokohama', region: 'Japan' },
+     latest_observation: {
+       observation_date: '2026-09-01',
+       rate_value: 37.31,
+       currency: 'USD',
+       unit: 'USD/MT',
+-      source_name: "USDA Agricultural Marketing Service / O'Neil Commodity Consulting",
++      source_name:
++        "USDA Agricultural Marketing Service / O'Neil Commodity Consulting",
+       is_derived: false,
+     },
+     baseline_forecast: {
+@@ -346,9 +417,18 @@ test('Test A: Seattle -> Yokohama renders MARNET segments and populates monitore
+     assert.equal(elements.get('pelagos-dist-nm').textContent, '4,512.3');
+
+     // Corridor
+-    assert.equal(elements.get('pelagos-corridor-status-tag').textContent, 'MONITORED');
+-    assert.equal(elements.get('pelagos-corridor-code').textContent, 'PNW-JPN-BULK');
+-    assert.equal(elements.get('pelagos-corridor-cargo').textContent, 'Grain / Dry Bulk');
++    assert.equal(
++      elements.get('pelagos-corridor-status-tag').textContent,
++      'MONITORED',
++    );
++    assert.equal(
++      elements.get('pelagos-corridor-code').textContent,
++      'PNW-JPN-BULK',
++    );
++    assert.equal(
++      elements.get('pelagos-corridor-cargo').textContent,
++      'Grain / Dry Bulk',
++    );
+
+     // Observed Rate
+     assert.equal(elements.get('pelagos-rate-val').textContent, '37.31');
+@@ -359,8 +439,14 @@ test('Test A: Seattle -> Yokohama renders MARNET segments and populates monitore
+
+     // Forecast
+     assert.equal(elements.get('pelagos-forecast-val').textContent, '37.31');
+-    assert.equal(elements.get('pelagos-forecast-period').textContent, '2026-10-01');
+-    assert.match(elements.get('pelagos-forecast-model').textContent, /Persistence/i);
++    assert.equal(
++      elements.get('pelagos-forecast-period').textContent,
++      '2026-10-01',
++    );
++    assert.match(
++      elements.get('pelagos-forecast-model').textContent,
++      /Persistence/i,
++    );
+
+     // Limitations
+     assert.ok(elements.get('pelagos-limitations-list').children.length >= 1);
+@@ -381,9 +467,19 @@ test('Test B: Rotterdam -> Singapore calculates route and displays honest unmoni
+     status: 'calculated',
+     route_method: 'marnet_50km_generalized_graph',
+     routing_mode: 'marnet',
+-    geometry: [[3.85, 52.0], [10.0, 40.0], [32.35, 31.4], [103.65, 1.22]],
++    geometry: [
++      [3.85, 52.0],
++      [10.0, 40.0],
++      [32.35, 31.4],
++      [103.65, 1.22],
++    ],
+     geometry_segments: [
+-      [[3.85, 52.0], [10.0, 40.0], [32.35, 31.4], [103.65, 1.22]],
++      [
++        [3.85, 52.0],
++        [10.0, 40.0],
++        [32.35, 31.4],
++        [103.65, 1.22],
++      ],
+     ],
+     waypoints: [
+       { name: 'Rotterdam Approach', longitude: 3.85, latitude: 52.0 },
+@@ -396,15 +492,29 @@ test('Test B: Rotterdam -> Singapore calculates route and displays honest unmoni
+       destination_name: 'Singapore',
+       total_distance_nm: 8409.79,
+       total_distance_km: 15574.93,
+-      canals_transited: ['dover', 'gibraltar', 'suez', 'babelmandeb', 'malacca'],
++      canals_transited: [
++        'dover',
++        'gibraltar',
++        'suez',
++        'babelmandeb',
++        'malacca',
++      ],
+     },
+   };
+
+   const mockFreightPayload = {
+     status: 'unmonitored',
+     corridor: null,
+-    origin_port: { port_id: 'NLRTM', name: 'Rotterdam', region: 'Northern Europe' },
+-    destination_port: { port_id: 'SGSIN', name: 'Singapore', region: 'Southeast Asia' },
++    origin_port: {
++      port_id: 'NLRTM',
++      name: 'Rotterdam',
++      region: 'Northern Europe',
++    },
++    destination_port: {
++      port_id: 'SGSIN',
++      name: 'Singapore',
++      region: 'Southeast Asia',
++    },
+     latest_observation: null,
+     baseline_forecast: null,
+     vessel_availability: {
+@@ -443,19 +553,43 @@ test('Test B: Rotterdam -> Singapore calculates route and displays honest unmoni
+     assert.equal(elements.get('pelagos-dist-nm').textContent, '8,409.8');
+
+     // Corridor: UNMONITORED tag and notice
+-    assert.equal(elements.get('pelagos-corridor-status-tag').textContent, 'UNMONITORED');
+-    assert.equal(elements.get('pelagos-corridor-content').style.display, 'none');
+-    assert.equal(elements.get('pelagos-unmonitored-notice').style.display, 'flex');
+-    assert.match(elements.get('pelagos-unmonitored-desc').textContent, /unmonitored/i);
++    assert.equal(
++      elements.get('pelagos-corridor-status-tag').textContent,
++      'UNMONITORED',
++    );
++    assert.equal(
++      elements.get('pelagos-corridor-content').style.display,
++      'none',
++    );
++    assert.equal(
++      elements.get('pelagos-unmonitored-notice').style.display,
++      'flex',
++    );
++    assert.match(
++      elements.get('pelagos-unmonitored-desc').textContent,
++      /unmonitored/i,
++    );
+
+     // No fabricated rate or forecast!
+-    assert.equal(elements.get('pelagos-observed-content').style.display, 'none');
++    assert.equal(
++      elements.get('pelagos-observed-content').style.display,
++      'none',
++    );
+     assert.equal(elements.get('pelagos-rate-empty').style.display, 'block');
+-    assert.match(elements.get('pelagos-rate-empty').textContent, /no freight rate observations/i);
+-
+-    assert.equal(elements.get('pelagos-forecast-content').style.display, 'none');
++    assert.match(
++      elements.get('pelagos-rate-empty').textContent,
++      /no freight rate observations/i,
++    );
++
++    assert.equal(
++      elements.get('pelagos-forecast-content').style.display,
++      'none',
++    );
+     assert.equal(elements.get('pelagos-forecast-empty').style.display, 'block');
+-    assert.match(elements.get('pelagos-forecast-empty').textContent, /no predictive forecast model/i);
++    assert.match(
++      elements.get('pelagos-forecast-empty').textContent,
++      /no predictive forecast model/i,
++    );
+   } finally {
+     globalThis.fetch = origFetch;
+     controller.destroy();
+@@ -474,7 +608,12 @@ test('Pelagos clearRoute removes graphics and resets dashboard', async () => {
+
+   controller.drawRouteOnGlobe(
+     {
+-      geometrySegments: [[[-124.75, 48.5], [139.73, 35.15]]],
++      geometrySegments: [
++        [
++          [-124.75, 48.5],
++          [139.73, 35.15],
++        ],
++      ],
+       steps: [],
+     },
+     { coordinates: [-124.75, 48.5], name: 'Seattle' },
+@@ -511,9 +650,14 @@ test('Pelagos updateFleetAvailability handles live AISStream states and distingu
+       }),
+     });
+
+-    await controller.updateFleetAvailability({ vessel_availability: { status: 'unavailable' } });
++    await controller.updateFleetAvailability({
++      vessel_availability: { status: 'unavailable' },
++    });
+     assert.equal(elements.get('pelagos-fleet-tag').textContent, 'UNCONFIGURED');
+-    assert.match(elements.get('pelagos-fleet-text').textContent, /AISSTREAM_API_KEY is not configured/);
++    assert.match(
++      elements.get('pelagos-fleet-text').textContent,
++      /AISSTREAM_API_KEY is not configured/,
++    );
+
+     // 2. Test live connected state with valid messages
+     globalThis.fetch = async () => ({
+@@ -525,10 +669,590 @@ test('Pelagos updateFleetAvailability handles live AISStream states and distingu
+       }),
+     });
+
+-    await controller.updateFleetAvailability({ vessel_availability: { status: 'unavailable' } });
+-    assert.equal(elements.get('pelagos-fleet-tag').textContent, 'TELEMETRY LIVE');
+-    assert.match(elements.get('pelagos-fleet-text').textContent, /Active — Live AIS Telemetry Connected/);
+-    assert.match(elements.get('pelagos-fleet-desc').textContent, /AIS telemetry alone does not establish commercial vessel charter availability/);
++    await controller.updateFleetAvailability({
++      vessel_availability: { status: 'unavailable' },
++    });
++    assert.equal(
++      elements.get('pelagos-fleet-tag').textContent,
++      'TELEMETRY LIVE',
++    );
++    assert.match(
++      elements.get('pelagos-fleet-text').textContent,
++      /Active — Live AIS Telemetry Connected/,
++    );
++    assert.match(
++      elements.get('pelagos-fleet-desc').textContent,
++      /AIS telemetry alone does not establish commercial vessel charter availability/,
++    );
++  } finally {
++    globalThis.fetch = origFetch;
++    controller.destroy();
++  }
++});
++
++test('Pelagos vessel list normalizes and renders vessel details with missing fields handled honestly', async () => {
++  const { doc, elements } = createMockDom();
++  const controller = new PelagosPanelController({ document: doc });
++  await controller.init();
++
++  const nowEpoch = Math.floor(Date.now() / 1000);
++  const rows = [
++    {
++      mmsi: '352001000',
++      imo: '9876543',
++      name: 'PACIFIC GLORY',
++      type: 'Cargo',
++      destination: 'YOKOHAMA',
++      lat: 48.0,
++      lon: -125.0,
++      speed: 14.5,
++      course: 270.0,
++      heading: 271,
++      last_position_UTC: '2026-10-19T07:00:00Z',
++      last_position_epoch: nowEpoch - 60,
++    },
++    {
++      mmsi: '211000000',
++      // All optional fields missing
++      lat: 30.0,
++      lon: 130.0,
++      last_position_epoch: nowEpoch - 1200,
++    },
++  ];
++
++  const origFetch = globalThis.fetch;
++  try {
++    globalThis.fetch = async () => ({
++      ok: true,
++      json: async () => ({ status: 'live', rows, rawRowCount: 2 }),
++    });
++
++    await controller.updateFleetAvailability();
++
++    // Verify UI container revealed
++    assert.equal(elements.get('pelagos-vessel-metrics').style.display, 'grid');
++    assert.equal(
++      elements.get('pelagos-vessel-filter-bar').style.display,
++      'flex',
++    );
++    assert.equal(
++      elements.get('pelagos-vessel-list-container').style.display,
++      'block',
++    );
++
++    const list = elements.get('pelagos-vessel-list');
++    assert.equal(list.children.length, 2);
++
++    // Verify fully populated vessel item
++    const item1 = list.children.find((c) => c.dataset.mmsi === '352001000');
++    assert.ok(item1);
++    assert.equal(item1.dataset.mmsi, '352001000');
++    const nameEl = item1.querySelectorAll('.vessel-name')[0];
++    assert.ok(nameEl);
++    assert.equal(nameEl.textContent, 'PACIFIC GLORY');
++
++    // Verify missing fields handling on selection of vessel 2
++    controller.selectVessel('211000000', {
++      syncGlobe: false,
++      flyCamera: false,
++    });
++
++    assert.equal(
++      elements.get('pelagos-selected-vessel-card').style.display,
++      'block',
++    );
++    assert.equal(
++      elements.get('pelagos-selected-vessel-mmsi').textContent,
++      '211000000',
++    );
++    assert.equal(
++      elements.get('pelagos-selected-vessel-name').textContent,
++      'MMSI 211000000',
++    );
++    assert.equal(
++      elements.get('pelagos-selected-vessel-imo').textContent,
++      'Not reported',
++    );
++    assert.equal(
++      elements.get('pelagos-selected-vessel-type').textContent,
++      'Not reported',
++    );
++    assert.equal(
++      elements.get('pelagos-selected-vessel-dest').textContent,
++      'Not reported',
++    );
++    assert.equal(
++      elements.get('pelagos-selected-vessel-nav').textContent,
++      'Not reported',
++    );
++    assert.equal(
++      elements.get('pelagos-selected-vessel-motion').textContent,
++      'Not reported · Not reported',
++    );
++    assert.equal(
++      elements.get('pelagos-selected-vessel-heading').textContent,
++      'Not reported',
++    );
++    assert.match(
++      elements.get('pelagos-selected-vessel-coords').textContent,
++      /30\.0000°N,\s*130\.0000°E/,
++    );
++  } finally {
++    globalThis.fetch = origFetch;
++    controller.destroy();
++  }
++});
++
++test('Pelagos deduplicates duplicate AIS vessel messages keeping the freshest fix', async () => {
++  const { doc, elements } = createMockDom();
++  const controller = new PelagosPanelController({ document: doc });
++  await controller.init();
++
++  const now = Math.floor(Date.now() / 1000);
++  const rows = [
++    {
++      mmsi: '352001000',
++      name: 'SHIP A (OLD)',
++      lat: 48.0,
++      lon: -125.0,
++      speed: 10.0,
++      last_position_epoch: now - 500,
++    },
++    {
++      mmsi: '352001000',
++      name: 'SHIP A (NEW)',
++      lat: 48.2,
++      lon: -125.5,
++      speed: 15.0,
++      last_position_epoch: now - 50,
++    },
++    {
++      mmsi: '400000000',
++      name: 'SHIP B',
++      lat: 35.0,
++      lon: 139.0,
++      speed: 12.0,
++      last_position_epoch: now - 100,
++    },
++  ];
++
++  const origFetch = globalThis.fetch;
++  try {
++    globalThis.fetch = async () => ({
++      ok: true,
++      json: async () => ({ status: 'live', rows, rawRowCount: 3 }),
++    });
++
++    await controller.updateFleetAvailability();
++
++    const list = elements.get('pelagos-vessel-list');
++    assert.equal(list.children.length, 2); // 2 distinct vessels, not 3
++
++    // Verify freshest fix was kept for SHIP A
++    const shipA = controller.vesselsNormalized.find(
++      (v) => v.mmsi === '352001000',
++    );
++    assert.ok(shipA);
++    assert.equal(shipA.speed, 15.0);
++    assert.equal(shipA.name, 'SHIP A (NEW)');
++    assert.equal(elements.get('pelagos-tab-all-count').textContent, '2');
++  } finally {
++    globalThis.fetch = origFetch;
++    controller.destroy();
++  }
++});
++
++test('Pelagos correctly distinguishes globally tracked vessels from route-relevant vessels and filters by tab', async () => {
++  const { doc, elements } = createMockDom();
++  const controller = new PelagosPanelController({ document: doc });
++  await controller.init();
++
++  // Set an active Seattle -> Yokohama route geometry
++  controller.currentRoute = {
++    geometrySegments: [
++      [
++        [-124.75, 48.5],
++        [-130.0, 49.0],
++        [-150.0, 50.0],
++        [-170.0, 49.0],
++      ],
++      [
++        [170.0, 45.0],
++        [150.0, 40.0],
++        [139.73, 35.15],
++      ],
++    ],
++  };
++
++  const now = Math.floor(Date.now() / 1000);
++  const rows = [
++    // Vessel 1: 5 NM off the Seattle exit segment -> Near corridor
++    {
++      mmsi: '111111111',
++      name: 'CORRIDOR RUNNER',
++      lat: 48.55,
++      lon: -124.75,
++      speed: 15.0,
++      last_position_epoch: now - 30,
++    },
++    // Vessel 2: Far away in Mediterranean
++    {
++      mmsi: '222222222',
++      name: 'MEDITERRANEAN TRADER',
++      lat: 33.0,
++      lon: 30.0,
++      speed: 12.0,
++      last_position_epoch: now - 40,
++    },
++    // Vessel 3: Far away in Indian Ocean
++    {
++      mmsi: '333333333',
++      name: 'INDIAN OCEAN CLIPPER',
++      lat: 5.0,
++      lon: 80.0,
++      speed: 11.0,
++      last_position_epoch: now - 50,
++    },
++  ];
++
++  const origFetch = globalThis.fetch;
++  try {
++    globalThis.fetch = async () => ({
++      ok: true,
++      json: async () => ({ status: 'live', rows, rawRowCount: 3 }),
++    });
++
++    await controller.updateFleetAvailability();
++
++    // Verify global count vs corridor count
++    assert.equal(elements.get('pelagos-global-vessel-count').textContent, '3');
++    assert.equal(elements.get('pelagos-route-vessel-count').textContent, '1');
++    assert.equal(elements.get('pelagos-tab-all-count').textContent, '3');
++    assert.equal(elements.get('pelagos-tab-corridor-count').textContent, '1');
++
++    // Default 'all' tab shows all 3 vessels
++    assert.equal(elements.get('pelagos-vessel-list').children.length, 3);
++
++    // Switch to 'corridor' tab
++    controller.setVesselTab('corridor');
++    assert.equal(elements.get('pelagos-vessel-list').children.length, 1);
++    assert.equal(
++      elements.get('pelagos-vessel-list').children[0].dataset.mmsi,
++      '111111111',
++    );
++
++    // Clear route -> corridor count becomes '—' and corridor list displays empty notice
++    controller.clearRoute();
++    assert.equal(elements.get('pelagos-route-vessel-count').textContent, '—');
++    assert.equal(elements.get('pelagos-tab-corridor-count').textContent, '—');
++    assert.equal(elements.get('pelagos-vessel-empty').style.display, 'block');
++    assert.match(
++      elements.get('pelagos-vessel-empty').textContent,
++      /Calculate a route first/,
++    );
++  } finally {
++    globalThis.fetch = origFetch;
++    controller.destroy();
++  }
++});
++
++test('Pelagos vessel list and Cesium globe bidirectional selection and camera focusing', async () => {
++  const { doc, elements } = createMockDom();
++
++  let selectedGlobeMmsi = null;
++  let clearedGlobe = false;
++  let worldFocusRecord = null;
++  let flewToCartesian = null;
++
++  const prevWindow = globalThis.window;
++  const prevCustomEvent = globalThis.CustomEvent;
++  const listeners = new Map();
++  globalThis.window = {
++    addEventListener: (evt, fn) => {
++      if (!listeners.has(evt)) listeners.set(evt, []);
++      listeners.get(evt).push(fn);
++    },
++    removeEventListener: (evt, fn) => {
++      const list = listeners.get(evt) || [];
++      const idx = list.indexOf(fn);
++      if (idx >= 0) list.splice(idx, 1);
++    },
++    dispatchEvent: (evt) => {
++      const list = listeners.get(evt.type) || [];
++      for (const fn of list) fn(evt);
++      return true;
++    },
++  };
++  globalThis.CustomEvent = class CustomEvent {
++    constructor(type, init = {}) {
++      this.type = type;
++      this.detail = init.detail;
++    }
++  };
++
++  const mockAisLiveLayer = {
++    selectById: (mmsi) => {
++      selectedGlobeMmsi = String(mmsi);
++      return true;
++    },
++    clearSelection: () => {
++      clearedGlobe = true;
++      selectedGlobeMmsi = null;
++      return true;
++    },
++  };
++
++  const mockWorldFocus = {
++    requestWorldFocus: (spec) => {
++      worldFocusRecord = spec;
++    },
++  };
++
++  const mockViewer = {
++    camera: {
++      flyTo: (spec) => {
++        flewToCartesian = spec.destination;
++      },
++    },
++    entities: {
++      add: (s) => s,
++      remove: () => {},
++    },
++  };
++
++  const controller = new PelagosPanelController({
++    viewer: mockViewer,
++    services: {
++      aisLiveVesselsLayer: mockAisLiveLayer,
++      worldFocus: mockWorldFocus,
++    },
++    document: doc,
++  });
++  await controller.init();
++
++  const rows = [
++    {
++      mmsi: '352001000',
++      name: 'NORTHERN STAR',
++      lat: 48.0,
++      lon: -125.0,
++      speed: 12.0,
++      last_position_UTC: '2026-10-19T09:00:00Z',
++      last_position_epoch: Math.floor(Date.now() / 1000) - 20,
++    },
++  ];
++
++  const origFetch = globalThis.fetch;
++  try {
++    globalThis.fetch = async () => ({
++      ok: true,
++      json: async () => ({ status: 'live', rows, rawRowCount: 1 }),
++    });
++
++    await controller.updateFleetAvailability();
++
++    // 1. Select vessel from Pelagos list -> triggers globe highlight and camera focus
++    controller.selectVessel('352001000', { syncGlobe: true, flyCamera: true });
++
++    assert.equal(controller.selectedMmsi, '352001000');
++    assert.equal(selectedGlobeMmsi, '352001000');
++    assert.ok(worldFocusRecord);
++    assert.equal(worldFocusRecord.id, '352001000');
++    assert.ok(flewToCartesian);
++    assert.equal(
++      elements.get('pelagos-selected-vessel-card').style.display,
++      'block',
++    );
++    assert.equal(
++      elements.get('pelagos-selected-vessel-name').textContent,
++      'NORTHERN STAR',
++    );
++
++    // Verify CSS class toggles on list item
++    const vesselListEl = elements.get('pelagos-vessel-list');
++    const vesselItem = vesselListEl.children[0];
++    assert.ok(vesselItem, 'Vessel item should be rendered in list');
++    assert.ok(
++      vesselItem.classList.contains('selected'),
++      'Vessel item should have selected class',
++    );
++    assert.ok(
++      vesselItem.classList.contains('is-selected'),
++      'Vessel item should have is-selected class',
++    );
++
++    // Verify inspector timestamp is valid and never contains 'undefined'
++    const timeText = elements.get('pelagos-selected-vessel-time').textContent;
++    assert.ok(
++      timeText.includes('2026-10-19T09:00:00Z'),
++      `Expected valid timestamp, got ${timeText}`,
++    );
++    assert.ok(
++      !timeText.includes('undefined'),
++      `Timestamp display should never display 'undefined', got ${timeText}`,
++    );
++
++    // 2. Clear selected vessel -> clears globe selection and hides inspector
++    controller.clearSelectedVessel({ syncGlobe: true });
++    assert.equal(controller.selectedMmsi, null);
++    assert.equal(clearedGlobe, true);
++    assert.equal(
++      elements.get('pelagos-selected-vessel-card').style.display,
++      'none',
++    );
++    assert.ok(
++      !vesselItem.classList.contains('selected'),
++      'Vessel item should not have selected class after clearing',
++    );
++    assert.ok(
++      !vesselItem.classList.contains('is-selected'),
++      'Vessel item should not have is-selected class after clearing',
++    );
++
++    // 3. Globe to list selection: dispatching gev:entity-selected on window
++    const entitySelectedEvent = new globalThis.CustomEvent(
++      'gev:entity-selected',
++      {
++        detail: {
++          layerId: 'ais-live-vessels',
++          id: 'ais-352001000',
++          properties: { mmsi: '352001000' },
++        },
++      },
++    );
++    globalThis.window.dispatchEvent(entitySelectedEvent);
++
++    assert.equal(controller.selectedMmsi, '352001000');
++    assert.equal(
++      elements.get('pelagos-selected-vessel-card').style.display,
++      'block',
++    );
++
++    // 4. Globe to list deselection: dispatching gev:entity-selection-cleared on window
++    const entityClearedEvent = new globalThis.CustomEvent(
++      'gev:entity-selection-cleared',
++      {
++        detail: { layerId: 'ais-live-vessels' },
++      },
++    );
++    globalThis.window.dispatchEvent(entityClearedEvent);
++
++    assert.equal(controller.selectedMmsi, null);
++    assert.equal(
++      elements.get('pelagos-selected-vessel-card').style.display,
++      'none',
++    );
++  } finally {
++    globalThis.fetch = origFetch;
++    controller.destroy();
++    globalThis.window = prevWindow;
++    globalThis.CustomEvent = prevCustomEvent;
++  }
++});
++
++test('Pelagos gracefully handles vessel disappearing from live cache without broken state', async () => {
++  const { doc, elements } = createMockDom();
++  const controller = new PelagosPanelController({ document: doc });
++  await controller.init();
++
++  const now = Math.floor(Date.now() / 1000);
++  const rowsInitial = [
++    {
++      mmsi: '352001000',
++      name: 'OCEAN PIONEER',
++      lat: 48.0,
++      lon: -125.0,
++      last_position_epoch: now - 10,
++    },
++  ];
++
++  const origFetch = globalThis.fetch;
++  try {
++    globalThis.fetch = async () => ({
++      ok: true,
++      json: async () => ({ status: 'live', rows: rowsInitial, rawRowCount: 1 }),
++    });
++
++    await controller.updateFleetAvailability();
++    controller.selectVessel('352001000', { syncGlobe: false });
++    assert.equal(controller.selectedMmsi, '352001000');
++    assert.equal(
++      elements.get('pelagos-selected-vessel-card').style.display,
++      'block',
++    );
++
++    // Next update arrives: vessel aged out and is not present in cache
++    globalThis.fetch = async () => ({
++      ok: true,
++      json: async () => ({ status: 'live', rows: [], rawRowCount: 0 }),
++    });
++
++    // Does not throw error, clears selection state safely
++    await controller.updateFleetAvailability();
++    assert.equal(controller.selectedMmsi, null);
++    assert.equal(
++      elements.get('pelagos-selected-vessel-card').style.display,
++      'none',
++    );
++  } finally {
++    globalThis.fetch = origFetch;
++    controller.destroy();
++  }
++});
++
++test('Pelagos search query filters vessel list and handles empty search results', async () => {
++  const { doc, elements } = createMockDom();
++  const controller = new PelagosPanelController({ document: doc });
++  await controller.init();
++
++  const now = Math.floor(Date.now() / 1000);
++  const rows = [
++    {
++      mmsi: '352001000',
++      name: 'EVER GIVEN',
++      type: 'Cargo',
++      lat: 48.0,
++      lon: -125.0,
++      last_position_epoch: now - 10,
++    },
++    {
++      mmsi: '211000000',
++      name: 'SEASPAN LEADER',
++      type: 'Container',
++      lat: 35.0,
++      lon: 139.0,
++      last_position_epoch: now - 20,
++    },
++  ];
++
++  const origFetch = globalThis.fetch;
++  try {
++    globalThis.fetch = async () => ({
++      ok: true,
++      json: async () => ({ status: 'live', rows, rawRowCount: 2 }),
++    });
++
++    await controller.updateFleetAvailability();
++    assert.equal(elements.get('pelagos-vessel-list').children.length, 2);
++
++    // Search for 'GIVEN'
++    controller.vesselSearchQuery = 'GIVEN';
++    controller.refreshVesselData();
++    assert.equal(elements.get('pelagos-vessel-list').children.length, 1);
++    assert.equal(
++      elements.get('pelagos-vessel-list').children[0].dataset.mmsi,
++      '352001000',
++    );
++
++    // Search for non-matching string
++    controller.vesselSearchQuery = 'NONEXISTENT';
++    controller.refreshVesselData();
++    assert.equal(elements.get('pelagos-vessel-list').children.length, 0);
++    assert.equal(elements.get('pelagos-vessel-empty').style.display, 'block');
++    assert.match(
++      elements.get('pelagos-vessel-empty').textContent,
++      /No tracked vessels match "NONEXISTENT"/,
++    );
+   } finally {
+     globalThis.fetch = origFetch;
+     controller.destroy();
+diff --git a/gods-eye-view-main/src/ui/pelagosVessels.js b/gods-eye-view-main/src/ui/pelagosVessels.js
+new file mode 100644
+index 0000000..7515a2e
+--- /dev/null
++++ b/gods-eye-view-main/src/ui/pelagosVessels.js
+@@ -0,0 +1,349 @@
++/**
++ * @module ui/pelagosVessels
++ * @description Vessel data normalization, corridor proximity calculation, and filtering
++ * for the Pelagos Maritime Intelligence workspace.
++ */
++
++/** Standard maritime trade corridor proximity buffer in nautical miles. */
++export const CORRIDOR_PROXIMITY_NM = 50.0;
++
++/**
++ * Format elapsed time into human-readable compact string.
++ * @param {number|null} epochSec - Unix epoch timestamp in seconds.
++ * @param {number} [nowEpochSec] - Current epoch seconds reference.
++ * @returns {string}
++ */
++export function formatRelativeAge(
++  epochSec,
++  nowEpochSec = Math.floor(Date.now() / 1000),
++) {
++  if (!Number.isFinite(epochSec) || epochSec <= 0) return 'Not reported';
++  const diffSec = Math.max(0, nowEpochSec - epochSec);
++  if (diffSec < 60) return '< 1m ago';
++  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
++  if (diffSec < 86400)
++    return `${Math.floor(diffSec / 3600)}h ${Math.floor((diffSec % 3600) / 60)}m ago`;
++  return `${Math.floor(diffSec / 86400)}d ago`;
++}
++
++/**
++ * Format latitude and longitude coordinates into navigation degrees notation.
++ * @param {number} lat
++ * @param {number} lon
++ * @returns {string}
++ */
++export function formatVesselCoords(lat, lon) {
++  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return 'Not reported';
++  const latDir = lat >= 0 ? 'N' : 'S';
++  const lonDir = lon >= 0 ? 'E' : 'W';
++  return `${Math.abs(lat).toFixed(4)}°${latDir}, ${Math.abs(lon).toFixed(4)}°${lonDir}`;
++}
++
++/**
++ * Normalize an incoming raw AIS row from the /api/ais-live feed into a clean,
++ * verifiable vessel data object.
++ *
++ * Requirements:
++ * - Shows "Unknown" or "Not reported" for missing fields.
++ * - Never invents vessel names, destinations, or coordinates.
++ * - Accurately notes whether data is historical sample vs live telemetry.
++ *
++ * @param {Object} row - Raw AIS record from feed.
++ * @param {number} [nowEpochSec] - Current epoch seconds reference.
++ * @returns {Object|null} Normalized vessel object, or null if coordinates/MMSI are unusable.
++ */
++export function normalizeLiveVesselItem(
++  row,
++  nowEpochSec = Math.floor(Date.now() / 1000),
++) {
++  if (!row || typeof row !== 'object') return null;
++
++  const lat = Number(row.lat);
++  const lon = Number(row.lon);
++  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
++
++  const mmsi = String(row.mmsi || '').trim();
++  if (!mmsi) return null;
++
++  const rawName = String(row.name || '').trim();
++  const isFallbackName = !rawName || /^MMSI\s*\d+$/i.test(rawName);
++  const displayName = isFallbackName ? `MMSI ${mmsi}` : rawName;
++
++  const imo =
++    row.imo && String(row.imo).trim() ? String(row.imo).trim() : 'Not reported';
++  const type =
++    row.type && String(row.type).trim()
++      ? String(row.type).trim()
++      : 'Not reported';
++  const destination =
++    row.destination && String(row.destination).trim()
++      ? String(row.destination).trim()
++      : 'Not reported';
++
++  const speedVal = Number(row.speed);
++  const speed = Number.isFinite(speedVal) && speedVal >= 0 ? speedVal : null;
++  const speedFormatted =
++    speed !== null ? `${speed.toFixed(1)} kn` : 'Not reported';
++
++  const courseVal = Number(row.course);
++  const course =
++    Number.isFinite(courseVal) && courseVal >= 0 && courseVal < 360
++      ? courseVal
++      : null;
++  const courseFormatted =
++    course !== null ? `${Math.round(course)}°` : 'Not reported';
++
++  const headingVal = Number(row.heading);
++  const heading =
++    Number.isFinite(headingVal) &&
++    headingVal >= 0 &&
++    headingVal < 360 &&
++    headingVal !== 511
++      ? headingVal
++      : null;
++  const headingFormatted =
++    heading !== null ? `${Math.round(heading)}°` : 'Not reported';
++
++  const lastPositionUtc =
++    row.last_position_UTC || row.lastPositionUtc || 'Not reported';
++  const epochVal = Number(row.last_position_epoch ?? row.lastPositionEpoch);
++  let lastEpoch = null;
++  if (Number.isFinite(epochVal) && epochVal > 0) {
++    lastEpoch = epochVal;
++  } else if (lastPositionUtc !== 'Not reported') {
++    const parsed = Date.parse(lastPositionUtc);
++    if (Number.isFinite(parsed)) lastEpoch = Math.floor(parsed / 1000);
++  }
++
++  const ageFormatted = formatRelativeAge(lastEpoch, nowEpochSec);
++  const isStale = lastEpoch !== null ? nowEpochSec - lastEpoch > 1800 : false;
++  const isHistorical = Boolean(row.historical);
++  const navStatus = row.navigational_status || row.navStatus || 'Not reported';
++
++  return {
++    mmsi,
++    displayName,
++    name: displayName,
++    hasReportedName: !isFallbackName,
++    imo,
++    type,
++    displayType: type !== 'Not reported' ? type : 'Not reported',
++    destination,
++    lat,
++    lon,
++    speed,
++    speedFormatted,
++    course,
++    courseFormatted,
++    heading,
++    headingFormatted,
++    lastPositionUtc,
++    lastUtc: lastPositionUtc,
++    lastEpoch,
++    ageFormatted,
++    isStale,
++    isHistorical,
++    navStatus,
++  };
++}
++
++/**
++ * Calculate the minimum distance in nautical miles from a vessel coordinate to any
++ * segment of the currently active MARNET maritime route.
++ *
++ * Algorithm:
++ * - Iterates over all consecutive waypoint pairs along all route geometry segments.
++ * - Handles antimeridian crossing longitude wrapping (180° meridian).
++ * - Computes localized equirectangular projection onto the segment centerline.
++ * - Returns minimum nautical mile distance, or null if no route is active.
++ *
++ * Limitations:
++ * - Proximity measures physical geometric distance (≤50 NM) to the generalized sea lane.
++ * - It does NOT imply the vessel is traveling on that specific route or toward the destination port.
++ * - It does NOT establish commercial charter availability or open-tonnage status.
++ *
++ * @param {number} lat - Vessel latitude.
++ * @param {number} lon - Vessel longitude.
++ * @param {Object|null} activeRoute - Normalized route object containing geometrySegments.
++ * @returns {number|null} Minimum distance in NM, or null if route is unavailable.
++ */
++export function calculateDistanceToRouteNm(lat, lon, activeRoute) {
++  if (!activeRoute || !Number.isFinite(lat) || !Number.isFinite(lon))
++    return null;
++
++  const segments =
++    Array.isArray(activeRoute.geometrySegments) &&
++    activeRoute.geometrySegments.length > 0
++      ? activeRoute.geometrySegments
++      : Array.isArray(activeRoute.geometry) && activeRoute.geometry.length >= 2
++        ? [activeRoute.geometry]
++        : [];
++
++  if (segments.length === 0) return null;
++
++  let minDistanceNm = Number.POSITIVE_INFINITY;
++
++  for (const seg of segments) {
++    if (!Array.isArray(seg) || seg.length < 2) continue;
++
++    for (let i = 0; i < seg.length - 1; i++) {
++      const p1 = seg[i];
++      const p2 = seg[i + 1];
++      if (!Array.isArray(p1) || !Array.isArray(p2)) continue;
++
++      let lon1 = p1[0];
++      let lat1 = p1[1];
++      let lon2 = p2[0];
++      let lat2 = p2[1];
++      let vLon = lon;
++      let vLat = lat;
++
++      if (
++        !Number.isFinite(lon1) ||
++        !Number.isFinite(lat1) ||
++        !Number.isFinite(lon2) ||
++        !Number.isFinite(lat2)
++      ) {
++        continue;
++      }
++
++      // Handle antimeridian wrapping between segment points
++      if (lon2 - lon1 > 180) lon2 -= 360;
++      else if (lon1 - lon2 > 180) lon2 += 360;
++
++      // Wrap vessel longitude relative to lon1
++      if (vLon - lon1 > 180) vLon -= 360;
++      else if (lon1 - vLon > 180) vLon += 360;
++
++      // Segment vector in degrees scaled by local cos(lat)
++      const midLatRad = (((lat1 + lat2) / 2) * Math.PI) / 180;
++      const cosMidLat = Math.cos(midLatRad);
++
++      const dx = (lon2 - lon1) * cosMidLat;
++      const dy = lat2 - lat1;
++      const segLenSq = dx * dx + dy * dy;
++
++      let distDeg;
++      if (segLenSq < 1e-12) {
++        const px = (vLon - lon1) * cosMidLat;
++        const py = vLat - lat1;
++        distDeg = Math.hypot(px, py);
++      } else {
++        const px = (vLon - lon1) * cosMidLat;
++        const py = vLat - lat1;
++        const t = Math.max(0, Math.min(1, (px * dx + py * dy) / segLenSq));
++        const projX = t * dx;
++        const projY = t * dy;
++        distDeg = Math.hypot(px - projX, py - projY);
++      }
++
++      const distNm = distDeg * 60.0;
++      if (distNm < minDistanceNm) {
++        minDistanceNm = distNm;
++      }
++    }
++  }
++
++  return Number.isFinite(minDistanceNm) ? minDistanceNm : null;
++}
++
++/**
++ * Deduplicate raw vessel rows by MMSI, annotate route proximity, and filter
++ * according to user query and corridor tabs.
++ *
++ * @param {Array<Object>} rawRows - Array of raw rows from AIS feed.
++ * @param {Object} [options]
++ * @param {string} [options.query=''] - Search filter text.
++ * @param {'all'|'corridor'} [options.filterTab='all'] - Active tab filter.
++ * @param {Object|null} [options.activeRoute=null] - Currently calculated maritime route.
++ * @param {number} [options.maxDistanceNm=CORRIDOR_PROXIMITY_NM] - Corridor distance threshold in NM.
++ * @param {number} [options.nowEpochSec] - Current epoch seconds reference.
++ * @returns {{ vessels: Array<Object>, totalCount: number, routeRelevantCount: number }}
++ */
++export function deduplicateAndFilterVessels(rawRows, options = {}) {
++  const {
++    query = '',
++    searchQuery = '',
++    filterTab = 'all',
++    tab = 'all',
++    activeRoute = null,
++    maxDistanceNm = CORRIDOR_PROXIMITY_NM,
++    nowEpochSec = Math.floor(Date.now() / 1000),
++  } = options;
++
++  const effectiveQuery = String(query || searchQuery || '')
++    .trim()
++    .toLowerCase();
++  const effectiveTab = filterTab !== 'all' ? filterTab : tab;
++
++  if (!Array.isArray(rawRows) || rawRows.length === 0) {
++    return {
++      vessels: [],
++      totalCount: 0,
++      routeRelevantCount: 0,
++      corridorCount: 0,
++    };
++  }
++
++  // 1. Deduplicate by MMSI (keep newest fix if multiple)
++  const byMmsi = new Map();
++  for (const row of rawRows) {
++    const item = normalizeLiveVesselItem(row, nowEpochSec);
++    if (!item) continue;
++
++    const existing = byMmsi.get(item.mmsi);
++    if (!existing || (item.lastEpoch || 0) > (existing.lastEpoch || 0)) {
++      byMmsi.set(item.mmsi, item);
++    }
++  }
++
++  const allVessels = Array.from(byMmsi.values());
++  let routeRelevantCount = 0;
++
++  // 2. Annotate route proximity
++  for (const v of allVessels) {
++    const distNm = calculateDistanceToRouteNm(v.lat, v.lon, activeRoute);
++    v.distanceToRouteNm = distNm !== null ? Math.round(distNm * 10) / 10 : null;
++    v.isNearRoute = distNm !== null && distNm <= maxDistanceNm;
++    v.isNearCorridor = v.isNearRoute;
++    if (v.isNearRoute) {
++      routeRelevantCount += 1;
++    }
++  }
++
++  // 3. Sort: near-corridor vessels first, then by display name
++  allVessels.sort((a, b) => {
++    if (a.isNearRoute && !b.isNearRoute) return -1;
++    if (!a.isNearRoute && b.isNearRoute) return 1;
++    if (a.distanceToRouteNm !== null && b.distanceToRouteNm !== null) {
++      return a.distanceToRouteNm - b.distanceToRouteNm;
++    }
++    return a.displayName.localeCompare(b.displayName);
++  });
++
++  // 4. Filter by tab
++  let filtered = allVessels;
++  if (effectiveTab === 'corridor') {
++    filtered = filtered.filter((v) => v.isNearRoute);
++  }
++
++  // 5. Filter by text search query
++  if (effectiveQuery) {
++    filtered = filtered.filter((v) => {
++      return (
++        v.displayName.toLowerCase().includes(effectiveQuery) ||
++        v.mmsi.toLowerCase().includes(effectiveQuery) ||
++        v.type.toLowerCase().includes(effectiveQuery) ||
++        v.destination.toLowerCase().includes(effectiveQuery) ||
++        v.imo.toLowerCase().includes(effectiveQuery)
++      );
++    });
++  }
++
++  return {
++    vessels: filtered,
++    totalCount: allVessels.length,
++    routeRelevantCount,
++    corridorCount: routeRelevantCount,
++  };
++}
+diff --git a/gods-eye-view-main/src/ui/pelagosVessels.test.mjs b/gods-eye-view-main/src/ui/pelagosVessels.test.mjs
+new file mode 100644
+index 0000000..7690979
+--- /dev/null
++++ b/gods-eye-view-main/src/ui/pelagosVessels.test.mjs
+@@ -0,0 +1,233 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import {
++  CORRIDOR_PROXIMITY_NM,
++  formatRelativeAge,
++  formatVesselCoords,
++  normalizeLiveVesselItem,
++  calculateDistanceToRouteNm,
++  deduplicateAndFilterVessels,
++} from './pelagosVessels.js';
++
++test('formatRelativeAge produces compact human-readable elapsed intervals', () => {
++  const now = 1700000000;
++  assert.equal(formatRelativeAge(null, now), 'Not reported');
++  assert.equal(formatRelativeAge(0, now), 'Not reported');
++  assert.equal(formatRelativeAge(now - 15, now), '< 1m ago');
++  assert.equal(formatRelativeAge(now - 180, now), '3m ago');
++  assert.equal(formatRelativeAge(now - 7500, now), '2h 5m ago');
++  assert.equal(formatRelativeAge(now - 100000, now), '1d ago');
++});
++
++test('formatVesselCoords produces formatted degrees with directional suffixes', () => {
++  assert.equal(formatVesselCoords(35.1234, 139.5678), '35.1234°N, 139.5678°E');
++  assert.equal(formatVesselCoords(-33.8688, -70.6483), '33.8688°S, 70.6483°W');
++  assert.equal(formatVesselCoords(null, 0), 'Not reported');
++});
++
++test('normalizeLiveVesselItem normalizes complete and partial AIS messages', () => {
++  const now = 1700000000;
++
++  // 1. Full payload
++  const full = normalizeLiveVesselItem(
++    {
++      mmsi: '353136000',
++      name: 'PACIFIC BULKER',
++      imo: '9456789',
++      type: 'Cargo',
++      destination: 'YOKOHAMA',
++      lat: 48.5,
++      lon: -125.0,
++      speed: 13.8,
++      course: 260.4,
++      heading: 261,
++      last_position_UTC: '2026-10-19T09:00:00Z',
++      last_position_epoch: now - 300,
++    },
++    now,
++  );
++
++  assert.equal(full.mmsi, '353136000');
++  assert.equal(full.displayName, 'PACIFIC BULKER');
++  assert.equal(full.hasReportedName, true);
++  assert.equal(full.imo, '9456789');
++  assert.equal(full.type, 'Cargo');
++  assert.equal(full.destination, 'YOKOHAMA');
++  assert.equal(full.speed, 13.8);
++  assert.equal(full.speedFormatted, '13.8 kn');
++  assert.equal(full.course, 260.4);
++  assert.equal(full.courseFormatted, '260°');
++  assert.equal(full.heading, 261);
++  assert.equal(full.headingFormatted, '261°');
++  assert.equal(full.lastPositionUtc, '2026-10-19T09:00:00Z');
++  assert.equal(full.lastUtc, '2026-10-19T09:00:00Z');
++  assert.equal(full.ageFormatted, '5m ago');
++  assert.equal(full.isStale, false);
++  assert.equal(full.isHistorical, false);
++
++  // 2. Minimal payload with missing optional values
++  const minimal = normalizeLiveVesselItem(
++    {
++      mmsi: '987654321',
++      lat: 34.0,
++      lon: 139.0,
++    },
++    now,
++  );
++
++  assert.equal(minimal.mmsi, '987654321');
++  assert.equal(minimal.displayName, 'MMSI 987654321');
++  assert.equal(minimal.hasReportedName, false);
++  assert.equal(minimal.imo, 'Not reported');
++  assert.equal(minimal.type, 'Not reported');
++  assert.equal(minimal.destination, 'Not reported');
++  assert.equal(minimal.speed, null);
++  assert.equal(minimal.speedFormatted, 'Not reported');
++  assert.equal(minimal.course, null);
++  assert.equal(minimal.courseFormatted, 'Not reported');
++  assert.equal(minimal.heading, null);
++  assert.equal(minimal.headingFormatted, 'Not reported');
++  assert.equal(minimal.lastPositionUtc, 'Not reported');
++  assert.equal(minimal.lastUtc, 'Not reported');
++  assert.equal(minimal.ageFormatted, 'Not reported');
++  assert.equal(minimal.isStale, false);
++
++  // 3. Stale vessel (> 30 min)
++  const stale = normalizeLiveVesselItem(
++    {
++      mmsi: '111222333',
++      lat: 30.0,
++      lon: 130.0,
++      last_position_epoch: now - 3600,
++    },
++    now,
++  );
++  assert.equal(stale.isStale, true);
++  assert.equal(stale.ageFormatted, '1h 0m ago');
++
++  // 4. Invalid inputs return null
++  assert.equal(normalizeLiveVesselItem(null), null);
++  assert.equal(normalizeLiveVesselItem({ mmsi: '' }), null);
++  assert.equal(
++    normalizeLiveVesselItem({ mmsi: '123', lat: 'invalid', lon: 10 }),
++    null,
++  );
++});
++
++test('calculateDistanceToRouteNm computes cross-track distance and antimeridian handling', () => {
++  // Simple route: straight along equator from lon 0 to lon 10
++  const simpleRoute = {
++    geometrySegments: [
++      [
++        [0.0, 0.0],
++        [10.0, 0.0],
++      ],
++    ],
++  };
++
++  // Vessel at (lat 0.5, lon 5.0) -> distance is 0.5 degrees lat = 30 nautical miles
++  const d1 = calculateDistanceToRouteNm(0.5, 5.0, simpleRoute);
++  assert.ok(Math.abs(d1 - 30.0) < 0.5, `Expected ~30 NM, got ${d1}`);
++
++  // Vessel at (lat 2.0, lon 5.0) -> distance is 2 degrees lat = 120 nautical miles
++  const d2 = calculateDistanceToRouteNm(2.0, 5.0, simpleRoute);
++  assert.ok(Math.abs(d2 - 120.0) < 1.0, `Expected ~120 NM, got ${d2}`);
++
++  // Null route returns null
++  assert.equal(calculateDistanceToRouteNm(10, 10, null), null);
++  assert.equal(
++    calculateDistanceToRouteNm(10, 10, { geometrySegments: [] }),
++    null,
++  );
++  assert.equal(calculateDistanceToRouteNm(NaN, 10, simpleRoute), null);
++});
++
++test('deduplicateAndFilterVessels deduplicates duplicate MMSI entries and calculates corridor relevance', () => {
++  const route = {
++    geometrySegments: [
++      [
++        [0.0, 0.0],
++        [10.0, 0.0],
++      ],
++    ],
++  };
++
++  const rawRows = [
++    // Older fix for Vessel A (in corridor)
++    {
++      mmsi: '111',
++      name: 'SHIP ALPHA',
++      lat: 0.2, // ~12 NM
++      lon: 5.0,
++      type: 'Cargo',
++      last_position_epoch: 1000,
++    },
++    // Newer fix for Vessel A (still in corridor)
++    {
++      mmsi: '111',
++      name: 'SHIP ALPHA',
++      lat: 0.3, // ~18 NM
++      lon: 5.0,
++      type: 'Cargo',
++      last_position_epoch: 2000,
++    },
++    // Vessel B (in corridor)
++    {
++      mmsi: '222',
++      name: 'SHIP BETA',
++      lat: 0.4, // ~24 NM
++      lon: 2.0,
++      type: 'Tanker',
++      last_position_epoch: 1500,
++    },
++    // Vessel C (far away, > 50 NM from corridor)
++    {
++      mmsi: '333',
++      name: 'SHIP GAMMA',
++      lat: 5.0, // ~300 NM away
++      lon: 5.0,
++      type: 'Fishing',
++      last_position_epoch: 1800,
++    },
++  ];
++
++  // 1. All tab: should have 3 deduplicated vessels (A, B, C)
++  const resultAll = deduplicateAndFilterVessels(rawRows, {
++    filterTab: 'all',
++    activeRoute: route,
++  });
++
++  assert.equal(resultAll.totalCount, 3, 'Should have 3 unique MMSIs');
++  assert.equal(
++    resultAll.routeRelevantCount,
++    2,
++    'Should have 2 vessels within 50 NM corridor',
++  );
++  assert.equal(resultAll.vessels.length, 3);
++
++  // Newest fix for 111 should be preserved (lat 0.3, epoch 2000)
++  const v111 = resultAll.vessels.find((v) => v.mmsi === '111');
++  assert.equal(v111.lat, 0.3);
++  assert.equal(v111.isNearRoute, true);
++
++  // 2. Corridor tab: should only return 2 vessels
++  const resultCorridor = deduplicateAndFilterVessels(rawRows, {
++    filterTab: 'corridor',
++    activeRoute: route,
++  });
++  assert.equal(resultCorridor.vessels.length, 2);
++  assert.ok(resultCorridor.vessels.every((v) => v.isNearRoute));
++
++  // 3. Search query filter
++  const resultQuery = deduplicateAndFilterVessels(rawRows, {
++    query: 'tanker',
++    activeRoute: route,
++  });
++  assert.equal(resultQuery.vessels.length, 1);
++  assert.equal(resultQuery.vessels[0].mmsi, '222');
++
++  // 4. Empty rows
++  const empty = deduplicateAndFilterVessels([], { activeRoute: route });
++  assert.equal(empty.totalCount, 0);
++  assert.equal(empty.vessels.length, 0);
++});
+diff --git a/gods-eye-view-main/src/ui/styles/pelagos.css b/gods-eye-view-main/src/ui/styles/pelagos.css
+index 53d9d5a..d152db9 100644
+--- a/gods-eye-view-main/src/ui/styles/pelagos.css
++++ b/gods-eye-view-main/src/ui/styles/pelagos.css
+@@ -55,7 +55,11 @@
+   min-height: 0;
+   box-sizing: border-box;
+   color: var(--text-primary, #e6f1ff);
+-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
++  font-family:
++    'Inter',
++    -apple-system,
++    BlinkMacSystemFont,
++    sans-serif;
+ }
+
+ #left-panel-stack > #pelagos-panel:not(.collapsed) {
+@@ -178,7 +182,9 @@
+   font-size: 11px;
+   color: #f1f5f9;
+   outline: none;
+-  transition: border-color var(--transition-fast, 0.15s), box-shadow var(--transition-fast, 0.15s);
++  transition:
++    border-color var(--transition-fast, 0.15s),
++    box-shadow var(--transition-fast, 0.15s);
+ }
+
+ .pelagos-filter-input:focus {
+@@ -198,7 +204,9 @@
+   color: #e2e8f0;
+   outline: none;
+   cursor: pointer;
+-  transition: border-color var(--transition-fast, 0.15s), box-shadow var(--transition-fast, 0.15s);
++  transition:
++    border-color var(--transition-fast, 0.15s),
++    box-shadow var(--transition-fast, 0.15s);
+ }
+
+ .pelagos-select:focus {
+@@ -248,7 +256,11 @@
+
+ .pelagos-btn-primary {
+   flex: 1;
+-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.28) 0%, rgba(0, 140, 200, 0.35) 100%);
++  background: linear-gradient(
++    135deg,
++    rgba(0, 212, 255, 0.28) 0%,
++    rgba(0, 140, 200, 0.35) 100%
++  );
+   border: 1px solid rgba(0, 212, 255, 0.55);
+   border-radius: 6px;
+   padding: 9px 14px;
+@@ -267,7 +279,11 @@
+ }
+
+ .pelagos-btn-primary:hover:not(:disabled) {
+-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.42) 0%, rgba(0, 160, 230, 0.5) 100%);
++  background: linear-gradient(
++    135deg,
++    rgba(0, 212, 255, 0.42) 0%,
++    rgba(0, 160, 230, 0.5) 100%
++  );
+   border-color: rgba(0, 212, 255, 0.85);
+   box-shadow: 0 4px 16px rgba(0, 212, 255, 0.35);
+   transform: translateY(-1px);
+@@ -318,7 +334,9 @@
+ }
+
+ @keyframes pelagos-spin {
+-  to { transform: rotate(360deg); }
++  to {
++    transform: rotate(360deg);
++  }
+ }
+
+ /* ── Validation & Status Feedback ── */
+@@ -705,3 +723,275 @@
+ .pelagos-limitations-list li:last-child {
+   margin-bottom: 0;
+ }
++
++/* ── Live AIS Vessel Intelligence & Inspector ─────────────────────────── */
++.pelagos-vessel-metrics-grid {
++  display: grid;
++  grid-template-columns: 1fr 1fr;
++  gap: 8px;
++  margin: 10px 0 8px;
++}
++
++.vessel-metric-box {
++  background: rgba(255, 255, 255, 0.03);
++  border: 1px solid rgba(255, 255, 255, 0.08);
++  border-radius: 6px;
++  padding: 6px 10px;
++  display: flex;
++  flex-direction: column;
++  gap: 2px;
++}
++
++.vessel-metric-k {
++  font-size: 9px;
++  letter-spacing: 0.8px;
++  color: var(--text-secondary, #94a3b8);
++  font-weight: 600;
++}
++
++.vessel-metric-v {
++  font-family: 'JetBrains Mono', monospace;
++  font-size: 15px;
++  font-weight: 700;
++  color: #f1f5f9;
++}
++
++.vessel-metric-v.highlight {
++  color: var(--accent, #00d4ff);
++}
++
++.pelagos-vessel-filter-bar {
++  display: flex;
++  flex-direction: column;
++  gap: 8px;
++  margin-bottom: 10px;
++}
++
++.vessel-search-wrap {
++  width: 100%;
++}
++
++.vessel-filter-tabs {
++  display: flex;
++  gap: 6px;
++}
++
++.vessel-tab-btn {
++  flex: 1;
++  background: rgba(255, 255, 255, 0.04);
++  border: 1px solid rgba(255, 255, 255, 0.1);
++  border-radius: 4px;
++  color: var(--text-secondary, #94a3b8);
++  font-size: 10px;
++  font-weight: 600;
++  padding: 5px 8px;
++  cursor: pointer;
++  transition: all 0.15s ease;
++  text-align: center;
++}
++
++.vessel-tab-btn:hover {
++  background: rgba(0, 212, 255, 0.1);
++  color: #e2e8f0;
++}
++
++.vessel-tab-btn.active {
++  background: rgba(0, 212, 255, 0.18);
++  border-color: rgba(0, 212, 255, 0.45);
++  color: #38bdf8;
++}
++
++/* ── Selected Vessel Inspector Card ── */
++.pelagos-selected-vessel-card {
++  background: rgba(0, 212, 255, 0.06);
++  border: 1px solid rgba(0, 212, 255, 0.35);
++  border-radius: 8px;
++  padding: 10px 12px;
++  margin-bottom: 10px;
++  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
++}
++
++.selected-vessel-header {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  margin-bottom: 8px;
++  padding-bottom: 6px;
++  border-bottom: 1px solid rgba(0, 212, 255, 0.18);
++}
++
++.selected-vessel-title-group {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  min-width: 0;
++}
++
++.selected-badge {
++  font-size: 9px;
++  font-weight: 700;
++  letter-spacing: 0.8px;
++  color: #38bdf8;
++  background: rgba(0, 212, 255, 0.15);
++  border: 1px solid rgba(0, 212, 255, 0.3);
++  padding: 2px 6px;
++  border-radius: 4px;
++  white-space: nowrap;
++}
++
++.selected-vessel-name {
++  font-size: 13px;
++  font-weight: 700;
++  color: #ffffff;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.selected-vessel-grid {
++  display: flex;
++  flex-direction: column;
++  gap: 4px;
++  margin-bottom: 10px;
++}
++
++.selected-vessel-actions {
++  display: flex;
++  gap: 8px;
++}
++
++.btn-focus-globe {
++  font-size: 11px;
++  padding: 5px 12px;
++  letter-spacing: 0.8px;
++}
++
++/* ── Vessel List & Items ── */
++.pelagos-vessel-list-container {
++  margin-bottom: 8px;
++}
++
++.pelagos-vessel-list {
++  max-height: 250px;
++  overflow-y: auto;
++  display: flex;
++  flex-direction: column;
++  gap: 6px;
++  padding-right: 4px;
++  scrollbar-width: thin;
++  scrollbar-color: rgba(0, 212, 255, 0.4) rgba(255, 255, 255, 0.04);
++}
++
++.pelagos-vessel-item {
++  background: rgba(255, 255, 255, 0.03);
++  border: 1px solid rgba(255, 255, 255, 0.08);
++  border-radius: 6px;
++  padding: 8px 10px;
++  cursor: pointer;
++  transition: all 0.15s ease;
++  display: flex;
++  flex-direction: column;
++  gap: 4px;
++}
++
++.pelagos-vessel-item:hover {
++  background: rgba(255, 255, 255, 0.06);
++  border-color: rgba(0, 212, 255, 0.25);
++}
++
++.pelagos-vessel-item.selected,
++.pelagos-vessel-item.is-selected {
++  background: rgba(0, 212, 255, 0.12);
++  border-color: rgba(0, 212, 255, 0.6);
++  box-shadow: 0 0 10px rgba(0, 212, 255, 0.25);
++}
++
++/* Row 1: Name and Type tag */
++.vessel-item-top {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  gap: 8px;
++}
++
++.vessel-name {
++  font-size: 12px;
++  font-weight: 600;
++  color: #f1f5f9;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++  min-width: 0;
++}
++
++.vessel-tag {
++  font-size: 9px;
++  font-weight: 600;
++  letter-spacing: 0.4px;
++  color: var(--text-secondary, #94a3b8);
++  background: rgba(255, 255, 255, 0.06);
++  border: 1px solid rgba(255, 255, 255, 0.12);
++  border-radius: 3px;
++  padding: 1px 6px;
++  white-space: nowrap;
++  flex-shrink: 0;
++}
++
++/* Row 2: MMSI and relative age */
++.vessel-item-sub {
++  display: flex;
++  justify-content: space-between;
++  align-items: baseline;
++  gap: 8px;
++}
++
++.vessel-mmsi {
++  font-family: 'JetBrains Mono', monospace;
++  font-size: 10px;
++  color: var(--text-secondary, #94a3b8);
++  letter-spacing: 0.3px;
++}
++
++.vessel-age {
++  font-size: 10px;
++  color: #64748b;
++  white-space: nowrap;
++}
++
++.vessel-age.stale {
++  color: #f59e0b;
++  font-weight: 600;
++}
++
++/* Row 3: Motion & Corridor Proximity */
++.vessel-item-detail {
++  display: flex;
++  justify-content: space-between;
++  align-items: center;
++  gap: 8px;
++  margin-top: 2px;
++}
++
++.vessel-motion {
++  font-family: 'JetBrains Mono', monospace;
++  font-size: 10px;
++  color: #cbd5e1;
++}
++
++.vessel-proximity {
++  font-size: 10px;
++  font-weight: 600;
++  letter-spacing: 0.3px;
++  color: var(--accent, #00d4ff);
++  background: rgba(0, 212, 255, 0.1);
++  border: 1px solid rgba(0, 212, 255, 0.35);
++  border-radius: 3px;
++  padding: 1px 6px;
++  white-space: nowrap;
++  flex-shrink: 0;
++}
++
++.vessel-commercial-callout {
++  margin-top: 10px;
++  font-size: 10px;
++}
+diff --git a/gods-eye-view-main/src/ui/templates/layer-panels.html b/gods-eye-view-main/src/ui/templates/layer-panels.html
+index 909d3c0..13a6967 100644
+--- a/gods-eye-view-main/src/ui/templates/layer-panels.html
++++ b/gods-eye-view-main/src/ui/templates/layer-panels.html
+@@ -317,7 +317,7 @@
+           <!-- 5. Vessel Availability Card -->
+           <div class="pelagos-card" id="pelagos-fleet-card">
+             <div class="card-header">
+-              <span class="card-title">VESSEL AVAILABILITY</span>
++              <span class="card-title">VESSEL AVAILABILITY & LIVE AIS</span>
+               <span class="pelagos-tag tag-offline" id="pelagos-fleet-tag">UNCONNECTED</span>
+             </div>
+             <div class="card-body">
+@@ -328,6 +328,96 @@
+               <p class="fleet-detail-text" id="pelagos-fleet-desc">
+                 Live commercial AIS fleet telemetry and forward position-list feeds are not linked to this installation (pelagos live_ais_connected: false). Static sample only covers coastal U.S. waters and is not interpreted as active fleet availability.
+               </p>
++
++              <!-- Global vs Corridor Metrics -->
++              <div class="pelagos-vessel-metrics-grid" id="pelagos-vessel-metrics" style="display: none;">
++                <div class="vessel-metric-box">
++                  <span class="vessel-metric-k">GLOBAL AIS FEED</span>
++                  <span class="vessel-metric-v" id="pelagos-global-vessel-count">0</span>
++                </div>
++                <div class="vessel-metric-box">
++                  <span class="vessel-metric-k">NEAR CORRIDOR (≤50 NM)</span>
++                  <span class="vessel-metric-v highlight" id="pelagos-route-vessel-count">—</span>
++                </div>
++              </div>
++
++              <!-- Filter Bar & Search Input -->
++              <div class="pelagos-vessel-filter-bar" id="pelagos-vessel-filter-bar" style="display: none;">
++                <div class="vessel-search-wrap">
++                  <input type="text" id="pelagos-vessel-search" class="pelagos-filter-input" placeholder="Filter by Name, MMSI, Type, Destination…" autocomplete="off" />
++                </div>
++                <div class="vessel-filter-tabs">
++                  <button type="button" class="vessel-tab-btn active" id="pelagos-tab-all">All Tracked (<span id="pelagos-tab-all-count">0</span>)</button>
++                  <button type="button" class="vessel-tab-btn" id="pelagos-tab-corridor">Near Corridor (<span id="pelagos-tab-corridor-count">0</span>)</button>
++                </div>
++              </div>
++
++              <!-- Selected Vessel Detail Inspector Card -->
++              <div class="pelagos-selected-vessel-card" id="pelagos-selected-vessel-card" style="display: none;">
++                <div class="selected-vessel-header">
++                  <div class="selected-vessel-title-group">
++                    <span class="selected-badge">SELECTED VESSEL</span>
++                    <span class="selected-vessel-name" id="pelagos-selected-vessel-name">—</span>
++                  </div>
++                  <button type="button" class="pelagos-btn-icon" id="pelagos-selected-vessel-close" title="Close inspection">✕</button>
++                </div>
++                <div class="selected-vessel-grid">
++                  <div class="meta-row">
++                    <span class="meta-key">MMSI:</span>
++                    <span class="meta-val" id="pelagos-selected-vessel-mmsi">—</span>
++                  </div>
++                  <div class="meta-row">
++                    <span class="meta-key">IMO Number:</span>
++                    <span class="meta-val" id="pelagos-selected-vessel-imo">—</span>
++                  </div>
++                  <div class="meta-row">
++                    <span class="meta-key">Vessel Type:</span>
++                    <span class="meta-val" id="pelagos-selected-vessel-type">—</span>
++                  </div>
++                  <div class="meta-row">
++                    <span class="meta-key">Reported Destination:</span>
++                    <span class="meta-val" id="pelagos-selected-vessel-dest">—</span>
++                  </div>
++                  <div class="meta-row">
++                    <span class="meta-key">Coordinates:</span>
++                    <span class="meta-val" id="pelagos-selected-vessel-coords">—</span>
++                  </div>
++                  <div class="meta-row">
++                    <span class="meta-key">Speed / Course:</span>
++                    <span class="meta-val" id="pelagos-selected-vessel-motion">—</span>
++                  </div>
++                  <div class="meta-row">
++                    <span class="meta-key">True Heading:</span>
++                    <span class="meta-val" id="pelagos-selected-vessel-heading">—</span>
++                  </div>
++                  <div class="meta-row">
++                    <span class="meta-key">Navigational Status:</span>
++                    <span class="meta-val" id="pelagos-selected-vessel-nav">—</span>
++                  </div>
++                  <div class="meta-row">
++                    <span class="meta-key">Last Position Fix:</span>
++                    <span class="meta-val" id="pelagos-selected-vessel-time">—</span>
++                  </div>
++                  <div class="meta-row" id="pelagos-selected-corridor-row" style="display: none;">
++                    <span class="meta-key">Corridor Proximity:</span>
++                    <span class="meta-val" id="pelagos-selected-vessel-corridor">—</span>
++                  </div>
++                </div>
++                <div class="selected-vessel-actions">
++                  <button type="button" class="pelagos-btn btn-focus-globe" id="pelagos-selected-vessel-focus">FOCUS ON GLOBE</button>
++                </div>
++              </div>
++
++              <!-- Scrollable Vessel List Container -->
++              <div class="pelagos-vessel-list-container" id="pelagos-vessel-list-container" style="display: none;">
++                <div class="pelagos-vessel-list" id="pelagos-vessel-list"></div>
++                <div class="pelagos-empty-state" id="pelagos-vessel-empty" style="display: none;">No tracked vessels found matching filter.</div>
++              </div>
++
++              <!-- Scope and Commercial Distinction Callout -->
++              <div class="pelagos-disclaimer-callout vessel-commercial-callout">
++                ℹ <strong>Commercial Scope:</strong> Live AIS positions represent observed radio beacon telemetry. Broadcast presence alone does <em>not</em> establish commercial open-tonnage status or charter availability.
++              </div>
+             </div>
+           </div>
