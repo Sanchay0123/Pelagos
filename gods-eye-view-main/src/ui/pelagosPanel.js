@@ -18,6 +18,14 @@ import {
   DIRECTIONS_ROUTE_COLOR,
   normalizeRoutePayload,
 } from '../layers/directions/index.js';
+import {
+  CORRIDOR_PROXIMITY_NM,
+  normalizeLiveVesselItem,
+  calculateDistanceToRouteNm,
+  deduplicateAndFilterVessels,
+  formatVesselCoords,
+  formatRelativeAge,
+} from './pelagosVessels.js';
 
 /** Verified hydrographic ports fallback dataset from backend/pelagos/routing/fixtures/ports.json */
 export const VERIFIED_HYDROGRAPHIC_PORTS = Object.freeze([
@@ -108,6 +116,14 @@ export class PelagosPanelController {
     this._abortController = null;
     this._boundListeners = [];
 
+    // AIS Vessel Intelligence state
+    this.vesselsRaw = [];
+    this.vesselsNormalized = [];
+    this.selectedMmsi = null;
+    this.vesselFilterTab = 'all'; // 'all' | 'corridor'
+    this.vesselSearchQuery = '';
+    this._windowListeners = [];
+
     this._resolveElements();
   }
 
@@ -176,6 +192,39 @@ export class PelagosPanelController {
       fleetText: d.getElementById('pelagos-fleet-text'),
       fleetDesc: d.getElementById('pelagos-fleet-desc'),
 
+      // Vessel Intelligence Controls & Inspector
+      vesselMetrics: d.getElementById('pelagos-vessel-metrics'),
+      globalVesselCount: d.getElementById('pelagos-global-vessel-count'),
+      routeVesselCount: d.getElementById('pelagos-route-vessel-count'),
+      vesselFilterBar: d.getElementById('pelagos-vessel-filter-bar'),
+      vesselSearch: d.getElementById('pelagos-vessel-search'),
+      tabAllBtn: d.getElementById('pelagos-tab-all'),
+      tabAllCount: d.getElementById('pelagos-tab-all-count'),
+      tabCorridorBtn: d.getElementById('pelagos-tab-corridor'),
+      tabCorridorCount: d.getElementById('pelagos-tab-corridor-count'),
+      selectedVesselCard: d.getElementById('pelagos-selected-vessel-card'),
+      selectedVesselName: d.getElementById('pelagos-selected-vessel-name'),
+      selectedVesselClose: d.getElementById('pelagos-selected-vessel-close'),
+      selectedVesselMmsi: d.getElementById('pelagos-selected-vessel-mmsi'),
+      selectedVesselImo: d.getElementById('pelagos-selected-vessel-imo'),
+      selectedVesselType: d.getElementById('pelagos-selected-vessel-type'),
+      selectedVesselDest: d.getElementById('pelagos-selected-vessel-dest'),
+      selectedVesselCoords: d.getElementById('pelagos-selected-vessel-coords'),
+      selectedVesselMotion: d.getElementById('pelagos-selected-vessel-motion'),
+      selectedVesselHeading: d.getElementById(
+        'pelagos-selected-vessel-heading',
+      ),
+      selectedVesselNav: d.getElementById('pelagos-selected-vessel-nav'),
+      selectedVesselTime: d.getElementById('pelagos-selected-vessel-time'),
+      selectedCorridorRow: d.getElementById('pelagos-selected-corridor-row'),
+      selectedVesselCorridor: d.getElementById(
+        'pelagos-selected-vessel-corridor',
+      ),
+      selectedVesselFocus: d.getElementById('pelagos-selected-vessel-focus'),
+      vesselListContainer: d.getElementById('pelagos-vessel-list-container'),
+      vesselList: d.getElementById('pelagos-vessel-list'),
+      vesselEmpty: d.getElementById('pelagos-vessel-empty'),
+
       // Limitations
       limitationsList: d.getElementById('pelagos-limitations-list'),
     };
@@ -187,6 +236,7 @@ export class PelagosPanelController {
     if (!this.elements.panel) return;
 
     this._bindEvents();
+    this._initGlobeEventListeners();
     await this.loadPorts();
   }
 
@@ -194,6 +244,39 @@ export class PelagosPanelController {
     if (!element) return;
     element.addEventListener(event, handler);
     this._boundListeners.push({ element, event, handler });
+  }
+
+  _initGlobeEventListeners() {
+    if (typeof window === 'undefined' || !window.addEventListener) return;
+
+    const onEntitySelected = (e) => {
+      const record = e?.detail;
+      if (record?.layerId === 'ais-live-vessels') {
+        const mmsi =
+          record?.properties?.mmsi ??
+          record?.entity?.mmsi ??
+          (typeof record?.id === 'string' && record.id.startsWith('ais-')
+            ? record.id.slice(4)
+            : null);
+        if (mmsi) {
+          this.selectVessel(mmsi, { syncGlobe: false, flyCamera: false });
+        }
+      }
+    };
+
+    const onEntityCleared = (e) => {
+      if (!e?.detail?.layerId || e.detail.layerId === 'ais-live-vessels') {
+        this.clearSelectedVessel({ syncGlobe: false });
+      }
+    };
+
+    window.addEventListener('gev:entity-selected', onEntitySelected);
+    window.addEventListener('gev:entity-selection-cleared', onEntityCleared);
+
+    this._windowListeners.push(
+      { event: 'gev:entity-selected', handler: onEntitySelected },
+      { event: 'gev:entity-selection-cleared', handler: onEntityCleared },
+    );
   }
 
   _bindEvents() {
@@ -234,6 +317,39 @@ export class PelagosPanelController {
     this._bind(el.destFilter, 'input', (e) => {
       this.filterPortOptions(el.destSelect, e.target.value);
     });
+
+    if (el.vesselSearch) {
+      this._bind(el.vesselSearch, 'input', (e) => {
+        this.vesselSearchQuery = e.target.value || '';
+        this.refreshVesselData();
+      });
+    }
+
+    if (el.tabAllBtn) {
+      this._bind(el.tabAllBtn, 'click', () => {
+        this.setVesselTab('all');
+      });
+    }
+
+    if (el.tabCorridorBtn) {
+      this._bind(el.tabCorridorBtn, 'click', () => {
+        this.setVesselTab('corridor');
+      });
+    }
+
+    if (el.selectedVesselClose) {
+      this._bind(el.selectedVesselClose, 'click', () => {
+        this.clearSelectedVessel({ syncGlobe: true });
+      });
+    }
+
+    if (el.selectedVesselFocus) {
+      this._bind(el.selectedVesselFocus, 'click', () => {
+        if (this.selectedMmsi) {
+          this.focusVesselOnGlobe(this.selectedMmsi);
+        }
+      });
+    }
   }
 
   /** Retrieve registered port records from the backend API, falling back to fixture data. */
@@ -350,7 +466,9 @@ export class PelagosPanelController {
     const dest = el.destSelect?.value;
 
     if (!origin || !dest) {
-      this.showValidationMessage('Please select both an origin and destination port.');
+      this.showValidationMessage(
+        'Please select both an origin and destination port.',
+      );
       return false;
     }
 
@@ -783,14 +901,14 @@ export class PelagosPanelController {
       if (el.rateEmpty) el.rateEmpty.style.display = 'none';
       if (el.observedTag) el.observedTag.style.display = 'inline-block';
 
-      if (el.rateVal) el.rateVal.textContent = Number(obs.rate_value).toFixed(2);
+      if (el.rateVal)
+        el.rateVal.textContent = Number(obs.rate_value).toFixed(2);
       if (el.rateUnit)
         el.rateUnit.textContent = `${obs.currency || 'USD'}/${obs.unit?.split('/')[1] || 'MT'}`;
       if (el.rateDate) el.rateDate.textContent = obs.observation_date || '—';
       if (el.rateSource)
         el.rateSource.textContent =
-          obs.source_name ||
-          "USDA AMS / O'Neil Commodity Consulting";
+          obs.source_name || "USDA AMS / O'Neil Commodity Consulting";
       if (el.rateType) {
         el.rateType.textContent = obs.is_derived
           ? 'Derived Analytical Estimate'
@@ -866,34 +984,78 @@ export class PelagosPanelController {
     if (!el.fleetCard) return;
 
     try {
-      const resp = await fetch('/api/ais-live?maxRows=1', { cache: 'no-store' });
+      const resp = await fetch('/api/ais-live?maxRows=200', {
+        cache: 'no-store',
+      });
       if (resp.ok) {
         const liveData = await resp.json();
         const status = liveData?.status;
-        const count = Array.isArray(liveData?.rows) ? liveData.rows.length : 0;
+        const rows = Array.isArray(liveData?.rows) ? liveData.rows : [];
+        const count = rows.length;
         const totalLive = liveData?.rawRowCount || count;
+        this.totalLiveCount = totalLive;
 
-        if (status === 'live' && count > 0) {
-          if (el.fleetTag) {
-            el.fleetTag.className = 'pelagos-tag tag-ready';
-            el.fleetTag.textContent = 'TELEMETRY LIVE';
+        if (
+          (status === 'live' || status === 'sample' || rows.length > 0) &&
+          count > 0
+        ) {
+          this.vesselsRaw = rows;
+          const isSample =
+            status === 'sample' || rows.some((r) => r.historical);
+
+          if (isSample) {
+            if (el.fleetTag) {
+              el.fleetTag.className = 'pelagos-tag tag-warning';
+              el.fleetTag.textContent = 'SAMPLE FEED';
+            }
+            if (el.fleetDot)
+              el.fleetDot.className = 'status-indicator-dot dot-warning';
+            if (el.fleetText) {
+              el.fleetText.textContent = `Historical Sample — 120 Coastal Vessel Tracks (${count} loaded)`;
+            }
+            if (el.fleetDesc) {
+              el.fleetDesc.textContent =
+                'Displaying historical coastal vessel sample. Notice: This is not live telemetry and does not reflect current sea positions or commercial vessel charter availability.';
+            }
+          } else {
+            if (el.fleetTag) {
+              el.fleetTag.className = 'pelagos-tag tag-ready';
+              el.fleetTag.textContent = 'TELEMETRY LIVE';
+            }
+            if (el.fleetDot)
+              el.fleetDot.className = 'status-indicator-dot dot-active';
+            if (el.fleetText) {
+              el.fleetText.textContent = `Active — Live AIS Telemetry Connected (${totalLive.toLocaleString()} vessels tracked)`;
+            }
+            if (el.fleetDesc) {
+              el.fleetDesc.textContent =
+                'Live AIS position stream is connected. Real-time fleet tracking is active across monitored sea lanes. Notice: Commercial open-tonnage fixture lists remain unconnected (AIS telemetry alone does not establish commercial vessel charter availability).';
+            }
           }
-          if (el.fleetDot) el.fleetDot.className = 'status-indicator-dot dot-active';
-          if (el.fleetText) el.fleetText.textContent = `Active — Live AIS Telemetry Connected (${totalLive.toLocaleString()} vessels tracked)`;
-          if (el.fleetDesc) {
-            el.fleetDesc.textContent =
-              'Live AIS position stream is connected. Real-time fleet tracking is active across monitored sea lanes. Notice: Commercial open-tonnage fixture lists remain unconnected (AIS telemetry alone does not establish commercial vessel charter availability).';
-          }
+
+          // Reveal vessel intelligence UI sections
+          if (el.vesselMetrics) el.vesselMetrics.style.display = 'grid';
+          if (el.vesselFilterBar) el.vesselFilterBar.style.display = 'flex';
+          if (el.vesselListContainer)
+            el.vesselListContainer.style.display = 'block';
+
+          this.refreshVesselData();
           return;
         }
+
+        // Handle offline / non-active statuses
+        this._hideVesselControls();
 
         if (status === 'connecting' || status === 'idle') {
           if (el.fleetTag) {
             el.fleetTag.className = 'pelagos-tag tag-loading';
             el.fleetTag.textContent = 'CONNECTING';
           }
-          if (el.fleetDot) el.fleetDot.className = 'status-indicator-dot dot-pending';
-          if (el.fleetText) el.fleetText.textContent = 'Connecting — Establishing AISStream WebSocket…';
+          if (el.fleetDot)
+            el.fleetDot.className = 'status-indicator-dot dot-pending';
+          if (el.fleetText)
+            el.fleetText.textContent =
+              'Connecting — Establishing AISStream WebSocket…';
           if (el.fleetDesc) {
             el.fleetDesc.textContent =
               'WebSocket connection to stream.aisstream.io is in progress. Awaiting initial valid AIS envelope reception.';
@@ -906,8 +1068,11 @@ export class PelagosPanelController {
             el.fleetTag.className = 'pelagos-tag tag-offline';
             el.fleetTag.textContent = 'UNCONFIGURED';
           }
-          if (el.fleetDot) el.fleetDot.className = 'status-indicator-dot dot-inactive';
-          if (el.fleetText) el.fleetText.textContent = 'Unavailable — AISSTREAM_API_KEY is not configured';
+          if (el.fleetDot)
+            el.fleetDot.className = 'status-indicator-dot dot-inactive';
+          if (el.fleetText)
+            el.fleetText.textContent =
+              'Unavailable — AISSTREAM_API_KEY is not configured';
           if (el.fleetDesc) {
             el.fleetDesc.textContent =
               'No AISStream key configured. Add AISSTREAM_API_KEY to Provider Settings (bottom right POWER UP panel) or .env to enable live fleet telemetry.';
@@ -920,8 +1085,11 @@ export class PelagosPanelController {
             el.fleetTag.className = 'pelagos-tag tag-offline';
             el.fleetTag.textContent = 'AUTH FAILED';
           }
-          if (el.fleetDot) el.fleetDot.className = 'status-indicator-dot dot-inactive';
-          if (el.fleetText) el.fleetText.textContent = 'Unavailable — AISStream API key rejected';
+          if (el.fleetDot)
+            el.fleetDot.className = 'status-indicator-dot dot-inactive';
+          if (el.fleetText)
+            el.fleetText.textContent =
+              'Unavailable — AISStream API key rejected';
           if (el.fleetDesc) {
             el.fleetDesc.textContent =
               'The configured AISStream credential was rejected by the upstream gateway. Please verify your AISSTREAM_API_KEY.';
@@ -933,16 +1101,372 @@ export class PelagosPanelController {
       /* Fallback to freight endpoint data or default offline state */
     }
 
+    this._hideVesselControls();
+
     if (el.fleetTag) {
       el.fleetTag.className = 'pelagos-tag tag-offline';
       el.fleetTag.textContent = 'UNCONNECTED';
     }
-    if (el.fleetDot) el.fleetDot.className = 'status-indicator-dot dot-inactive';
-    if (el.fleetText) el.fleetText.textContent = 'Unavailable — live vessel availability data is not connected';
+    if (el.fleetDot)
+      el.fleetDot.className = 'status-indicator-dot dot-inactive';
+    if (el.fleetText)
+      el.fleetText.textContent =
+        'Unavailable — live vessel availability data is not connected';
     if (el.fleetDesc) {
       el.fleetDesc.textContent =
         freight?.vessel_availability?.reason ||
         'Live AIS fleet telemetry and commercial open tonnage lists are not connected (pelagos live_ais_connected: false). Static sample only covers coastal U.S. waters and is not interpreted as active fleet availability.';
+    }
+  }
+
+  _hideVesselControls() {
+    this.vesselsRaw = [];
+    this.vesselsNormalized = [];
+    this.clearSelectedVessel({ syncGlobe: false });
+    if (this.elements.vesselMetrics)
+      this.elements.vesselMetrics.style.display = 'none';
+    if (this.elements.vesselFilterBar)
+      this.elements.vesselFilterBar.style.display = 'none';
+    if (this.elements.vesselListContainer)
+      this.elements.vesselListContainer.style.display = 'none';
+    if (this.elements.selectedVesselCard)
+      this.elements.selectedVesselCard.style.display = 'none';
+  }
+
+  /** Switch between All Tracked and Near Corridor filter tabs */
+  setVesselTab(tab) {
+    if (this.vesselFilterTab === tab) return;
+    this.vesselFilterTab = tab;
+    if (this.elements.tabAllBtn) {
+      this.elements.tabAllBtn.classList.toggle('active', tab === 'all');
+    }
+    if (this.elements.tabCorridorBtn) {
+      this.elements.tabCorridorBtn.classList.toggle(
+        'active',
+        tab === 'corridor',
+      );
+    }
+    this.refreshVesselData();
+  }
+
+  /** Refresh vessel deduplication, route proximity, metrics, and list rendering */
+  refreshVesselData() {
+    if (!this.vesselsRaw || this.vesselsRaw.length === 0) return;
+
+    const { vessels, totalCount, corridorCount } = deduplicateAndFilterVessels(
+      this.vesselsRaw,
+      {
+        activeRoute: this.currentRoute,
+        searchQuery: this.vesselSearchQuery,
+        tab: this.vesselFilterTab,
+      },
+    );
+    this.vesselsNormalized = vessels;
+
+    if (this.elements.globalVesselCount) {
+      this.elements.globalVesselCount.textContent = (
+        this.totalLiveCount ||
+        totalCount ||
+        this.vesselsRaw.length
+      ).toLocaleString();
+    }
+    if (this.elements.routeVesselCount) {
+      this.elements.routeVesselCount.textContent = this.currentRoute
+        ? corridorCount.toLocaleString()
+        : '—';
+    }
+    if (this.elements.tabAllCount) {
+      this.elements.tabAllCount.textContent = String(totalCount);
+    }
+    if (this.elements.tabCorridorCount) {
+      this.elements.tabCorridorCount.textContent = this.currentRoute
+        ? String(corridorCount)
+        : '—';
+    }
+
+    this.renderVesselList();
+
+    if (this.selectedMmsi) {
+      const stillExists = this.vesselsNormalized.some(
+        (v) => String(v.mmsi) === String(this.selectedMmsi),
+      );
+      if (stillExists) {
+        this.renderSelectedVesselCard();
+      } else {
+        const allVessels = deduplicateAndFilterVessels(this.vesselsRaw, {
+          activeRoute: this.currentRoute,
+        }).vessels;
+        const existsInRaw = allVessels.find(
+          (v) => String(v.mmsi) === String(this.selectedMmsi),
+        );
+        if (existsInRaw) {
+          this.renderSelectedVesselCard(existsInRaw);
+        } else {
+          // Vessel aged out or disappeared from live cache
+          this.clearSelectedVessel({ syncGlobe: false });
+        }
+      }
+    }
+  }
+
+  /** Render the scrollable vessel list with rich telemetry items */
+  renderVesselList() {
+    const el = this.elements;
+    if (!el.vesselList) return;
+    el.vesselList.innerHTML = '';
+
+    const list = this.vesselsNormalized || [];
+    if (list.length === 0) {
+      if (el.vesselEmpty) {
+        el.vesselEmpty.style.display = 'block';
+        if (this.vesselFilterTab === 'corridor' && !this.currentRoute) {
+          el.vesselEmpty.textContent =
+            'Calculate a route first to identify vessels operating near the corridor.';
+        } else if (this.vesselFilterTab === 'corridor') {
+          el.vesselEmpty.textContent =
+            'No live vessels detected within 50 NM of the active route corridor.';
+        } else if (this.vesselSearchQuery) {
+          el.vesselEmpty.textContent = `No tracked vessels match "${this.vesselSearchQuery}".`;
+        } else {
+          el.vesselEmpty.textContent =
+            'No tracked vessels currently available.';
+        }
+      }
+      return;
+    }
+
+    if (el.vesselEmpty) el.vesselEmpty.style.display = 'none';
+
+    list.forEach((v) => {
+      const item = this.doc.createElement('div');
+      item.className = 'pelagos-vessel-item';
+      if (this.selectedMmsi && String(v.mmsi) === String(this.selectedMmsi)) {
+        item.classList.add('selected');
+        item.classList.add('is-selected');
+      }
+      if (!item.dataset) item.dataset = {};
+      item.dataset.mmsi = String(v.mmsi);
+
+      // Top row: name and type tag
+      const topRow = this.doc.createElement('div');
+      topRow.className = 'vessel-item-top';
+
+      const nameEl = this.doc.createElement('span');
+      nameEl.className = 'vessel-name';
+      nameEl.textContent = v.displayName;
+      topRow.appendChild(nameEl);
+
+      const typeTag = this.doc.createElement('span');
+      typeTag.className = 'vessel-tag';
+      typeTag.textContent = v.displayType;
+      topRow.appendChild(typeTag);
+      item.appendChild(topRow);
+
+      // Sub row: MMSI and relative age
+      const subRow = this.doc.createElement('div');
+      subRow.className = 'vessel-item-sub';
+
+      const mmsiEl = this.doc.createElement('span');
+      mmsiEl.className = 'vessel-mmsi';
+      mmsiEl.textContent = `MMSI: ${v.mmsi}`;
+      subRow.appendChild(mmsiEl);
+
+      const ageEl = this.doc.createElement('span');
+      ageEl.className = `vessel-age ${v.isStale ? 'stale' : ''}`;
+      ageEl.textContent = v.ageFormatted;
+      subRow.appendChild(ageEl);
+      item.appendChild(subRow);
+
+      // Detail row: Motion & Proximity
+      const detailRow = this.doc.createElement('div');
+      detailRow.className = 'vessel-item-detail';
+
+      const motionEl = this.doc.createElement('span');
+      motionEl.className = 'vessel-motion';
+      motionEl.textContent = `${v.speedFormatted} · ${v.courseFormatted}`;
+      detailRow.appendChild(motionEl);
+
+      if (v.isNearCorridor && v.distanceToRouteNm !== null) {
+        const proxEl = this.doc.createElement('span');
+        proxEl.className = 'vessel-proximity';
+        proxEl.textContent = `⟵ ${v.distanceToRouteNm.toFixed(1)} NM`;
+        detailRow.appendChild(proxEl);
+      }
+      item.appendChild(detailRow);
+
+      item.addEventListener('click', () => {
+        this.selectVessel(v.mmsi, { syncGlobe: true, flyCamera: true });
+      });
+
+      el.vesselList.appendChild(item);
+    });
+  }
+
+  /** Select a vessel by MMSI, update the inspector card, and sync with Cesium globe */
+  selectVessel(mmsi, { syncGlobe = true, flyCamera = true } = {}) {
+    if (!mmsi) return;
+    this.selectedMmsi = String(mmsi);
+
+    let vessel = this.vesselsNormalized.find(
+      (v) => String(v.mmsi) === this.selectedMmsi,
+    );
+    if (!vessel && this.vesselsRaw?.length > 0) {
+      const all = deduplicateAndFilterVessels(this.vesselsRaw, {
+        activeRoute: this.currentRoute,
+      }).vessels;
+      vessel = all.find((v) => String(v.mmsi) === this.selectedMmsi);
+    }
+
+    if (!vessel) return;
+
+    if (this.elements.vesselList) {
+      const items = this.elements.vesselList.querySelectorAll
+        ? this.elements.vesselList.querySelectorAll('.pelagos-vessel-item')
+        : [];
+      for (const item of items) {
+        const isSelected = item.dataset?.mmsi === this.selectedMmsi;
+        if (item.classList?.toggle) {
+          item.classList.toggle('selected', isSelected);
+          item.classList.toggle('is-selected', isSelected);
+        }
+      }
+    }
+
+    this.renderSelectedVesselCard(vessel);
+
+    if (syncGlobe) {
+      this.services.aisLiveVesselsLayer?.selectById?.(vessel.mmsi);
+      if (flyCamera) {
+        this.focusVesselOnGlobe(vessel.mmsi);
+      }
+    }
+  }
+
+  /** Clear selected vessel state and deselect on Cesium layer */
+  clearSelectedVessel({ syncGlobe = true } = {}) {
+    this.selectedMmsi = null;
+
+    if (this.elements.selectedVesselCard) {
+      this.elements.selectedVesselCard.style.display = 'none';
+    }
+
+    if (this.elements.vesselList) {
+      const items = this.elements.vesselList.querySelectorAll
+        ? this.elements.vesselList.querySelectorAll('.pelagos-vessel-item')
+        : [];
+      for (const item of items) {
+        if (item.classList?.remove) {
+          item.classList.remove('selected');
+          item.classList.remove('is-selected');
+        }
+      }
+    }
+
+    if (syncGlobe) {
+      this.services.aisLiveVesselsLayer?.clearSelection?.();
+    }
+  }
+
+  /** Focus the Cesium globe camera onto a tracked vessel */
+  focusVesselOnGlobe(mmsi) {
+    if (!mmsi) return;
+    const targetMmsi = String(mmsi);
+    let vessel = this.vesselsNormalized.find(
+      (v) => String(v.mmsi) === targetMmsi,
+    );
+    if (!vessel && this.vesselsRaw?.length > 0) {
+      const all = deduplicateAndFilterVessels(this.vesselsRaw, {
+        activeRoute: this.currentRoute,
+      }).vessels;
+      vessel = all.find((v) => String(v.mmsi) === targetMmsi);
+    }
+    if (!vessel) return;
+
+    if (this.services.worldFocus?.requestWorldFocus) {
+      this.services.worldFocus.requestWorldFocus({
+        kind: 'vessel',
+        id: vessel.mmsi,
+        label: vessel.displayName,
+        position: {
+          latitude: vessel.lat,
+          longitude: vessel.lon,
+          altitude: 25000,
+        },
+      });
+    }
+
+    if (
+      this.viewer?.camera?.flyTo &&
+      Number.isFinite(vessel.lat) &&
+      Number.isFinite(vessel.lon)
+    ) {
+      try {
+        this.viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(
+            vessel.lon,
+            vessel.lat,
+            25000,
+          ),
+          duration: 1.5,
+        });
+      } catch {
+        /* best effort */
+      }
+    }
+  }
+
+  /** Render the Selected Vessel inspector card with complete telemetry fields */
+  renderSelectedVesselCard(vesselRecord = null) {
+    const el = this.elements;
+    if (!el.selectedVesselCard) return;
+
+    const v =
+      vesselRecord ||
+      this.vesselsNormalized.find(
+        (item) => String(item.mmsi) === String(this.selectedMmsi),
+      );
+
+    if (!v) {
+      el.selectedVesselCard.style.display = 'none';
+      return;
+    }
+
+    el.selectedVesselCard.style.display = 'block';
+
+    if (el.selectedVesselName)
+      el.selectedVesselName.textContent = v.displayName;
+    if (el.selectedVesselMmsi) el.selectedVesselMmsi.textContent = v.mmsi;
+    if (el.selectedVesselImo) el.selectedVesselImo.textContent = v.imo;
+    if (el.selectedVesselType)
+      el.selectedVesselType.textContent = v.type || 'Not reported';
+    if (el.selectedVesselDest)
+      el.selectedVesselDest.textContent = v.destination;
+    if (el.selectedVesselCoords)
+      el.selectedVesselCoords.textContent = formatVesselCoords(v.lat, v.lon);
+    if (el.selectedVesselMotion)
+      el.selectedVesselMotion.textContent = `${v.speedFormatted} · ${v.courseFormatted}`;
+    if (el.selectedVesselHeading)
+      el.selectedVesselHeading.textContent = v.headingFormatted;
+    if (el.selectedVesselNav) el.selectedVesselNav.textContent = v.navStatus;
+    if (el.selectedVesselTime) {
+      if (v.lastPositionUtc && v.lastPositionUtc !== 'Not reported') {
+        el.selectedVesselTime.textContent = `${v.lastPositionUtc} (${v.ageFormatted})`;
+      } else if (v.ageFormatted && v.ageFormatted !== 'Not reported') {
+        el.selectedVesselTime.textContent = v.ageFormatted;
+      } else {
+        el.selectedVesselTime.textContent = 'Not reported';
+      }
+    }
+
+    if (el.selectedCorridorRow && el.selectedVesselCorridor) {
+      if (v.distanceToRouteNm !== null && this.currentRoute) {
+        el.selectedCorridorRow.style.display = 'flex';
+        el.selectedVesselCorridor.textContent = `${v.distanceToRouteNm.toFixed(1)} NM ${
+          v.isNearCorridor ? '(Within 50 NM Corridor)' : '(Outside Corridor)'
+        }`;
+      } else {
+        el.selectedCorridorRow.style.display = 'none';
+      }
     }
   }
 
@@ -981,6 +1505,11 @@ export class PelagosPanelController {
 
     this.filterPortOptions(this.elements.originSelect, '');
     this.filterPortOptions(this.elements.destSelect, '');
+
+    // Refresh vessel corridor proximity calculations without active route
+    if (this.vesselsRaw && this.vesselsRaw.length > 0) {
+      this.refreshVesselData();
+    }
   }
 
   /** Teardown all event listeners, graphics, and abort pending requests. */
@@ -996,5 +1525,20 @@ export class PelagosPanelController {
       }
     }
     this._boundListeners = [];
+
+    for (const { event, handler } of this._windowListeners) {
+      try {
+        if (typeof window !== 'undefined' && window.removeEventListener) {
+          window.removeEventListener(event, handler);
+        }
+      } catch {
+        /* listener cleanup is best effort */
+      }
+    }
+    this._windowListeners = [];
+
+    this.clearSelectedVessel({ syncGlobe: true });
+    this.vesselsRaw = [];
+    this.vesselsNormalized = [];
   }
 }

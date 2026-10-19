@@ -317,7 +317,7 @@
           <!-- 5. Vessel Availability Card -->
           <div class="pelagos-card" id="pelagos-fleet-card">
             <div class="card-header">
-              <span class="card-title">VESSEL AVAILABILITY</span>
+              <span class="card-title">VESSEL AVAILABILITY & LIVE AIS</span>
               <span class="pelagos-tag tag-offline" id="pelagos-fleet-tag">UNCONNECTED</span>
             </div>
             <div class="card-body">
@@ -328,6 +328,96 @@
               <p class="fleet-detail-text" id="pelagos-fleet-desc">
                 Live commercial AIS fleet telemetry and forward position-list feeds are not linked to this installation (pelagos live_ais_connected: false). Static sample only covers coastal U.S. waters and is not interpreted as active fleet availability.
               </p>
+
+              <!-- Global vs Corridor Metrics -->
+              <div class="pelagos-vessel-metrics-grid" id="pelagos-vessel-metrics" style="display: none;">
+                <div class="vessel-metric-box">
+                  <span class="vessel-metric-k">GLOBAL AIS FEED</span>
+                  <span class="vessel-metric-v" id="pelagos-global-vessel-count">0</span>
+                </div>
+                <div class="vessel-metric-box">
+                  <span class="vessel-metric-k">NEAR CORRIDOR (≤50 NM)</span>
+                  <span class="vessel-metric-v highlight" id="pelagos-route-vessel-count">—</span>
+                </div>
+              </div>
+
+              <!-- Filter Bar & Search Input -->
+              <div class="pelagos-vessel-filter-bar" id="pelagos-vessel-filter-bar" style="display: none;">
+                <div class="vessel-search-wrap">
+                  <input type="text" id="pelagos-vessel-search" class="pelagos-filter-input" placeholder="Filter by Name, MMSI, Type, Destination…" autocomplete="off" />
+                </div>
+                <div class="vessel-filter-tabs">
+                  <button type="button" class="vessel-tab-btn active" id="pelagos-tab-all">All Tracked (<span id="pelagos-tab-all-count">0</span>)</button>
+                  <button type="button" class="vessel-tab-btn" id="pelagos-tab-corridor">Near Corridor (<span id="pelagos-tab-corridor-count">0</span>)</button>
+                </div>
+              </div>
+
+              <!-- Selected Vessel Detail Inspector Card -->
+              <div class="pelagos-selected-vessel-card" id="pelagos-selected-vessel-card" style="display: none;">
+                <div class="selected-vessel-header">
+                  <div class="selected-vessel-title-group">
+                    <span class="selected-badge">SELECTED VESSEL</span>
+                    <span class="selected-vessel-name" id="pelagos-selected-vessel-name">—</span>
+                  </div>
+                  <button type="button" class="pelagos-btn-icon" id="pelagos-selected-vessel-close" title="Close inspection">✕</button>
+                </div>
+                <div class="selected-vessel-grid">
+                  <div class="meta-row">
+                    <span class="meta-key">MMSI:</span>
+                    <span class="meta-val" id="pelagos-selected-vessel-mmsi">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">IMO Number:</span>
+                    <span class="meta-val" id="pelagos-selected-vessel-imo">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Vessel Type:</span>
+                    <span class="meta-val" id="pelagos-selected-vessel-type">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Reported Destination:</span>
+                    <span class="meta-val" id="pelagos-selected-vessel-dest">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Coordinates:</span>
+                    <span class="meta-val" id="pelagos-selected-vessel-coords">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Speed / Course:</span>
+                    <span class="meta-val" id="pelagos-selected-vessel-motion">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">True Heading:</span>
+                    <span class="meta-val" id="pelagos-selected-vessel-heading">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Navigational Status:</span>
+                    <span class="meta-val" id="pelagos-selected-vessel-nav">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Last Position Fix:</span>
+                    <span class="meta-val" id="pelagos-selected-vessel-time">—</span>
+                  </div>
+                  <div class="meta-row" id="pelagos-selected-corridor-row" style="display: none;">
+                    <span class="meta-key">Corridor Proximity:</span>
+                    <span class="meta-val" id="pelagos-selected-vessel-corridor">—</span>
+                  </div>
+                </div>
+                <div class="selected-vessel-actions">
+                  <button type="button" class="pelagos-btn btn-focus-globe" id="pelagos-selected-vessel-focus">FOCUS ON GLOBE</button>
+                </div>
+              </div>
+
+              <!-- Scrollable Vessel List Container -->
+              <div class="pelagos-vessel-list-container" id="pelagos-vessel-list-container" style="display: none;">
+                <div class="pelagos-vessel-list" id="pelagos-vessel-list"></div>
+                <div class="pelagos-empty-state" id="pelagos-vessel-empty" style="display: none;">No tracked vessels found matching filter.</div>
+              </div>
+
+              <!-- Scope and Commercial Distinction Callout -->
+              <div class="pelagos-disclaimer-callout vessel-commercial-callout">
+                ℹ <strong>Commercial Scope:</strong> Live AIS positions represent observed radio beacon telemetry. Broadcast presence alone does <em>not</em> establish commercial open-tonnage status or charter availability.
+              </div>
             </div>
           </div>
 
