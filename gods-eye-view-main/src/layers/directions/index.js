@@ -29,11 +29,18 @@ export const DIRECTIONS_STEP_OVERLAY_SOURCE_OPTIONS = Object.freeze({
   moving: false,
 });
 
-/** Travel modes, keyed by the `/api/route` profile name. */
+/** Pelagos REST maritime routing endpoint. */
+export const MARITIME_ROUTING_ENDPOINT = '/api/v1/routing/calculate';
+
+/** Pelagos REST commercial freight route intelligence endpoint. */
+export const FREIGHT_INTELLIGENCE_ENDPOINT = '/api/v1/freight/route-intelligence';
+
+/** Travel modes, keyed by profile name. */
 export const DIRECTIONS_MODES = Object.freeze({
   car: Object.freeze({ chip: 'DRIVE', word: 'Drive', icon: '🚗' }),
   foot: Object.freeze({ chip: 'WALK', word: 'Walk', icon: '🚶' }),
   bike: Object.freeze({ chip: 'BIKE', word: 'Bike', icon: '🚲' }),
+  sea: Object.freeze({ chip: 'SEA', word: 'Sea (MARNET)', icon: '🚢' }),
 });
 export const DEFAULT_DIRECTIONS_MODE = 'car';
 
@@ -103,7 +110,19 @@ export function normalizeDirectionsParams(params = {}) {
  * @returns {{chips: object[], legend: object[]}}
  */
 export function directionsRowControls(state) {
-  const { mode, armed, a, b, status, route, selectedStep, flightStep } = state;
+  const {
+    mode,
+    armed,
+    a,
+    b,
+    status,
+    route,
+    selectedStep,
+    flightStep,
+    freightIntelligence,
+    freightStatus,
+    freightError,
+  } = state;
   const routing = status === 'routing';
   const chips = Object.entries(DIRECTIONS_MODES).map(([id, spec]) => ({
     id: `mode-${id}`,
@@ -169,6 +188,9 @@ export function directionsRowControls(state) {
       route,
       selectedStep: selectedStep ?? null,
       flightStep: flightStep ?? null,
+      freightIntelligence: freightIntelligence ?? null,
+      freightStatus: freightStatus ?? 'idle',
+      freightError: freightError ?? null,
     }),
   };
 }
@@ -265,19 +287,115 @@ export function directionsStepList({
   route,
   selectedStep = null,
   flightStep = null,
+  freightIntelligence = null,
+  freightStatus = 'idle',
+  freightError = null,
 }) {
   const steps = route?.steps;
   if (!Array.isArray(steps) || !steps.length) return null;
   const active = Number.isInteger(flightStep) ? flightStep : selectedStep;
-  const items = steps.map((step, index) => ({
-    id: `step-${index}`,
-    ordinal: index + 1,
-    lead: formatRouteDistance(step.distanceM) || '—',
-    text: step.instruction,
-    active: index === active,
-    current: Number.isInteger(flightStep) && index === flightStep,
-    params: { step: index },
-  }));
+  const items = [];
+
+  // Maritime route-level freight intelligence cards
+  if (route.isMaritime) {
+    if (freightStatus === 'loading') {
+      items.push({
+        id: 'freight-status',
+        ordinal: '★',
+        lead: 'FREIGHT',
+        text: 'Loading route freight market intelligence…',
+        disabled: true,
+      });
+    } else if (freightIntelligence) {
+      if (freightIntelligence.status === 'monitored') {
+        const c = freightIntelligence.corridor;
+        const obs = freightIntelligence.latest_observation;
+        const fc = freightIntelligence.baseline_forecast;
+        const fleet = freightIntelligence.vessel_availability;
+
+        if (c) {
+          items.push({
+            id: 'freight-corridor',
+            ordinal: '1',
+            lead: 'CORRIDOR',
+            text: `${c.route_name} (${c.route_code}) · ${c.vessel_class || 'Panamax / Supramax'} · ${c.cargo_type || 'Bulk Grain'}`,
+            disabled: true,
+          });
+        }
+        if (obs) {
+          items.push({
+            id: 'freight-rate',
+            ordinal: '2',
+            lead: 'OBSERVED',
+            text: `$${obs.rate_value.toFixed(2)} ${obs.unit} (${obs.observation_date}) · Source: ${obs.source_name}`,
+            disabled: true,
+          });
+        }
+        if (fc && fc.predicted_value !== null && fc.predicted_value !== undefined) {
+          items.push({
+            id: 'freight-forecast',
+            ordinal: '3',
+            lead: 'FORECAST',
+            text: `$${fc.predicted_value.toFixed(2)} ${fc.unit} (${fc.target_date}) · Model: ${fc.model_type} (1-mo horizon)`,
+            disabled: true,
+          });
+        }
+        items.push({
+          id: 'freight-vessels',
+          ordinal: '4',
+          lead: 'FLEET',
+          text: `Vessel availability: Unavailable (${fleet?.reason || 'no live AIS feed'})`,
+          disabled: true,
+        });
+        items.push({
+          id: 'freight-scope',
+          ordinal: '5',
+          lead: 'SCOPE',
+          text: 'Agricultural bulk grain only; does not apply to container, tanker, or general cargo.',
+          disabled: true,
+        });
+      } else if (freightIntelligence.status === 'unmonitored') {
+        const fleet = freightIntelligence.vessel_availability;
+        items.push({
+          id: 'freight-unmonitored',
+          ordinal: '1',
+          lead: 'FREIGHT',
+          text: freightIntelligence.message || 'Unmonitored corridor — no published freight observations or model forecasts exist for this route.',
+          disabled: true,
+        });
+        items.push({
+          id: 'freight-vessels',
+          ordinal: '2',
+          lead: 'FLEET',
+          text: `Vessel availability: Unavailable (${fleet?.reason || 'no live AIS feed'})`,
+          disabled: true,
+        });
+      }
+    } else if (freightStatus === 'error') {
+      items.push({
+        id: 'freight-error',
+        ordinal: '!',
+        lead: 'FREIGHT',
+        text: `Freight intelligence unavailable (${freightError || 'request failed'})`,
+        disabled: true,
+      });
+    }
+  }
+
+  // Navigational turn-by-turn / sea-lane waypoints
+  for (let index = 0; index < steps.length; index += 1) {
+    const step = steps[index];
+    items.push({
+      id: `step-${index}`,
+      ordinal: index + 1,
+      lead: formatRouteDistance(step.distanceM) || '—',
+      text: step.instruction,
+      active: index === active,
+      current: Number.isInteger(flightStep) && index === flightStep,
+      params: { step: index },
+    });
+  }
+
   if (route.stepsTruncated) {
     // The arrival step is missing, so the list must not end as if the reader
     // had arrived. A plain, unclickable last line says where it really stops.
@@ -291,7 +409,10 @@ export function directionsStepList({
       disabled: true,
     });
   }
-  return { ariaLabel: 'Turn-by-turn directions', items };
+  return {
+    ariaLabel: route.isMaritime ? 'Maritime route and freight intelligence' : 'Turn-by-turn directions',
+    items,
+  };
 }
 
 /**
@@ -330,11 +451,16 @@ export function directionsStats(state) {
     lastUpdate,
     armed,
     pointerBlocked,
+    freightIntelligence,
+    freightStatus,
   } = state;
-  const source = 'OSM routing';
+  const isMaritime = mode === 'sea' || Boolean(route?.isMaritime);
+  const source = isMaritime
+    ? (route?.routeMethod || 'Pelagos MARNET')
+    : 'OSM routing';
   if (pointerBlocked) {
     return {
-      count: route?.steps.length || 0,
+      count: route?.steps?.length || 0,
       lastUpdate,
       error: 'Another map tool is using clicks — close it, then SET A again',
       status: 'empty',
@@ -364,12 +490,39 @@ export function directionsStats(state) {
   // set (not only while loading), so the route summary and the placement
   // guidance ride on it; `coverage` carries the same text for stats readers.
   if (route) {
-    const word = DIRECTIONS_MODES[mode]?.word || mode;
-    const summary =
-      `${formatRouteDistance(route.distanceM)} · ${formatRouteDuration(route.durationS)} · ${word}` +
-      (route.stepsTruncated ? ` · first ${route.steps.length} turns` : '');
+    let summary;
+    if (isMaritime) {
+      const nm = Number(route.distanceNm || 0);
+      const nmStr = `${nm.toLocaleString('en-US', { maximumFractionDigits: 1 })} NM`;
+      const kmStr = route.distanceKm ? ` (${Math.round(route.distanceKm).toLocaleString('en-US')} km)` : '';
+      const canals = Array.isArray(route.canalsTransited) && route.canalsTransited.length
+        ? ` · ${route.canalsTransited.map((c) => c.charAt(0).toUpperCase() + c.slice(1)).join(', ')}`
+        : '';
+      const snapDist = (Number(route.originSnapDistanceNm || 0) + Number(route.destinationSnapDistanceNm || 0));
+      const snapStr = snapDist > 0 ? ` · snap ~${snapDist.toFixed(1)} NM` : '';
+
+      let freightSnippet = '';
+      if (freightStatus === 'loading') {
+        freightSnippet = ' · Freight loading…';
+      } else if (freightIntelligence) {
+        if (freightIntelligence.status === 'monitored' && freightIntelligence.latest_observation) {
+          const rateVal = Number(freightIntelligence.latest_observation.rate_value);
+          const rateStr = Number.isFinite(rateVal) ? `$${rateVal.toFixed(2)}/MT` : 'Benchmark';
+          freightSnippet = ` · Grain: ${rateStr}`;
+        } else if (freightIntelligence.status === 'unmonitored') {
+          freightSnippet = ' · Freight: Unmonitored';
+        }
+      }
+
+      summary = `${nmStr}${kmStr} · Sea (MARNET)${canals}${snapStr}${freightSnippet}`;
+    } else {
+      const word = DIRECTIONS_MODES[mode]?.word || mode;
+      summary =
+        `${formatRouteDistance(route.distanceM)} · ${formatRouteDuration(route.durationS)} · ${word}` +
+        (route.stepsTruncated ? ` · first ${route.steps.length} turns` : '');
+    }
     return {
-      count: route.steps.length,
+      count: route.steps ? route.steps.length : 0,
       lastUpdate,
       error: null,
       source,
@@ -453,19 +606,159 @@ export function createDirectionsStepOverlayEntry(index, position, copy) {
  * @returns {string}
  */
 export function directionsRequestUrl(mode, a, b) {
+  if (mode === 'sea') {
+    return MARITIME_ROUTING_ENDPOINT;
+  }
   const coords = `${a.lon.toFixed(6)},${a.lat.toFixed(6)};${b.lon.toFixed(6)},${b.lat.toFixed(6)}`;
   return `/api/route?profile=${encodeURIComponent(mode)}&coords=${encodeURIComponent(coords)}&steps=1`;
+}
+
+/**
+ * Build the JSON request body for Pelagos maritime routing.
+ * @param {{lat:number, lon:number}} a Origin coordinate
+ * @param {{lat:number, lon:number}} b Destination coordinate
+ * @param {object} [options]
+ * @returns {object}
+ */
+export function buildMaritimeRoutingPayload(a, b, options = {}) {
+  return {
+    origin: { coordinates: [Number(a.lon.toFixed(6)), Number(a.lat.toFixed(6))] },
+    destination: { coordinates: [Number(b.lon.toFixed(6)), Number(b.lat.toFixed(6))] },
+    canal_policy: options.canal_policy || 'allow',
+    routing_mode: options.routing_mode || 'marnet',
+    supports_segments: true,
+  };
 }
 
 /**
  * Validate a proxy payload into the route record the layer keeps, or null.
  * @param {object} payload
  * @param {string} mode
- * @returns {{distanceM:number, durationS:number, geometry:number[][], steps:object[], mode:string}|null}
+ * @returns {object|null}
  */
 export function normalizeRoutePayload(payload, mode) {
+  if (!payload) return null;
+
+  if (mode === 'sea') {
+    if (payload.status !== 'calculated') return null;
+
+    const rawSegments =
+      Array.isArray(payload.geometry_segments) && payload.geometry_segments.length > 0
+        ? payload.geometry_segments
+        : Array.isArray(payload.geometry) && payload.geometry.length >= 2
+          ? [payload.geometry]
+          : [];
+
+    if (!rawSegments.length) return null;
+
+    const geometrySegments = [];
+    for (const seg of rawSegments) {
+      if (!Array.isArray(seg)) continue;
+      const cleanSeg = seg
+        .map((pair) => [Number(pair?.[0]), Number(pair?.[1])])
+        .filter(
+          ([lon, lat]) =>
+            Number.isFinite(lon) &&
+            Number.isFinite(lat) &&
+            Math.abs(lat) <= 90 &&
+            Math.abs(lon) <= 180,
+        );
+      if (!cleanSeg.length) continue;
+
+      let currentSubSeg = [];
+      for (let i = 0; i < cleanSeg.length; i++) {
+        const pt = cleanSeg[i];
+        if (currentSubSeg.length > 0) {
+          const prev = currentSubSeg[currentSubSeg.length - 1];
+          // 1. Deduplicate consecutive identical coordinates
+          if (pt[0] === prev[0] && pt[1] === prev[1]) {
+            continue;
+          }
+          // 2. Coincident points on opposite sides of the antimeridian seam (e.g. [-180, lat] and [180, lat])
+          const isAntimeridianSeam =
+            Math.abs(Math.abs(pt[0]) - 180) < 1e-4 &&
+            Math.abs(Math.abs(prev[0]) - 180) < 1e-4 &&
+            Math.abs(pt[1] - prev[1]) < 1e-4;
+
+          // 3. Longitude jump crossing the 180th meridian (|lon1 - lon2| > 180)
+          const isCrossAntimeridianJump = Math.abs(pt[0] - prev[0]) > 180;
+
+          if (isAntimeridianSeam || isCrossAntimeridianJump) {
+            if (currentSubSeg.length >= 2) {
+              geometrySegments.push(currentSubSeg);
+            }
+            currentSubSeg = [pt];
+            continue;
+          }
+        }
+        currentSubSeg.push(pt);
+      }
+      if (currentSubSeg.length >= 2) {
+        geometrySegments.push(currentSubSeg);
+      }
+    }
+
+    if (!geometrySegments.length) return null;
+
+    const flatGeometry =
+      geometrySegments.length === 1
+        ? geometrySegments[0]
+        : Array.isArray(payload.geometry) && payload.geometry.length >= 2
+          ? payload.geometry.filter(
+              ([lon, lat]) =>
+                Number.isFinite(lon) &&
+                Number.isFinite(lat) &&
+                Math.abs(lat) <= 90 &&
+                Math.abs(lon) <= 180,
+            )
+          : [];
+
+    const rawWaypoints = Array.isArray(payload.waypoints) ? payload.waypoints : [];
+    const steps = rawWaypoints
+      .filter((wp) => wp && Number.isFinite(wp.longitude) && Number.isFinite(wp.latitude))
+      .map((wp, index) => ({
+        index,
+        instruction: wp.name || `MARNET Waypoint ${index + 1}`,
+        lat: Number(wp.latitude),
+        lon: Number(wp.longitude),
+        distanceM: Math.round(Number(wp.cumulative_distance_nm || 0) * 1852),
+        durationS: 0,
+        waypointType: wp.waypoint_type || 'sea_lane',
+      }));
+
+    const distNm = payload.summary?.total_distance_nm ?? payload.summary?.distance_nm ?? 0;
+    const distKm = payload.summary?.total_distance_km ?? payload.summary?.distance_km ?? (distNm * 1.852);
+
+    return {
+      isMaritime: true,
+      originId: payload.summary?.origin_id || null,
+      destinationId: payload.summary?.destination_id || null,
+      originName: payload.summary?.origin_name || null,
+      destinationName: payload.summary?.destination_name || null,
+      distanceM: Math.round(distKm * 1000),
+      durationS: 0,
+      distanceNm: Number(distNm),
+      distanceKm: Number(distKm),
+      canalsTransited: Array.isArray(payload.summary?.canals_transited)
+        ? payload.summary.canals_transited
+        : [],
+      canalPolicyApplied: payload.summary?.canal_policy_applied || 'allow',
+      originSnapDistanceNm: Number(payload.summary?.origin_snap_distance_nm || 0),
+      destinationSnapDistanceNm: Number(payload.summary?.destination_snap_distance_nm || 0),
+      geometrySegments,
+      geometry: flatGeometry,
+      steps,
+      stepsTruncated: false,
+      mode: 'sea',
+      routeMethod: payload.route_method || 'marnet_50km_generalized_graph',
+      routingMode: payload.routing_mode || 'marnet',
+      limitations: Array.isArray(payload.limitations) ? payload.limitations : [],
+      provenance: payload.data_provenance || {},
+    };
+  }
+
+  // Existing land routing normalization (car, foot, bike)
   if (
-    !payload ||
     payload.ok !== true ||
     !Array.isArray(payload.geometry) ||
     payload.geometry.length < 2
@@ -491,12 +784,12 @@ export function normalizeRoutePayload(payload, mode) {
     )
     .map((step, index) => ({ ...step, index }));
   return {
+    isMaritime: false,
     distanceM: Math.max(0, Number(payload.distanceM) || 0),
     durationS: Math.max(0, Number(payload.durationS) || 0),
     geometry,
+    geometrySegments: [geometry],
     steps,
-    // A route with more maneuvers than the proxy will serve is cut off, and
-    // the cut is shown rather than passed off as the whole route.
     stepsTruncated: payload.stepsTruncated === true,
     mode,
   };
@@ -546,6 +839,7 @@ export function createDirectionsLayer({ services }) {
   let _markerA = null;
   let _markerB = null;
   let _routeEntity = null;
+  let _routeEntities = [];
   let _stepPoints = null;
   let _selectedStep = null;
   let _clickHandler = null;
@@ -570,6 +864,11 @@ export function createDirectionsLayer({ services }) {
   let _anchorTimer = null;
   let _anchorAttempts = 0;
   let _anchorStartedAt = 0;
+  let _freightIntelligence = null;
+  let _freightStatus = 'idle';
+  let _freightError = null;
+  let _freightAbort = null;
+  let _freightSeq = 0;
   /**
    * Camera seams handed over by the UI shell: the one navigation-authority
    * facade every camera owner goes through, plus the shared ground-floor
@@ -594,6 +893,9 @@ export function createDirectionsLayer({ services }) {
       selectedStep: _selectedStep,
       flightStep: _flightStep,
       pointerBlocked: _pointerBlocked,
+      freightIntelligence: _freightIntelligence,
+      freightStatus: _freightStatus,
+      freightError: _freightError,
     };
   }
 
@@ -695,10 +997,17 @@ export function createDirectionsLayer({ services }) {
   }
 
   function clearRouteGraphics() {
+    clearFreight();
     _clearStepSelection();
     stopStepAnchoring();
-    removeEntity(_routeEntity);
-    _routeEntity = null;
+    if (_routeEntity) {
+      removeEntity(_routeEntity);
+      _routeEntity = null;
+    }
+    for (const ent of _routeEntities) {
+      removeEntity(ent);
+    }
+    _routeEntities = [];
     _stepPoints?.removeAll();
     syncRenderHold();
   }
@@ -765,20 +1074,54 @@ export function createDirectionsLayer({ services }) {
     clearRouteGraphics();
     if (!_viewer) return;
     services.annotations.ensureFlowFabricRegistered();
-    const positions = Cesium.Cartesian3.fromDegreesArray(route.geometry.flat());
-    _routeEntity = _viewer.entities.add({
-      id: 'directions:route',
-      polyline: {
-        positions,
-        width: 9,
-        material: new services.annotations.FlowMaterialProperty(
-          DIRECTIONS_ROUTE_COLOR,
-        ),
-        clampToGround: true,
-        // BOTH: drape on 3D tiles when they are up and on terrain when they are
-        // not, so the keyless globe shows the route too.
-        classificationType: Cesium.ClassificationType.BOTH,
-      },
+
+    const segments =
+      Array.isArray(route.geometrySegments) && route.geometrySegments.length > 0
+        ? route.geometrySegments
+        : Array.isArray(route.geometry) && route.geometry.length >= 2
+          ? [route.geometry]
+          : [];
+
+    segments.forEach((segmentCoords, idx) => {
+      const cleanCoords = [];
+      for (const pt of segmentCoords) {
+        if (!Array.isArray(pt) || pt.length < 2) continue;
+        const lon = Number(pt[0]);
+        const lat = Number(pt[1]);
+        if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+        if (cleanCoords.length > 0) {
+          const prev = cleanCoords[cleanCoords.length - 1];
+          if (lon === prev[0] && lat === prev[1]) continue;
+          if (
+            Math.abs(Math.abs(lon) - 180) < 1e-4 &&
+            Math.abs(Math.abs(prev[0]) - 180) < 1e-4 &&
+            Math.abs(lat - prev[1]) < 1e-4
+          ) {
+            continue;
+          }
+        }
+        cleanCoords.push([lon, lat]);
+      }
+      if (cleanCoords.length >= 2) {
+        const positions = Cesium.Cartesian3.fromDegreesArray(cleanCoords.flat());
+        const entityId = segments.length > 1 ? `directions:route:segment_${idx}` : 'directions:route';
+        const entity = _viewer.entities.add({
+          id: entityId,
+          polyline: {
+            positions,
+            width: 9,
+            material: new services.annotations.FlowMaterialProperty(
+              DIRECTIONS_ROUTE_COLOR,
+            ),
+            clampToGround: true,
+            // BOTH: drape on 3D tiles when they are up and on terrain when they are
+            // not, so the keyless globe shows the route too.
+            classificationType: Cesium.ClassificationType.BOTH,
+          },
+        });
+        _routeEntities.push(entity);
+        if (!_routeEntity) _routeEntity = entity;
+      }
     });
     // One dot per decision; A and B already mark departure and arrival. The dots
     // start hidden and appear as anchorStepPoints resolves each ground cell.
@@ -825,10 +1168,24 @@ export function createDirectionsLayer({ services }) {
     _error = null;
     notifyRow();
     try {
-      const response = await fetch(directionsRequestUrl(mode, _a, _b), {
-        signal: controller.signal,
-        headers: { Accept: 'application/json' },
-      });
+      const isSea = mode === 'sea';
+      const requestUrl = isSea ? MARITIME_ROUTING_ENDPOINT : directionsRequestUrl(mode, _a, _b);
+      const fetchOptions = isSea
+        ? {
+            method: 'POST',
+            signal: controller.signal,
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify(buildMaritimeRoutingPayload(_a, _b)),
+          }
+        : {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          };
+
+      const response = await fetch(requestUrl, fetchOptions);
       const payload = await response.json();
       if (response.status === 429) {
         throw new Error(
@@ -837,6 +1194,9 @@ export function createDirectionsLayer({ services }) {
             : 'Routing is rate limited — try again in a moment',
         );
       }
+      if (!response.ok && !payload?.error_message && !payload?.error) {
+        throw new Error(`Routing request failed with HTTP ${response.status}`);
+      }
       if (seq !== _routeSeq || !_enabled) return;
       const route = normalizeRoutePayload(payload, mode);
       if (!route) {
@@ -844,20 +1204,25 @@ export function createDirectionsLayer({ services }) {
         clearRouteGraphics();
         _status = 'error';
         _error =
-          payload?.error === 'no route found'
+          payload?.error_message ||
+          (payload?.error === 'no route found'
             ? 'No route found between A and B'
             : payload?.error
               ? `Routing failed: ${payload.error}`
-              : 'No route found between A and B';
+              : 'No route found between A and B');
         return;
       }
       _route = route;
       _status = 'ready';
       _lastUpdate = Date.now();
       drawRoute(route);
+      if (mode === 'sea') {
+        void requestFreightIntelligence(_a, _b, route);
+      }
     } catch (error) {
       if (seq !== _routeSeq || !_enabled) return;
       _route = null;
+      clearFreight();
       clearRouteGraphics();
       _status = 'error';
       // A fetch that never reaches the proxy rejects with the browser's own
@@ -988,6 +1353,7 @@ export function createDirectionsLayer({ services }) {
   }
 
   function clearAll() {
+    clearFreight();
     _routeAbort?.abort();
     _routeAbort = null;
     _routeSeq += 1;
@@ -1057,14 +1423,50 @@ export function createDirectionsLayer({ services }) {
   function flyCurrentRoute() {
     if (!_route || !_viewer) return false;
     cancelOwnedFlight('directions-refly');
+
+    // Multi-segment routes (e.g. crossing the antimeridian) cannot be flown as
+    // a single continuous path without introducing a false connecting leg across
+    // the 180° meridian or through the Earth. Avoid continuous flight and safely
+    // frame the destination endpoint if camera navigation is available.
+    if (Array.isArray(_route.geometrySegments) && _route.geometrySegments.length > 1) {
+      const message =
+        'Continuous camera flight is not supported across disjoint antimeridian segments';
+      console.warn(`[Data:Directions] ${message}`);
+      _shellSeams?.showToast?.(message);
+
+      const target =
+        _b || (_route.steps && _route.steps.length > 0 ? _route.steps.at(-1) : null);
+      if (
+        typeof _viewer?.camera?.flyTo === 'function' &&
+        target &&
+        Number.isFinite(target.lat) &&
+        Number.isFinite(target.lon)
+      ) {
+        _viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(target.lon, target.lat, 2000000),
+          duration: 2.0,
+        });
+      }
+      return false;
+    }
+
     services.camera.initCameraVerbs(_viewer);
     const seams = _shellSeams;
+    const flyPoints =
+      Array.isArray(_route.geometrySegments) && _route.geometrySegments.length === 1
+        ? _route.geometrySegments[0]
+        : Array.isArray(_route.geometry) && _route.geometry.length >= 2
+          ? _route.geometry
+          : [];
+
+    if (flyPoints.length < 2) return false;
+
     const result = services.camera.flyRoute(
       [
         {
           type: 'route',
           label: 'Directions',
-          path: _route.geometry.map(([lon, lat]) => ({ lon, lat, height: 0 })),
+          path: flyPoints.map(([lon, lat]) => ({ lon, lat, height: 0 })),
         },
       ],
       { speed: 'normal' },
@@ -1328,6 +1730,7 @@ export function createDirectionsLayer({ services }) {
       if (patch.clear) clearAll();
       if (patch.mode !== undefined && patch.mode !== _mode) {
         _mode = patch.mode;
+        clearFreight();
         if (_a && _b && _enabled) void requestRoute();
       }
       if (patch.arm !== undefined) setArmed(patch.arm);
@@ -1426,7 +1829,118 @@ export function createDirectionsLayer({ services }) {
     _setOverlayHostForTest(host) {
       _overlayHost = host || DEFAULT_OVERLAY_HOST;
     },
+
+    /** Test seam: draw route entities directly. */
+    _drawRouteForTest(route) {
+      drawRoute(route);
+    },
+
+    /** Test seam: clear route entities directly. */
+    _clearRouteGraphicsForTest() {
+      clearRouteGraphics();
+    },
+
+    /** Test seam: inspect current route polyline entities. */
+    _getRouteEntitiesForTest() {
+      return [..._routeEntities];
+    },
+
+    /** Test seam: set current route directly. */
+    _setRouteForTest(route) {
+      _route = route;
+    },
+
+    /** Test seam: set freight intelligence directly. */
+    _setFreightIntelligenceForTest(intel, status = 'ready', error = null) {
+      _freightIntelligence = intel;
+      _freightStatus = status;
+      _freightError = error;
+      notifyRow();
+    },
+
+    /** Test seam: inspect current freight intelligence. */
+    _getFreightIntelligenceForTest() {
+      return {
+        intelligence: _freightIntelligence,
+        status: _freightStatus,
+        error: _freightError,
+      };
+    },
+
+    /** Test seam: execute flyCurrentRoute directly. */
+    _flyCurrentRouteForTest() {
+      return flyCurrentRoute();
+    },
   };
+
+  function clearFreight() {
+    if (_freightAbort) {
+      _freightAbort.abort();
+      _freightAbort = null;
+    }
+    _freightSeq += 1;
+    _freightIntelligence = null;
+    _freightStatus = 'idle';
+    _freightError = null;
+  }
+
+  async function requestFreightIntelligence(a, b, route) {
+    if (!route || !route.isMaritime || !_enabled) return;
+    if (_freightAbort) {
+      _freightAbort.abort();
+      _freightAbort = null;
+    }
+    _freightSeq += 1;
+    const seq = _freightSeq;
+    const controller = new AbortController();
+    _freightAbort = controller;
+    _freightStatus = 'loading';
+    _freightError = null;
+    notifyRow();
+
+    try {
+      const params = new URLSearchParams();
+      if (a && Number.isFinite(a.lon) && Number.isFinite(a.lat)) {
+        params.set('origin_lon', a.lon.toFixed(6));
+        params.set('origin_lat', a.lat.toFixed(6));
+      }
+      if (b && Number.isFinite(b.lon) && Number.isFinite(b.lat)) {
+        params.set('dest_lon', b.lon.toFixed(6));
+        params.set('dest_lat', b.lat.toFixed(6));
+      }
+      if (route.originId) params.set('origin', route.originId);
+      if (route.destinationId) params.set('destination', route.destinationId);
+
+      const url = `${FREIGHT_INTELLIGENCE_ENDPOINT}?${params.toString()}`;
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Freight API returned HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (seq !== _freightSeq || !_enabled) return;
+
+      _freightIntelligence = data;
+      _freightStatus = 'ready';
+      _freightError = null;
+    } catch (err) {
+      if (seq !== _freightSeq || !_enabled) return;
+      if (err?.name === 'AbortError') return;
+      _freightIntelligence = null;
+      _freightStatus = 'error';
+      _freightError = err?.message || 'Freight data unavailable';
+    } finally {
+      if (_freightAbort === controller) _freightAbort = null;
+      if (seq === _freightSeq) {
+        notifyRow();
+        services.render.governorRequestRender('directions-freight');
+      }
+    }
+  }
 
   return directionsLayer;
 }
