@@ -15,6 +15,7 @@ import { CockpitCoordinator } from './cockpitCoordinator.js';
 import { ContextControls } from './context.js';
 import { CctvControls } from './cctv.js';
 import { RadioControls } from './radio.js';
+import { PelagosPanelController } from './pelagosPanel.js';
 import { LocationNavigation } from './locationNavigation.js';
 import { bindClearLayersControl } from './layers.js';
 import { bindCameraOrientationControls } from './cameraOrientationControls.js';
@@ -536,6 +537,7 @@ export class StyleManager extends ShellFacade {
     this._initRightPanelAdaptiveLayout();
     this._initRadioPanel();
     this._initCctvPanel();
+    this._initPelagosPanel();
     this._initGlobalContextPanel();
     this._initLocationBar();
     this._initShareButton();
@@ -918,6 +920,28 @@ export class StyleManager extends ShellFacade {
         setSplitFlapText,
       },
     });
+  }
+
+  /** Initialize the Pelagos dedicated maritime intelligence workspace. */
+  _initPelagosPanel() {
+    this._pelagosControls?.destroy();
+    this._pelagosControls = new PelagosPanelController({
+      viewer: this.viewer,
+      services: this.services,
+      actions: {
+        showToast: (message) => this._showToast(message),
+        holdContinuousRender: (id) =>
+          this.services.holdContinuousRender?.(id) ||
+          this.services.render?.holdContinuousRender?.(id),
+        releaseContinuousRender: (id) =>
+          this.services.releaseContinuousRender?.(id) ||
+          this.services.render?.releaseContinuousRender?.(id),
+        governorRequestRender: (id) =>
+          this.services.governorRequestRender?.(id) ||
+          this.services.render?.governorRequestRender?.(id),
+      },
+    });
+    void this._pelagosControls.init();
   }
 
   /**
@@ -1471,6 +1495,7 @@ export class StyleManager extends ShellFacade {
     this._cameraOrientationControls?.destroy();
     this._clearLayersControl?.destroy();
     this._cctvControls?.destroy();
+    this._pelagosControls?.destroy();
     this._radioControls?.destroy();
     this._cockpitCoordinator.stop();
     this._visualSettings.stop();

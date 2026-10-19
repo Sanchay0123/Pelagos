@@ -105,4 +105,248 @@
     </div>
   </div>
 
+  <!-- Pelagos Maritime Intelligence Panel -->
+  <div id="pelagos-panel" class="panel-collapsible collapsed" data-panel-id="pelagos-panel">
+    <div class="panel-glow"></div>
+    <div class="pelagos-panel-inner">
+      <div class="panel-header">
+        <span class="panel-title"><span class="pelagos-title-icon" aria-hidden="true">⚓</span>PELAGOS</span>
+        <span class="panel-divider"></span>
+        <button class="panel-collapse-btn" data-collapse-target="pelagos-panel" title="Collapse panel">+</button>
+      </div>
+
+      <div class="pelagos-content">
+        <!-- Route Endpoints Section -->
+        <section class="pelagos-section pelagos-selector-section" aria-label="Port selection">
+          <div class="pelagos-form-group">
+            <label class="pelagos-label" for="pelagos-origin-select">
+              <span class="pelagos-endpoint-badge badge-origin">A</span> Origin Port
+            </label>
+            <div class="pelagos-select-wrapper">
+              <input type="text" id="pelagos-origin-filter" class="pelagos-filter-input" placeholder="Search origin port, city, country..." autocomplete="off" aria-label="Filter origin port" />
+              <select id="pelagos-origin-select" class="pelagos-select" aria-label="Origin port">
+                <option value="">Select origin port…</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="pelagos-swap-row">
+            <button id="pelagos-swap-btn" class="pelagos-btn-icon" title="Swap origin and destination" type="button" aria-label="Swap endpoints">⇄</button>
+          </div>
+
+          <div class="pelagos-form-group">
+            <label class="pelagos-label" for="pelagos-dest-select">
+              <span class="pelagos-endpoint-badge badge-dest">B</span> Destination Port
+            </label>
+            <div class="pelagos-select-wrapper">
+              <input type="text" id="pelagos-dest-filter" class="pelagos-filter-input" placeholder="Search destination port, city, country..." autocomplete="off" aria-label="Filter destination port" />
+              <select id="pelagos-dest-select" class="pelagos-select" aria-label="Destination port">
+                <option value="">Select destination port…</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="pelagos-validation-msg" class="pelagos-validation-msg" role="alert" aria-live="polite"></div>
+
+          <div class="pelagos-actions-row">
+            <button id="pelagos-calculate-btn" class="pelagos-btn-primary" type="button">
+              <span class="btn-spinner" aria-hidden="true"></span>
+              <span class="btn-text">CALCULATE ROUTE</span>
+            </button>
+            <button id="pelagos-reset-btn" class="pelagos-btn-secondary" type="button" title="Clear route and selections">CLEAR</button>
+          </div>
+        </section>
+
+        <!-- Loading / Status feedback banner -->
+        <div id="pelagos-status-banner" class="pelagos-status-banner" role="status" aria-live="polite"></div>
+
+        <!-- Dashboard Result Container -->
+        <div id="pelagos-dashboard" class="pelagos-dashboard" style="display: none;">
+          <!-- 1. Route Overview Card -->
+          <div class="pelagos-card" id="pelagos-route-card">
+            <div class="card-header">
+              <span class="card-title">ROUTE OVERVIEW</span>
+              <span id="pelagos-route-status-tag" class="pelagos-tag tag-ready">CALCULATED</span>
+            </div>
+            <div class="card-body">
+              <div class="pelagos-route-summary">
+                <div class="route-endpoint-line">
+                  <span class="badge-origin">A</span>
+                  <span id="pelagos-summary-origin" class="endpoint-name">—</span>
+                </div>
+                <div class="route-arrow-down">↓</div>
+                <div class="route-endpoint-line">
+                  <span class="badge-dest">B</span>
+                  <span id="pelagos-summary-dest" class="endpoint-name">—</span>
+                </div>
+              </div>
+              <div class="pelagos-metrics-grid">
+                <div class="metric-box">
+                  <span class="metric-label">SEA DISTANCE (NM)</span>
+                  <span id="pelagos-dist-nm" class="metric-value">—</span>
+                </div>
+                <div class="metric-box">
+                  <span class="metric-label">DISTANCE (KM)</span>
+                  <span id="pelagos-dist-km" class="metric-value">—</span>
+                </div>
+              </div>
+              <div class="pelagos-meta-list">
+                <div class="meta-row">
+                  <span class="meta-key">Routing Method:</span>
+                  <span id="pelagos-route-method" class="meta-val">MARNET 50km generalized</span>
+                </div>
+                <div class="meta-row" id="pelagos-canals-row">
+                  <span class="meta-key">Canals Transited:</span>
+                  <span id="pelagos-canals-val" class="meta-val">None (Open Ocean)</span>
+                </div>
+                <div class="meta-row">
+                  <span class="meta-key">Waypoints:</span>
+                  <span id="pelagos-waypoint-count" class="meta-val">—</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Freight Corridor Card -->
+          <div class="pelagos-card" id="pelagos-corridor-card">
+            <div class="card-header">
+              <span class="card-title">FREIGHT CORRIDOR</span>
+              <span id="pelagos-corridor-status-tag" class="pelagos-tag">—</span>
+            </div>
+            <div class="card-body">
+              <div id="pelagos-corridor-content">
+                <div class="pelagos-highlight-name" id="pelagos-corridor-name">—</div>
+                <div class="pelagos-corridor-meta-grid">
+                  <div class="meta-pill">
+                    <span class="pill-label">Code:</span>
+                    <span id="pelagos-corridor-code" class="pill-value">—</span>
+                  </div>
+                  <div class="meta-pill">
+                    <span class="pill-label">Cargo:</span>
+                    <span id="pelagos-corridor-cargo" class="pill-value">—</span>
+                  </div>
+                  <div class="meta-pill">
+                    <span class="pill-label">Vessel Class:</span>
+                    <span id="pelagos-corridor-vessel-class" class="pill-value">—</span>
+                  </div>
+                </div>
+              </div>
+              <div id="pelagos-unmonitored-notice" class="pelagos-notice notice-unmonitored" style="display: none;">
+                <div class="notice-icon">ℹ</div>
+                <div class="notice-body">
+                  <div class="notice-title">Unmonitored Freight Corridor</div>
+                  <div id="pelagos-unmonitored-desc" class="notice-desc">
+                    This maritime route has no published freight benchmark or active predictive forecast model.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Observed Freight Rate Card -->
+          <div class="pelagos-card" id="pelagos-observed-card">
+            <div class="card-header">
+              <span class="card-title">OBSERVED FREIGHT RATE</span>
+              <span id="pelagos-observed-tag" class="pelagos-tag tag-verified">BENCHMARK</span>
+            </div>
+            <div class="card-body">
+              <div id="pelagos-observed-content">
+                <div class="rate-display">
+                  <span class="currency-symbol">$</span>
+                  <span id="pelagos-rate-val" class="rate-large">—</span>
+                  <span id="pelagos-rate-unit" class="rate-unit">USD/MT</span>
+                </div>
+                <div class="pelagos-meta-list">
+                  <div class="meta-row">
+                    <span class="meta-key">Observation Date:</span>
+                    <span id="pelagos-rate-date" class="meta-val">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Data Source:</span>
+                    <span id="pelagos-rate-source" class="meta-val">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Observation Type:</span>
+                    <span id="pelagos-rate-type" class="meta-val">Verified Market Benchmark (Not Derived)</span>
+                  </div>
+                </div>
+              </div>
+              <div id="pelagos-rate-empty" class="pelagos-empty-state" style="display: none;">
+                No benchmark freight rate observations exist for this corridor.
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Freight Forecast Card -->
+          <div class="pelagos-card" id="pelagos-forecast-card">
+            <div class="card-header">
+              <span class="card-title">FREIGHT FORECAST</span>
+              <span class="pelagos-tag tag-model">BASELINE</span>
+            </div>
+            <div class="card-body">
+              <div id="pelagos-forecast-content">
+                <div class="rate-display forecast-display">
+                  <span class="currency-symbol">$</span>
+                  <span id="pelagos-forecast-val" class="rate-large">—</span>
+                  <span id="pelagos-forecast-unit" class="rate-unit">USD/MT</span>
+                </div>
+                <div class="pelagos-meta-list">
+                  <div class="meta-row">
+                    <span class="meta-key">Target Period:</span>
+                    <span id="pelagos-forecast-period" class="meta-val">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Model:</span>
+                    <span id="pelagos-forecast-model" class="meta-val">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Horizon:</span>
+                    <span id="pelagos-forecast-horizon" class="meta-val">1 Month Forward</span>
+                  </div>
+                </div>
+                <div class="pelagos-disclaimer-callout">
+                  ⚠ <strong>Baseline forecast model</strong> — for strategic planning only; not a guaranteed commercial freight quote or trade execution offer.
+                </div>
+              </div>
+              <div id="pelagos-forecast-empty" class="pelagos-empty-state" style="display: none;">
+                No predictive freight forecast model active for this corridor.
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Vessel Availability Card -->
+          <div class="pelagos-card" id="pelagos-fleet-card">
+            <div class="card-header">
+              <span class="card-title">VESSEL AVAILABILITY</span>
+              <span class="pelagos-tag tag-offline" id="pelagos-fleet-tag">UNCONNECTED</span>
+            </div>
+            <div class="card-body">
+              <div class="fleet-status-line">
+                <span class="status-indicator-dot dot-inactive" id="pelagos-fleet-dot"></span>
+                <span class="status-text" id="pelagos-fleet-text">Unavailable — live vessel availability data is not connected</span>
+              </div>
+              <p class="fleet-detail-text" id="pelagos-fleet-desc">
+                Live commercial AIS fleet telemetry and forward position-list feeds are not linked to this installation (pelagos live_ais_connected: false). Static sample only covers coastal U.S. waters and is not interpreted as active fleet availability.
+              </p>
+            </div>
+          </div>
+
+          <!-- 6. Scope & Limitations Card -->
+          <div class="pelagos-card" id="pelagos-scope-card">
+            <div class="card-header">
+              <span class="card-title">DATA COVERAGE & LIMITATIONS</span>
+            </div>
+            <div class="card-body">
+              <ul class="pelagos-limitations-list" id="pelagos-limitations-list">
+                <li>Rates apply specifically to <strong>Agricultural Bulk Grain</strong> in Panamax / Supramax dry bulk vessels.</li>
+                <li>Does <strong>NOT</strong> represent general container (TEU), tanker (VLCC/Suezmax), or specialized breakbulk rates.</li>
+                <li>MARNET sea-lane routes are hydrographic approximations; not certified voyage passage plans.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   </div>

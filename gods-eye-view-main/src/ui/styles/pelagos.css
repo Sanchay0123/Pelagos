@@ -1,0 +1,707 @@
+/* ── Pelagos Maritime Intelligence Workspace ───────────────────────────── */
+#pelagos-panel {
+  --panel-expanded-width: 420px;
+  position: fixed;
+  top: calc(var(--left-stack-top) + (var(--left-stack-gap) * 3));
+  left: var(--left-stack-x);
+  right: auto;
+  bottom: auto;
+  z-index: 100;
+  width: var(--panel-expanded-width);
+  max-height: calc(100vh - 24px);
+}
+
+#left-panel-stack > #pelagos-panel {
+  order: 5;
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  z-index: auto;
+  max-height: none;
+  flex: 0 0 auto;
+  min-height: 0;
+  pointer-events: auto;
+}
+
+#pelagos-panel .panel-glow {
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 212, 255, 0.16) 0%,
+    transparent 65%
+  );
+  filter: blur(20px);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.pelagos-panel-inner {
+  position: relative;
+  background: var(--glass-bg, rgba(10, 16, 24, 0.88));
+  border: 1px solid var(--glass-border, rgba(0, 212, 255, 0.22));
+  border-radius: var(--panel-radius, 12px);
+  padding: 14px 16px 14px;
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 1px 0 rgba(255, 255, 255, 0.08) inset;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  box-sizing: border-box;
+  color: var(--text-primary, #e6f1ff);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#left-panel-stack > #pelagos-panel:not(.collapsed) {
+  box-sizing: border-box;
+  width: var(--panel-expanded-width, 420px);
+  max-width: min(420px, calc(100vw - 32px));
+  flex: 0 1 var(--left-panel-allocated-height, auto);
+  height: var(--left-panel-allocated-height, auto);
+  max-height: var(--left-panel-allocated-height, 100%);
+}
+
+#left-panel-stack > #pelagos-panel:not(.collapsed) .pelagos-panel-inner {
+  height: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 212, 255, 0.5) rgba(255, 255, 255, 0.04);
+  scrollbar-gutter: stable;
+}
+
+#pelagos-panel.collapsed {
+  width: var(--left-collapsed-width, 110px);
+}
+
+#pelagos-panel.collapsed .pelagos-content {
+  display: none !important;
+}
+
+#pelagos-panel.collapsed .panel-title {
+  font-size: 8px;
+  letter-spacing: 1.8px;
+}
+
+#pelagos-panel.collapsed .pelagos-panel-inner {
+  padding-bottom: 10px;
+}
+
+#pelagos-panel.collapsed .panel-header {
+  margin-bottom: 2px;
+}
+
+.pelagos-title-icon {
+  margin-right: 6px;
+  color: var(--accent, #00d4ff);
+  font-size: 13px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ── Content Layout ── */
+.pelagos-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.pelagos-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pelagos-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pelagos-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #94a3b8);
+  letter-spacing: 0.6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: uppercase;
+}
+
+.pelagos-endpoint-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.badge-origin {
+  background: rgba(93, 255, 159, 0.18);
+  color: #5dff9f;
+  border: 1px solid rgba(93, 255, 159, 0.45);
+}
+
+.badge-dest {
+  background: rgba(255, 107, 107, 0.18);
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.45);
+}
+
+.pelagos-select-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pelagos-filter-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #f1f5f9;
+  outline: none;
+  transition: border-color var(--transition-fast, 0.15s), box-shadow var(--transition-fast, 0.15s);
+}
+
+.pelagos-filter-input:focus {
+  border-color: var(--accent, #00d4ff);
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+}
+
+.pelagos-select {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #e2e8f0;
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition-fast, 0.15s), box-shadow var(--transition-fast, 0.15s);
+}
+
+.pelagos-select:focus {
+  border-color: var(--accent, #00d4ff);
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+}
+
+.pelagos-select option {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 6px;
+}
+
+.pelagos-swap-row {
+  display: flex;
+  justify-content: center;
+  margin: -4px 0;
+}
+
+.pelagos-btn-icon {
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.25);
+  border-radius: 4px;
+  color: var(--accent, #00d4ff);
+  width: 32px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  transition: all var(--transition-fast, 0.15s);
+}
+
+.pelagos-btn-icon:hover {
+  background: rgba(0, 212, 255, 0.25);
+  border-color: rgba(0, 212, 255, 0.6);
+  transform: rotate(180deg);
+}
+
+.pelagos-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.pelagos-btn-primary {
+  flex: 1;
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.28) 0%, rgba(0, 140, 200, 0.35) 100%);
+  border: 1px solid rgba(0, 212, 255, 0.55);
+  border-radius: 6px;
+  padding: 9px 14px;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 2px 10px rgba(0, 212, 255, 0.2);
+  transition: all var(--transition-fast, 0.15s);
+}
+
+.pelagos-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.42) 0%, rgba(0, 160, 230, 0.5) 100%);
+  border-color: rgba(0, 212, 255, 0.85);
+  box-shadow: 0 4px 16px rgba(0, 212, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.pelagos-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.pelagos-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+}
+
+.pelagos-btn-secondary {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 9px 12px;
+  color: var(--text-secondary, #94a3b8);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  transition: all var(--transition-fast, 0.15s);
+}
+
+.pelagos-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f5f9;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-spinner {
+  display: none;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: pelagos-spin 0.8s linear infinite;
+}
+
+.pelagos-btn-primary.is-loading .btn-spinner {
+  display: inline-block;
+}
+
+@keyframes pelagos-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Validation & Status Feedback ── */
+.pelagos-validation-msg {
+  display: none;
+  font-size: 11px;
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid rgba(255, 107, 107, 0.35);
+  border-radius: 6px;
+  padding: 6px 10px;
+  line-height: 1.4;
+}
+
+.pelagos-validation-msg.visible {
+  display: block;
+}
+
+.pelagos-status-banner {
+  display: none;
+  font-size: 11px;
+  border-radius: 6px;
+  padding: 8px 10px;
+  line-height: 1.4;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.pelagos-status-banner.visible {
+  display: block;
+}
+
+.pelagos-status-banner.status-loading {
+  color: var(--accent, #00d4ff);
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.3);
+}
+
+.pelagos-status-banner.status-error {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid rgba(255, 107, 107, 0.35);
+}
+
+/* ── Dashboard Cards Container ── */
+.pelagos-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.pelagos-card {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: border-color var(--transition-fast, 0.15s);
+}
+
+.pelagos-card:hover {
+  border-color: rgba(0, 212, 255, 0.25);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.card-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: var(--text-secondary, #94a3b8);
+  text-transform: uppercase;
+}
+
+.pelagos-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.tag-ready {
+  background: rgba(0, 212, 255, 0.15);
+  color: var(--accent, #00d4ff);
+  border: 1px solid rgba(0, 212, 255, 0.4);
+}
+
+.tag-verified {
+  background: rgba(93, 255, 159, 0.15);
+  color: #5dff9f;
+  border: 1px solid rgba(93, 255, 159, 0.4);
+}
+
+.tag-model {
+  background: rgba(168, 85, 247, 0.18);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+
+.tag-offline {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.tag-unmonitored {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+/* ── Route Overview Styling ── */
+.pelagos-route-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.route-endpoint-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.endpoint-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.route-arrow-down {
+  margin-left: 6px;
+  color: var(--accent, #00d4ff);
+  font-size: 12px;
+}
+
+.pelagos-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.metric-box {
+  background: rgba(0, 212, 255, 0.05);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  border-radius: 6px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metric-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.metric-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.2;
+}
+
+.pelagos-meta-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+  gap: 8px;
+}
+
+.meta-key {
+  color: var(--text-secondary, #94a3b8);
+  flex-shrink: 0;
+}
+
+.meta-val {
+  font-family: 'JetBrains Mono', monospace;
+  color: #e2e8f0;
+  text-align: right;
+  word-break: break-word;
+}
+
+/* ── Freight Corridor Card ── */
+.pelagos-highlight-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f1f5f9;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.pelagos-corridor-meta-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.meta-pill {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 3px 8px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+}
+
+.pill-label {
+  color: var(--text-secondary, #94a3b8);
+  font-size: 10px;
+}
+
+.pill-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  color: var(--accent, #00d4ff);
+}
+
+/* ── Rate and Forecast Readouts ── */
+.rate-display {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.currency-symbol {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: #5dff9f;
+}
+
+.forecast-display .currency-symbol {
+  color: #c084fc;
+}
+
+.rate-large {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 26px;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1;
+}
+
+.rate-unit {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #94a3b8);
+  margin-left: 2px;
+}
+
+.pelagos-disclaimer-callout {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: rgba(192, 132, 252, 0.08);
+  border: 1px solid rgba(192, 132, 252, 0.25);
+  border-radius: 4px;
+  font-size: 10px;
+  color: #e2e8f0;
+  line-height: 1.4;
+}
+
+/* ── Notice / Empty / Unmonitored States ── */
+.pelagos-notice {
+  display: flex;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin-top: 4px;
+}
+
+.notice-unmonitored {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.notice-icon {
+  color: #fbbf24;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.notice-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fbbf24;
+  margin-bottom: 2px;
+}
+
+.notice-desc {
+  font-size: 11px;
+  color: #fde68a;
+  line-height: 1.4;
+}
+
+.pelagos-empty-state {
+  font-size: 11px;
+  color: var(--text-secondary, #94a3b8);
+  font-style: italic;
+  padding: 6px 0;
+}
+
+/* ── Vessel Availability Card ── */
+.fleet-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-bottom: 6px;
+}
+
+.status-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-inactive {
+  background: #94a3b8;
+  box-shadow: 0 0 4px rgba(148, 163, 184, 0.5);
+}
+
+.dot-active {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.7);
+}
+
+.dot-pending {
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.7);
+}
+
+.fleet-detail-text {
+  font-size: 11px;
+  color: var(--text-secondary, #94a3b8);
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* ── Limitations List ── */
+.pelagos-limitations-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.pelagos-limitations-list li {
+  margin-bottom: 4px;
+}
+
+.pelagos-limitations-list li:last-child {
+  margin-bottom: 0;
+}
