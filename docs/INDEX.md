@@ -3,9 +3,9 @@ title: Pelagos Documentation Index
 document_id: DOC-003
 type: documentation_index
 status: approved
-version: 1.0.20
+version: 1.0.21
 created: 2026-10-10
-updated: 2026-10-18
+updated: 2026-10-21
 tags:
   - index
   - navigation
@@ -51,8 +51,8 @@ N/A
 * [Operational Maritime Routing Readiness Assessment (ROUT-001)](./routing/operational-maritime-routing-readiness.md) (v1.1.0, Status: Drafting)
 * [Real Maritime Routing Network Data Investigation (ROUT-002)](./routing/D9.3-real-network-data-investigation.md) (v1.0.1, Status: Under Review)
 * [Operational Maritime Routing Foundation Implementation Plan (ROUT-003)](./routing/D9.4-implementation-plan.md) (v1.0.0, Status: Under Review)
-* [Operational Maritime Routing Foundation Stage 3 Design and Test Plan (ROUT-004)](./routing/D9.4-stage-3-design.md) (v1.4.0, Status: Under Review)
-* [Coordinated GUI Maritime Routing Integration (ROUT-005)](./routing/D9.4-increment-3-gui-integration.md) (v1.0.0, Status: Under Review)
+* [Operational Maritime Routing Foundation Stage 3 Design and Test Plan (ROUT-004)](./routing/D9.4-stage-3-design.md) (v1.4.0, Status: Accepted)
+* [Coordinated GUI Maritime Routing Integration (ROUT-005)](./routing/D9.4-increment-3-gui-integration.md) (v1.0.0, Status: Accepted)
 
 ### Engineering and Operations
 * API Specifications (Planned)
@@ -118,3 +118,4 @@ Links to established, governed documentation within the repository, and maps pla
 | 1.0.18 | 2026-10-18 | Implementation Agent | Synchronized ROUT-004 version reference (v1.3.0) following Project Overseer final evidence correction pass. Kept status approved. |
 | 1.0.19 | 2026-10-18 | Implementation Agent | Synchronized ROUT-004 version reference (v1.4.0) following Increment 2 final corrective pass (symmetric polar boundary exclusion and cache integrity lifecycle specification). Kept status approved. |
 | 1.0.20 | 2026-10-18 | Implementation Agent | Milestone D9.4 Increment 3 launch: Registered Coordinated GUI Maritime Routing Integration (ROUT-005) under_review. Kept status approved. |
+| 1.0.21 | 2026-10-21 | Implementation Agent | D9.4 final status reconciliation: Synchronized ROUT-004 and ROUT-005 status references to Accepted following Project Overseer manual verification and acceptance audit. Kept status approved. |
