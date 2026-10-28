@@ -3,9 +3,9 @@ title: Pelagos System Architecture Specification
 document_id: ARCH-001
 type: architecture_spec
 status: drafting
-version: 1.0.0
+version: 1.0.1
 created: 2026-10-14
-updated: 2026-10-14
+updated: 2026-10-24
 tags:
   - architecture
   - specification
@@ -160,7 +160,7 @@ graph TB
 
 #### 4. Freight Rate Forecasting Engine (`pelagos.forecasting`)
 * **Responsibilities:**
-  * Generation of route-conditioned freight rate predictions ($/ton or $/day) across configurable horizons (7, 15, 30, 60 days) ([REQ-FR-FRF-001](../requirements/functional-requirements.md)).
+  * Generation of route-conditioned freight rate predictions ($/ton or $/day) across configurable horizons (reconciled under OD-ROUT-06-01 to candidate calendar-month horizons T+1, T+3, T+6 for monthly-cadence datasets; daily horizons reserved for future verified daily feeds) ([REQ-FR-FRF-001](../requirements/functional-requirements.md)).
   * Enforcement of the four-state forecast availability lifecycle: `unavailable`, `insufficient-data`, `eligible`, and `available` ([REQ-FR-FRF-002](../requirements/functional-requirements.md)).
   * Data-readiness gate evaluation: validating observation depth (provisional 12-month candidate window) and fixture continuity.
   * Empirical out-of-sample held-out validation gate: benchmarking against persistence, rolling moving average, and FFA curves on genuine out-of-sample data partitions (provisional 90-day window) with zero data leakage.
@@ -460,3 +460,4 @@ graph TB
 | Version | Date | Author | Description |
 |---|---|---|---|
 | 1.0.0 | 2026-10-14 | Project Agent | Initial draft of Pelagos System Architecture Specification (ARCH-001) under Milestone D3. Defines modular monolith decomposition, GEV frontend integration, dual-tier storage, failure isolation, and container boundaries. Status: drafting. |
+| 1.0.1 | 2026-10-24 | Project Agent | Reconciled freight forecasting engine horizons to candidate monthly horizons (T+1, T+3, T+6) per OD-ROUT-06-01 resolution and REQ-FR-FRF-001. Kept status drafting. |

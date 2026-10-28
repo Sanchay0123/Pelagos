@@ -116,6 +116,19 @@ export class PelagosPanelController {
     this._abortController = null;
     this._boundListeners = [];
 
+    // Voyage Freight Calculator state (OPT-001)
+    this.currentCargoTonnes = 52000;
+    this.currentCostResult = null;
+    this.isCalculatingCost = false;
+    this._costSeq = 0;
+    this._costAbortController = null;
+
+    // Candidate Vessel Suitability state (OPT-002)
+    this.currentSuitabilityResult = null;
+    this.isMatchingSuitability = false;
+    this._suitabilitySeq = 0;
+    this._suitabilityAbortController = null;
+
     // AIS Vessel Intelligence state
     this.vesselsRaw = [];
     this.vesselsNormalized = [];
@@ -174,6 +187,35 @@ export class PelagosPanelController {
       rateSource: d.getElementById('pelagos-rate-source'),
       rateType: d.getElementById('pelagos-rate-type'),
       rateEmpty: d.getElementById('pelagos-rate-empty'),
+
+      // Voyage Freight Calculator (OPT-001)
+      costCard: d.getElementById('pelagos-cost-card'),
+      costStatusTag: d.getElementById('pelagos-cost-status-tag'),
+      cargoTonnesInput: d.getElementById('pelagos-cargo-tonnes'),
+      calculateCostBtn: d.getElementById('pelagos-calculate-cost-btn'),
+      costValidationMsg: d.getElementById('pelagos-cost-validation-msg'),
+      costContent: d.getElementById('pelagos-cost-content'),
+      costVal: d.getElementById('pelagos-cost-val'),
+      costCurrency: d.getElementById('pelagos-cost-currency'),
+      costFormula: d.getElementById('pelagos-cost-formula'),
+      costRate: d.getElementById('pelagos-cost-rate'),
+      costCargo: d.getElementById('pelagos-cost-cargo'),
+      costSource: d.getElementById('pelagos-cost-source'),
+      costDistance: d.getElementById('pelagos-cost-distance'),
+      costDistProvenance: d.getElementById('pelagos-cost-distance-provenance'),
+      costEmpty: d.getElementById('pelagos-cost-empty'),
+
+      // Candidate Vessel Suitability (OPT-002)
+      suitabilityCard: d.getElementById('pelagos-suitability-card'),
+      suitabilityTag: d.getElementById('pelagos-suitability-tag'),
+      suitabilityContext: d.getElementById('pelagos-suitability-context'),
+      suitabilityMetrics: d.getElementById('pelagos-suitability-metrics'),
+      suitabilityTotalCount: d.getElementById('pelagos-suitability-total-count'),
+      suitabilityMatchedCount: d.getElementById('pelagos-suitability-matched-count'),
+      suitabilityIncompatibleCount: d.getElementById('pelagos-suitability-incompatible-count'),
+      suitabilityListContainer: d.getElementById('pelagos-suitability-list-container'),
+      suitabilityList: d.getElementById('pelagos-suitability-list'),
+      suitabilityEmpty: d.getElementById('pelagos-suitability-empty'),
 
       // Forecast
       forecastCard: d.getElementById('pelagos-forecast-card'),
@@ -350,6 +392,24 @@ export class PelagosPanelController {
         }
       });
     }
+
+    if (el.calculateCostBtn) {
+      this._bind(el.calculateCostBtn, 'click', () => {
+        void this.calculateVoyageCost();
+      });
+    }
+
+    if (el.cargoTonnesInput) {
+      this._bind(el.cargoTonnesInput, 'input', () => {
+        this.clearCostValidationMessage();
+      });
+      this._bind(el.cargoTonnesInput, 'keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          void this.calculateVoyageCost();
+        }
+      });
+    }
   }
 
   /** Retrieve registered port records from the backend API, falling back to fixture data. */
@@ -497,6 +557,34 @@ export class PelagosPanelController {
     if (!el) return;
     el.textContent = '';
     el.classList.remove('visible');
+  }
+
+  showCostValidationMessage(message) {
+    const el = this.elements.costValidationMsg;
+    if (!el) return;
+    el.textContent = message;
+    el.style.display = 'block';
+  }
+
+  clearCostValidationMessage() {
+    const el = this.elements.costValidationMsg;
+    if (!el) return;
+    el.textContent = '';
+    el.style.display = 'none';
+  }
+
+  setCostCalculatingState(calculating) {
+    this.isCalculatingCost = calculating;
+    const btn = this.elements.calculateCostBtn;
+    if (!btn) return;
+    btn.disabled = calculating;
+    btn.classList.toggle('is-loading', calculating);
+    const textSpan = btn.querySelector('.btn-text');
+    if (textSpan) {
+      textSpan.textContent = calculating
+        ? 'CALCULATING…'
+        : 'CALCULATE VOYAGE COST';
+    }
   }
 
   showStatusBanner(variant, message) {
@@ -925,6 +1013,38 @@ export class PelagosPanelController {
       if (el.observedTag) el.observedTag.style.display = 'none';
     }
 
+    // 3b. Voyage Freight Calculator Card (OPT-001)
+    if (isMonitored) {
+      if (el.costCard) el.costCard.style.display = 'block';
+      void this.calculateVoyageCost({
+        triggerOrigin: originPort?.port_id || route.originId,
+        triggerDest: destPort?.port_id || route.destinationId,
+      });
+      void this.matchSuitableVessels({
+        triggerOrigin: originPort?.port_id || route.originId,
+        triggerDest: destPort?.port_id || route.destinationId,
+        cargoTonnes: this.currentCargoTonnes,
+      });
+    } else {
+      if (el.costCard) el.costCard.style.display = 'block';
+      if (el.costStatusTag) {
+        el.costStatusTag.className = 'pelagos-tag tag-unmonitored';
+        el.costStatusTag.textContent = 'UNAVAILABLE';
+      }
+      if (el.costContent) el.costContent.style.display = 'none';
+      if (el.costEmpty) {
+        el.costEmpty.style.display = 'block';
+        el.costEmpty.textContent =
+          freight?.message ||
+          'Voyage freight cost calculation is unavailable for unmonitored trade routes. Genuine rate benchmarks are currently limited to U.S.-Japan dry bulk grain corridors.';
+      }
+      void this.matchSuitableVessels({
+        triggerOrigin: originPort?.port_id || route.originId,
+        triggerDest: destPort?.port_id || route.destinationId,
+        cargoTonnes: this.currentCargoTonnes,
+      });
+    }
+
     // 4. Freight Forecast
     const fc = isMonitored ? freight.baseline_forecast : null;
     if (fc && Number.isFinite(Number(fc.predicted_value))) {
@@ -1131,6 +1251,534 @@ export class PelagosPanelController {
       this.elements.vesselListContainer.style.display = 'none';
     if (this.elements.selectedVesselCard)
       this.elements.selectedVesselCard.style.display = 'none';
+  }
+
+  /** Compute deterministic voyage gross freight cost via backend API. */
+  async calculateVoyageCost({ triggerOrigin, triggerDest } = {}) {
+    const el = this.elements;
+    const rawVal = el.cargoTonnesInput
+      ? el.cargoTonnesInput.value
+      : this.currentCargoTonnes;
+    const tonnes = Number(rawVal);
+
+    if (!Number.isFinite(tonnes) || tonnes <= 0) {
+      this.showCostValidationMessage(
+        'Cargo tonnage must be strictly positive (> 0 MT).',
+      );
+      if (el.costStatusTag) {
+        el.costStatusTag.className = 'pelagos-tag tag-offline';
+        el.costStatusTag.textContent = 'INVALID INPUT';
+      }
+      return false;
+    }
+
+    this.clearCostValidationMessage();
+    this.currentCargoTonnes = tonnes;
+
+    const originId = triggerOrigin || el.originSelect?.value;
+    const destId = triggerDest || el.destSelect?.value;
+
+    if (!originId || !destId) {
+      this.showCostValidationMessage(
+        'Please select both an origin and destination port first.',
+      );
+      return false;
+    }
+
+    this.setCostCalculatingState(true);
+    this._costSeq += 1;
+    const seq = this._costSeq;
+
+    this._costAbortController?.abort();
+    const controller = new AbortController();
+    this._costAbortController = controller;
+
+    try {
+      const payload = {
+        origin: originId,
+        destination: destId,
+        cargo_tonnes: tonnes,
+      };
+
+      const res = await fetch('/api/v1/calculator/voyage-freight', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      if (seq !== this._costSeq) return false; // Stale request discarded
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          data?.message || data?.error_message || `HTTP ${res.status}`,
+        );
+      }
+
+      this.currentCostResult = data;
+      this.renderCostResult(data);
+      void this.matchSuitableVessels({
+        triggerOrigin: originId,
+        triggerDest: destId,
+        cargoTonnes: tonnes,
+      });
+      return true;
+    } catch (err) {
+      if (seq !== this._costSeq) return false;
+      if (err.name === 'AbortError') return false;
+
+      this.renderCostError(err.message || 'Cost calculation service unavailable');
+      return false;
+    } finally {
+      if (seq === this._costSeq) {
+        this.setCostCalculatingState(false);
+      }
+    }
+  }
+
+  /** Render structured voyage gross freight calculation outcome. */
+  renderCostResult(data) {
+    const el = this.elements;
+    if (!el.costCard) return;
+
+    if (
+      data.status === 'calculated' &&
+      Number.isFinite(Number(data.gross_freight_cost))
+    ) {
+      if (el.costStatusTag) {
+        el.costStatusTag.className = 'pelagos-tag tag-verified';
+        el.costStatusTag.textContent = 'ESTIMATED';
+      }
+      if (el.costContent) el.costContent.style.display = 'block';
+      if (el.costEmpty) el.costEmpty.style.display = 'none';
+
+      if (el.costVal) {
+        el.costVal.textContent = Number(data.gross_freight_cost).toLocaleString(
+          'en-US',
+          {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          },
+        );
+      }
+      if (el.costCurrency) {
+        el.costCurrency.textContent = data.gross_freight_cost_currency || 'USD';
+      }
+      if (el.costFormula) {
+        const rateVal = data.applicable_rate?.rate_value ?? 0;
+        const cargoT = data.cargo_tonnes ?? this.currentCargoTonnes;
+        el.costFormula.textContent = `Gross Ocean Freight: ${Number(cargoT).toLocaleString('en-US')} MT × $${Number(rateVal).toFixed(2)}/MT`;
+      }
+      if (el.costRate && data.applicable_rate) {
+        el.costRate.textContent = `$${Number(data.applicable_rate.rate_value).toFixed(2)} ${data.applicable_rate.unit || 'USD/MT'} (${data.applicable_rate.currency || 'USD'})`;
+      }
+      if (el.costCargo) {
+        el.costCargo.textContent = `${Number(data.cargo_tonnes).toLocaleString('en-US')} ${data.cargo_unit || 'MT'}`;
+      }
+      if (el.costSource && data.applicable_rate) {
+        el.costSource.textContent = `${data.applicable_rate.observation_date || '—'} · ${data.applicable_rate.source_name || 'USDA Benchmark'}`;
+      }
+      if (el.costDistance) {
+        const distNm = data.distance?.distance_nm;
+        if (distNm !== undefined && distNm !== null) {
+          el.costDistance.textContent = `${Number(distNm).toLocaleString('en-US', { maximumFractionDigits: 1 })} NM (Benchmark)`;
+        } else {
+          el.costDistance.textContent = '—';
+        }
+      }
+      if (el.costDistProvenance) {
+        el.costDistProvenance.textContent =
+          'Prototype Benchmark (Unverified for navigation)';
+      }
+    } else if (data.status === 'unavailable') {
+      if (el.costStatusTag) {
+        el.costStatusTag.className = 'pelagos-tag tag-unmonitored';
+        el.costStatusTag.textContent = 'UNAVAILABLE';
+      }
+      if (el.costContent) el.costContent.style.display = 'none';
+      if (el.costEmpty) {
+        el.costEmpty.style.display = 'block';
+        el.costEmpty.textContent =
+          data.message ||
+          'Voyage freight benchmark is unavailable for this unmonitored trade corridor.';
+      }
+    } else if (data.status === 'invalid_input') {
+      if (el.costStatusTag) {
+        el.costStatusTag.className = 'pelagos-tag tag-offline';
+        el.costStatusTag.textContent = 'INVALID INPUT';
+      }
+      this.showCostValidationMessage(
+        data.message || 'Invalid cargo tonnage or route parameters.',
+      );
+    }
+  }
+
+  /** Render cost calculation error state. */
+  renderCostError(errorMsg) {
+    const el = this.elements;
+    if (el.costStatusTag) {
+      el.costStatusTag.className = 'pelagos-tag tag-offline';
+      el.costStatusTag.textContent = 'ERROR';
+    }
+    if (el.costContent) el.costContent.style.display = 'none';
+    if (el.costEmpty) {
+      el.costEmpty.style.display = 'block';
+      el.costEmpty.textContent = `Cost calculation service error: ${errorMsg}`;
+    }
+  }
+
+  /** Set candidate vessel suitability loading state */
+  setSuitabilityLoadingState(loading) {
+    this.isMatchingSuitability = loading;
+    const el = this.elements;
+    if (el.suitabilityTag && loading) {
+      el.suitabilityTag.className = 'pelagos-tag tag-loading';
+      el.suitabilityTag.textContent = 'MATCHING…';
+    }
+  }
+
+  /**
+   * Evaluate candidate vessel suitability for corridor and cargo tonnage via API (OPT-002).
+   */
+  async matchSuitableVessels({ triggerOrigin, triggerDest, cargoTonnes } = {}) {
+    const el = this.elements;
+    if (!el.suitabilityCard) return false;
+
+    const tonnes = Number(
+      cargoTonnes ||
+        (el.cargoTonnesInput ? el.cargoTonnesInput.value : this.currentCargoTonnes),
+    );
+    if (!Number.isFinite(tonnes) || tonnes <= 0) {
+      return false;
+    }
+
+    const originId = triggerOrigin || el.originSelect?.value;
+    const destId = triggerDest || el.destSelect?.value;
+
+    if (!originId || !destId) {
+      if (el.suitabilityTag) {
+        el.suitabilityTag.className = 'pelagos-tag tag-unmonitored';
+        el.suitabilityTag.textContent = 'AWAITING ROUTE';
+      }
+      if (el.suitabilityContext) {
+        el.suitabilityContext.textContent =
+          'Select a freight corridor and cargo tonnage to evaluate physical vessel suitability.';
+      }
+      if (el.suitabilityMetrics) el.suitabilityMetrics.style.display = 'none';
+      if (el.suitabilityListContainer)
+        el.suitabilityListContainer.style.display = 'none';
+      if (el.suitabilityEmpty) {
+        el.suitabilityEmpty.style.display = 'block';
+        el.suitabilityEmpty.textContent =
+          'Calculate a corridor route above to match candidate vessels.';
+      }
+      return false;
+    }
+
+    this.setSuitabilityLoadingState(true);
+    this._suitabilitySeq += 1;
+    const seq = this._suitabilitySeq;
+
+    this._suitabilityAbortController?.abort();
+    const controller = new AbortController();
+    this._suitabilityAbortController = controller;
+
+    try {
+      const payload = {
+        origin: originId,
+        destination: destId,
+        cargo_tonnes: tonnes,
+        max_vessels: 50,
+      };
+
+      const res = await fetch('/api/v1/calculator/vessel-suitability', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      if (seq !== this._suitabilitySeq) return false;
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.detail || data?.message || `HTTP ${res.status}`);
+      }
+
+      this.currentSuitabilityResult = data;
+      this.renderSuitabilityResult(data);
+      return true;
+    } catch (err) {
+      if (seq !== this._suitabilitySeq) return false;
+      if (err.name === 'AbortError') return false;
+
+      this.renderSuitabilityError(
+        err.message || 'Vessel suitability service unavailable',
+      );
+      return false;
+    } finally {
+      if (seq === this._suitabilitySeq) {
+        this.setSuitabilityLoadingState(false);
+      }
+    }
+  }
+
+  /** Render structured candidate vessel suitability matches. */
+  renderSuitabilityResult(data) {
+    const el = this.elements;
+    if (!el.suitabilityCard) return;
+
+    if (
+      data.status === 'matched' ||
+      data.status === 'unmonitored_corridor_matched'
+    ) {
+      const isMonitored = data.status === 'matched';
+      const suitableCount = Number(data.potentially_suitable_count || 0);
+      const totalCount = Number(data.total_vessels_evaluated || 0);
+      const incompatibleCount = Math.max(0, totalCount - suitableCount);
+
+      if (el.suitabilityTag) {
+        el.suitabilityTag.className = isMonitored
+          ? suitableCount > 0
+            ? 'pelagos-tag tag-verified'
+            : 'pelagos-tag tag-warning'
+          : 'pelagos-tag tag-unmonitored';
+        el.suitabilityTag.textContent = isMonitored
+          ? `${suitableCount} POTENTIALLY SUITABLE`
+          : 'UNMONITORED CORRIDOR';
+      }
+
+      if (el.suitabilityContext) {
+        const loadName =
+          data.loading_port_name || data.loading_port_id || 'Origin';
+        const corridorTitle =
+          data.corridor?.route_name || 'Selected Sea Route';
+        const vesselClassStr = data.target_vessel_class
+          ? ` (${data.target_vessel_class})`
+          : '';
+        el.suitabilityContext.textContent = `${corridorTitle} · Loading: ${loadName} · Target: ${Number(data.cargo_tonnes).toLocaleString('en-US')} MT${vesselClassStr}`;
+      }
+
+      if (el.suitabilityMetrics) el.suitabilityMetrics.style.display = 'grid';
+      if (el.suitabilityTotalCount)
+        el.suitabilityTotalCount.textContent = totalCount.toLocaleString('en-US');
+      if (el.suitabilityMatchedCount)
+        el.suitabilityMatchedCount.textContent =
+          suitableCount.toLocaleString('en-US');
+      if (el.suitabilityIncompatibleCount)
+        el.suitabilityIncompatibleCount.textContent =
+          incompatibleCount.toLocaleString('en-US');
+
+      const candidates = Array.isArray(data.candidates) ? data.candidates : [];
+      if (el.suitabilityList) {
+        el.suitabilityList.innerHTML = '';
+
+        if (candidates.length === 0) {
+          if (el.suitabilityListContainer)
+            el.suitabilityListContainer.style.display = 'none';
+          if (el.suitabilityEmpty) {
+            el.suitabilityEmpty.style.display = 'block';
+            el.suitabilityEmpty.textContent =
+              'No vessel telemetry records evaluated for this route.';
+          }
+        } else {
+          if (el.suitabilityListContainer)
+            el.suitabilityListContainer.style.display = 'block';
+          if (el.suitabilityEmpty) el.suitabilityEmpty.style.display = 'none';
+
+          candidates.forEach((cand) => {
+            const item = this.doc.createElement('div');
+            item.className = 'pelagos-candidate-item';
+            if (
+              this.selectedMmsi &&
+              String(cand.mmsi) === String(this.selectedMmsi)
+            ) {
+              item.classList.add('is-selected');
+            }
+            if (!item.dataset) item.dataset = {};
+            item.dataset.mmsi = String(cand.mmsi);
+
+            // Top row: name, MMSI, and status badge
+            const topRow = this.doc.createElement('div');
+            topRow.className = 'candidate-item-top';
+
+            const nameGroup = this.doc.createElement('div');
+            nameGroup.className = 'candidate-name-group';
+
+            const nameEl = this.doc.createElement('span');
+            nameEl.className = 'candidate-name';
+            nameEl.textContent = cand.vessel_name || `MMSI ${cand.mmsi}`;
+            nameGroup.appendChild(nameEl);
+
+            const idMeta = this.doc.createElement('span');
+            idMeta.className = 'candidate-id-meta';
+            const imoStr = cand.imo ? ` · IMO: ${cand.imo}` : '';
+            const classStr = cand.estimated_dimensional_class ? ` · ${cand.estimated_dimensional_class}` : '';
+            idMeta.textContent = `MMSI: ${cand.mmsi}${imoStr}${classStr}`;
+            nameGroup.appendChild(idMeta);
+            topRow.appendChild(nameGroup);
+
+            const badge = this.doc.createElement('span');
+            if (cand.suitability_status === 'potentially_suitable') {
+              badge.className = 'pelagos-tag tag-verified';
+              badge.textContent = 'POTENTIALLY SUITABLE';
+            } else if (cand.suitability_status === 'insufficient_data') {
+              badge.className = 'pelagos-tag tag-warning';
+              badge.textContent = 'INSUFFICIENT DATA';
+            } else if (cand.suitability_status === 'dimension_mismatch') {
+              badge.className = 'pelagos-tag tag-unmonitored';
+              badge.textContent = 'DIMENSION MISMATCH';
+            } else {
+              badge.className = 'pelagos-tag tag-offline';
+              badge.textContent = 'UNSUITABLE TYPE';
+            }
+            topRow.appendChild(badge);
+            item.appendChild(topRow);
+
+            // Metrics row: Dimensions, Distance to Loading Port, Speed, Age
+            const metricsRow = this.doc.createElement('div');
+            metricsRow.className = 'candidate-metrics-row';
+
+            if (
+              cand.distance_to_load_port_nm !== null &&
+              cand.distance_to_load_port_nm !== undefined
+            ) {
+              const distEl = this.doc.createElement('span');
+              const portLabel =
+                data.loading_port_name || data.loading_port_id || 'load port';
+              const distFormatted = Number(cand.distance_to_load_port_nm).toLocaleString('en-US', {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1,
+              });
+              if (cand.is_stale) {
+                distEl.className = 'candidate-distance distance-historical';
+                distEl.textContent = `⚓ ${distFormatted} NM at fix (${portLabel} · Historical)`;
+                distEl.title =
+                  cand.distance_qualification ||
+                  'Historical observation distance; current proximity unknown.';
+              } else {
+                distEl.className = 'candidate-distance';
+                distEl.textContent = `⚓ ${distFormatted} NM to ${portLabel} (Live fix)`;
+              }
+              metricsRow.appendChild(distEl);
+            }
+
+            const dimEl = this.doc.createElement('span');
+            const loaStr = cand.length_meters
+              ? `${Math.round(cand.length_meters)}m LOA`
+              : 'LOA: —';
+            const beamStr = cand.width_meters
+              ? `${Math.round(cand.width_meters)}m Beam`
+              : 'Beam: —';
+            const draftStr = cand.draft_meters
+              ? `${Number(cand.draft_meters).toFixed(1)}m Draft`
+              : 'Draft: —';
+            dimEl.textContent = `${loaStr} · ${beamStr} · ${draftStr}`;
+            metricsRow.appendChild(dimEl);
+
+            const speedEl = this.doc.createElement('span');
+            const spd =
+              cand.speed_knots !== null && cand.speed_knots !== undefined
+                ? `${Number(cand.speed_knots).toFixed(1)} kn`
+                : 'Speed: —';
+            const crs =
+              cand.course_degrees !== null && cand.course_degrees !== undefined
+                ? `${Math.round(cand.course_degrees)}°`
+                : '—';
+            speedEl.textContent = `${spd} · ${crs}`;
+            metricsRow.appendChild(speedEl);
+
+            const ageEl = this.doc.createElement('span');
+            if (cand.is_stale) {
+              ageEl.className = 'vessel-age stale';
+              const dateStr = cand.observation_time
+                ? cand.observation_time.split('T')[0]
+                : 'Historical';
+              ageEl.textContent = `Historical Fix (${dateStr} · Stale)`;
+            } else {
+              ageEl.className = 'vessel-age live';
+              ageEl.textContent = 'Live Fix (<30m)';
+            }
+            metricsRow.appendChild(ageEl);
+
+            item.appendChild(metricsRow);
+
+            // Reason explanation box
+            const reasonBox = this.doc.createElement('div');
+            reasonBox.className = `candidate-reason-box ${cand.suitability_status === 'potentially_suitable' ? 'suitable' : ''}`;
+            const prefix =
+              cand.suitability_status === 'potentially_suitable'
+                ? '✓ '
+                : cand.suitability_status === 'insufficient_data'
+                  ? '⚠ '
+                  : '✕ ';
+            reasonBox.textContent = `${prefix}${cand.suitability_reason}`;
+            item.appendChild(reasonBox);
+
+            // Sub-badges row: DWT Capacity & Laycan Feasibility (Commercial Boundaries)
+            const metaBadgesRow = this.doc.createElement('div');
+            metaBadgesRow.className = 'candidate-meta-badges';
+
+            const capacityPill = this.doc.createElement('span');
+            capacityPill.className = 'candidate-sub-pill capacity-unverified';
+            capacityPill.textContent = 'DWT Capacity: UNVERIFIED (AIS Broadcast Only)';
+            metaBadgesRow.appendChild(capacityPill);
+
+            const laycanPill = this.doc.createElement('span');
+            laycanPill.className = 'candidate-sub-pill laycan-unconfirmed';
+            laycanPill.textContent =
+              'Laycan: UNCONFIRMED · Commercial Commitments Unverified';
+            metaBadgesRow.appendChild(laycanPill);
+
+            item.appendChild(metaBadgesRow);
+
+            // Selection & camera interaction
+            item.addEventListener('click', () => {
+              this.selectVessel(cand.mmsi, { syncGlobe: true, flyCamera: true });
+            });
+
+            el.suitabilityList.appendChild(item);
+          });
+        }
+      }
+    } else if (data.status === 'invalid_input') {
+      if (el.suitabilityTag) {
+        el.suitabilityTag.className = 'pelagos-tag tag-offline';
+        el.suitabilityTag.textContent = 'INVALID INPUT';
+      }
+      if (el.suitabilityMetrics) el.suitabilityMetrics.style.display = 'none';
+      if (el.suitabilityListContainer)
+        el.suitabilityListContainer.style.display = 'none';
+      if (el.suitabilityEmpty) {
+        el.suitabilityEmpty.style.display = 'block';
+        el.suitabilityEmpty.textContent =
+          data.message ||
+          'Invalid parameters for candidate vessel suitability matching.';
+      }
+    }
+  }
+
+  /** Render candidate vessel suitability error state. */
+  renderSuitabilityError(errorMsg) {
+    const el = this.elements;
+    if (el.suitabilityTag) {
+      el.suitabilityTag.className = 'pelagos-tag tag-offline';
+      el.suitabilityTag.textContent = 'ERROR';
+    }
+    if (el.suitabilityMetrics) el.suitabilityMetrics.style.display = 'none';
+    if (el.suitabilityListContainer)
+      el.suitabilityListContainer.style.display = 'none';
+    if (el.suitabilityEmpty) {
+      el.suitabilityEmpty.style.display = 'block';
+      el.suitabilityEmpty.textContent = `Candidate suitability service error: ${errorMsg}`;
+    }
   }
 
   /** Switch between All Tracked and Near Corridor filter tabs */
@@ -1491,6 +2139,38 @@ export class PelagosPanelController {
     this.clearGlobeGraphics();
     this.currentRoute = null;
     this.currentFreight = null;
+    this.currentCostResult = null;
+    this.currentSuitabilityResult = null;
+    this._costAbortController?.abort();
+    this._suitabilityAbortController?.abort();
+
+    if (this.elements.suitabilityMetrics) {
+      this.elements.suitabilityMetrics.style.display = 'none';
+    }
+    if (this.elements.suitabilityListContainer) {
+      this.elements.suitabilityListContainer.style.display = 'none';
+    }
+    if (this.elements.suitabilityEmpty) {
+      this.elements.suitabilityEmpty.style.display = 'block';
+      this.elements.suitabilityEmpty.textContent =
+        'Calculate a corridor route above to match candidate vessels.';
+    }
+    if (this.elements.suitabilityTag) {
+      this.elements.suitabilityTag.className = 'pelagos-tag tag-unmonitored';
+      this.elements.suitabilityTag.textContent = 'AWAITING ROUTE';
+    }
+
+    if (this.elements.costContent) {
+      this.elements.costContent.style.display = 'none';
+    }
+    if (this.elements.costEmpty) {
+      this.elements.costEmpty.style.display = 'none';
+    }
+    if (this.elements.costStatusTag) {
+      this.elements.costStatusTag.className = 'pelagos-tag tag-model';
+      this.elements.costStatusTag.textContent = 'CALCULATOR';
+    }
+    this.clearCostValidationMessage();
 
     if (this.elements.dashboard) {
       this.elements.dashboard.style.display = 'none';
@@ -1515,6 +2195,8 @@ export class PelagosPanelController {
   /** Teardown all event listeners, graphics, and abort pending requests. */
   destroy() {
     this._abortController?.abort();
+    this._costAbortController?.abort();
+    this._suitabilityAbortController?.abort();
     this.clearGlobeGraphics();
 
     for (const { element, event, handler } of this._boundListeners) {

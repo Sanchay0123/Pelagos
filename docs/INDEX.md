@@ -3,9 +3,9 @@ title: Pelagos Documentation Index
 document_id: DOC-003
 type: documentation_index
 status: approved
-version: 1.0.23
+version: 1.0.24
 created: 2026-10-10
-updated: 2026-10-21
+updated: 2026-10-24
 tags:
   - index
   - navigation
@@ -30,10 +30,10 @@ N/A
 ### Core Foundations
 * [Documentation Standard](./DOCUMENTATION_STANDARD.md) (v1.1.1, Status: Approved)
 * [Project Overview](./PROJECT_OVERVIEW.md) (v1.0.3, Status: Approved)
-* [Documentation Index](./INDEX.md) (v1.0.23, Status: Approved)
+* [Documentation Index](./INDEX.md) (v1.0.24, Status: Approved)
 
 ### Architecture and Decisions
-* [System Architecture Specification](./architecture/system-architecture.md) (v1.0.0, Status: Drafting)
+* [System Architecture Specification](./architecture/system-architecture.md) (v1.0.1, Status: Drafting)
 * Architecture Decision Records (ADRs):
   * [ADR-0001: Modular Monolith Backend Architecture](./architecture/adr/adr-0001-modular-monolith-architecture.md) (v1.0.0, Status: Drafting)
   * [ADR-0002: Dual-Tier Storage Strategy](./architecture/adr/adr-0002-dual-tier-storage-strategy.md) (v1.0.0, Status: Drafting)
@@ -42,7 +42,7 @@ N/A
   * [ADR-0005: Frontend Integration and Basemap Decoupling](./architecture/adr/adr-0005-frontend-integration-and-basemap-strategy.md) (v1.0.0, Status: Drafting)
 
 ### Product and Requirements
-* [Functional Requirements Specification](./requirements/functional-requirements.md) (v1.0.5, Status: Drafting)
+* [Functional Requirements Specification](./requirements/functional-requirements.md) (v1.0.6, Status: Drafting)
 * [Nonfunctional Requirements Specification](./requirements/nonfunctional-requirements.md) (v1.0.3, Status: Drafting)
 
 ### Data and Intelligence
@@ -53,7 +53,8 @@ N/A
 * [Operational Maritime Routing Foundation Implementation Plan (ROUT-003)](./routing/D9.4-implementation-plan.md) (v1.0.0, Status: Under Review)
 * [Operational Maritime Routing Foundation Stage 3 Design and Test Plan (ROUT-004)](./routing/D9.4-stage-3-design.md) (v1.4.0, Status: Accepted)
 * [Coordinated GUI Maritime Routing Integration (ROUT-005)](./routing/D9.4-increment-3-gui-integration.md) (v1.0.0, Status: Accepted)
-* [Commercial Freight Route Intelligence Specification (ROUT-006)](./routing/D9.5-commercial-freight-route-intelligence.md) (v1.0.0, Status: Accepted)
+* [Commercial Freight Route Intelligence Specification (ROUT-006)](./routing/D9.5-commercial-freight-route-intelligence.md) (v1.0.1, Status: Accepted)
+* [Forecast Cadence Reconciliation Decision Record (OD-ROUT-06-01)](./routing/od-rout-06-01-forecasting-horizons-amendment-proposal.md) (v1.0.0, Status: Approved)
 
 ### Engineering and Operations
 * API Specifications (Planned)
@@ -122,3 +123,4 @@ Links to established, governed documentation within the repository, and maps pla
 | 1.0.21 | 2026-10-21 | Implementation Agent | D9.4 final status reconciliation: Synchronized ROUT-004 and ROUT-005 status references to Accepted following Project Overseer manual verification and acceptance audit. Kept status approved. |
 | 1.0.22 | 2026-10-21 | Implementation Agent | Milestone D9.5 launch: Registered Commercial Freight Route Intelligence Specification (ROUT-006) under drafting status. Synchronized index version reference. Kept status approved. |
 | 1.0.23 | 2026-10-21 | Implementation Agent | Synchronized ROUT-006 status reference to Accepted following independent final review and Project Owner formal specification acceptance. Synchronized index version reference. Kept status approved. |
+| 1.0.24 | 2026-10-24 | Implementation Agent | Registered OD-ROUT-06-01 decision record; synchronized Functional Requirements (v1.0.6), System Architecture (v1.0.1), and ROUT-006 (v1.0.1) following formal forecast cadence reconciliation. Status: approved. |

@@ -13,11 +13,24 @@ function createMockDom() {
     const children = [];
     const classes = new Set();
     let _innerHTML = '';
+    let _textContent = '';
     const el = {
       id,
       tagName: tag.toUpperCase(),
       value: '',
-      textContent: '',
+      get textContent() {
+        if (_textContent) return _textContent;
+        if (children.length > 0) {
+          return children.map((c) => c.textContent).filter(Boolean).join(' ');
+        }
+        return '';
+      },
+      set textContent(val) {
+        _textContent = String(val ?? '');
+        if (val !== '') {
+          children.length = 0;
+        }
+      },
       get innerHTML() {
         return _innerHTML;
       },
@@ -25,6 +38,7 @@ function createMockDom() {
         _innerHTML = val;
         if (val === '') {
           children.length = 0;
+          _textContent = '';
         }
       },
       style: {},
@@ -139,6 +153,36 @@ function createMockDom() {
     'pelagos-rate-source',
     'pelagos-rate-type',
     'pelagos-rate-empty',
+
+    // Voyage Freight Calculator (OPT-001)
+    'pelagos-cost-card',
+    'pelagos-cost-status-tag',
+    'pelagos-cargo-tonnes',
+    'pelagos-calculate-cost-btn',
+    'pelagos-cost-validation-msg',
+    'pelagos-cost-content',
+    'pelagos-cost-val',
+    'pelagos-cost-currency',
+    'pelagos-cost-formula',
+    'pelagos-cost-rate',
+    'pelagos-cost-cargo',
+    'pelagos-cost-source',
+    'pelagos-cost-distance',
+    'pelagos-cost-distance-provenance',
+    'pelagos-cost-empty',
+
+    // Candidate Vessel Suitability (OPT-002)
+    'pelagos-suitability-card',
+    'pelagos-suitability-tag',
+    'pelagos-suitability-context',
+    'pelagos-suitability-metrics',
+    'pelagos-suitability-total-count',
+    'pelagos-suitability-matched-count',
+    'pelagos-suitability-incompatible-count',
+    'pelagos-suitability-list-container',
+    'pelagos-suitability-list',
+    'pelagos-suitability-empty',
+
     'pelagos-forecast-card',
     'pelagos-forecast-content',
     'pelagos-forecast-val',
@@ -187,6 +231,10 @@ function createMockDom() {
 
   for (const id of ids) {
     makeElement(id);
+  }
+
+  if (elements.has('pelagos-cargo-tonnes')) {
+    elements.get('pelagos-cargo-tonnes').value = '52000';
   }
 
   const doc = {
@@ -1258,3 +1306,598 @@ test('Pelagos search query filters vessel list and handles empty search results'
     controller.destroy();
   }
 });
+
+test('Pelagos Voyage Freight Calculator input validation enforces positive cargo tonnage and handles boundary cases', async () => {
+  const { doc, elements } = createMockDom();
+  const viewer = createMockViewer();
+
+  const controller = new PelagosPanelController({ viewer, document: doc });
+  await controller.init();
+
+  elements.get('pelagos-origin-select').value = 'USSEA';
+  elements.get('pelagos-dest-select').value = 'JPYOK';
+
+  // 1. Zero tonnage
+  elements.get('pelagos-cargo-tonnes').value = '0';
+  const resZero = await controller.calculateVoyageCost();
+  assert.equal(resZero, false);
+  assert.match(
+    elements.get('pelagos-cost-validation-msg').textContent,
+    /strictly positive/i,
+  );
+  assert.equal(
+    elements.get('pelagos-cost-status-tag').textContent,
+    'INVALID INPUT',
+  );
+
+  // 2. Negative tonnage
+  elements.get('pelagos-cargo-tonnes').value = '-500';
+  const resNeg = await controller.calculateVoyageCost();
+  assert.equal(resNeg, false);
+  assert.match(
+    elements.get('pelagos-cost-validation-msg').textContent,
+    /strictly positive/i,
+  );
+
+  // 3. Non-numeric tonnage
+  elements.get('pelagos-cargo-tonnes').value = 'abc';
+  const resNaN = await controller.calculateVoyageCost();
+  assert.equal(resNaN, false);
+  assert.match(
+    elements.get('pelagos-cost-validation-msg').textContent,
+    /strictly positive/i,
+  );
+
+  // 4. Missing endpoint selection
+  elements.get('pelagos-origin-select').value = '';
+  elements.get('pelagos-cargo-tonnes').value = '52000';
+  const resMissing = await controller.calculateVoyageCost();
+  assert.equal(resMissing, false);
+  assert.match(
+    elements.get('pelagos-cost-validation-msg').textContent,
+    /select both an origin and destination/i,
+  );
+
+  controller.destroy();
+});
+
+test('Pelagos Voyage Freight Calculator renders gross freight cost, currency, formula, rate, and unverified distance provenance for supported corridor', async () => {
+  const { doc, elements } = createMockDom();
+  const viewer = createMockViewer();
+
+  const controller = new PelagosPanelController({ viewer, document: doc });
+  await controller.init();
+
+  elements.get('pelagos-origin-select').value = 'USSEA';
+  elements.get('pelagos-dest-select').value = 'JPYOK';
+  elements.get('pelagos-cargo-tonnes').value = '52000';
+
+  const mockCostPayload = {
+    status: 'calculated',
+    cargo_tonnes: 52000.0,
+    cargo_unit: 'MT',
+    route: {
+      route_code: 'PNW-JPN-BULK',
+      route_name: 'U.S. Pacific Northwest to Japan Bulk Grain Ocean Corridor',
+      origin_region: 'U.S. Pacific Northwest',
+      destination_region: 'Japan',
+    },
+    applicable_rate: {
+      rate_value: 37.31,
+      currency: 'USD',
+      unit: 'USD/MT',
+      observation_date: '2026-09-01',
+      source_name: "USDA Agricultural Marketing Service / O'Neil Commodity Consulting",
+      provenance_validated: true,
+    },
+    distance: {
+      distance_nm: 4403.4,
+      distance_unit: 'NM',
+      distance_source: 'prototype_operational_routing',
+    },
+    gross_freight_cost: 1940120.0,
+    gross_freight_cost_currency: 'USD',
+    calculation_formula: 'gross_freight_cost = cargo_tonnes * rate_per_tonne',
+  };
+
+  const origFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('/calculator/voyage-freight')) {
+        return { ok: true, json: async () => mockCostPayload };
+      }
+      return { ok: true, json: async () => ({}) };
+    };
+
+    const success = await controller.calculateVoyageCost();
+    assert.equal(success, true);
+
+    // Verify status tag and displays
+    assert.equal(elements.get('pelagos-cost-status-tag').textContent, 'ESTIMATED');
+    assert.equal(elements.get('pelagos-cost-content').style.display, 'block');
+    assert.equal(elements.get('pelagos-cost-empty').style.display, 'none');
+
+    // Arithmetic & currency
+    assert.equal(elements.get('pelagos-cost-val').textContent, '1,940,120.00');
+    assert.equal(elements.get('pelagos-cost-currency').textContent, 'USD');
+    assert.match(
+      elements.get('pelagos-cost-formula').textContent,
+      /52,000 MT × \$37.31\/MT/,
+    );
+
+    // Metadata breakdown
+    assert.match(elements.get('pelagos-cost-rate').textContent, /\$37.31 USD\/MT/);
+    assert.match(elements.get('pelagos-cost-cargo').textContent, /52,000 MT/);
+    assert.match(elements.get('pelagos-cost-source').textContent, /2026-09-01/);
+    assert.match(elements.get('pelagos-cost-distance').textContent, /4,403.4 NM/);
+
+    // Critical Provenance Requirement: Prototype distance must be labeled unverified for navigation
+    assert.match(
+      elements.get('pelagos-cost-distance-provenance').textContent,
+      /Prototype Benchmark \(Unverified for navigation\)/,
+    );
+  } finally {
+    globalThis.fetch = origFetch;
+    controller.destroy();
+  }
+});
+
+test('Pelagos Voyage Freight Calculator displays unavailable state and no fabricated cost for unmonitored trade corridor', async () => {
+  const { doc, elements } = createMockDom();
+  const viewer = createMockViewer();
+
+  const controller = new PelagosPanelController({ viewer, document: doc });
+  await controller.init();
+
+  elements.get('pelagos-origin-select').value = 'NLRTM';
+  elements.get('pelagos-dest-select').value = 'SGSIN';
+  elements.get('pelagos-cargo-tonnes').value = '50000';
+
+  const mockUnavailablePayload = {
+    status: 'unavailable',
+    message: 'Trade corridor Rotterdam -> Singapore is currently unmonitored.',
+    gross_freight_cost: null,
+    applicable_rate: null,
+  };
+
+  const origFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('/calculator/voyage-freight')) {
+        return { ok: true, json: async () => mockUnavailablePayload };
+      }
+      return { ok: true, json: async () => ({}) };
+    };
+
+    const success = await controller.calculateVoyageCost();
+    assert.equal(success, true);
+
+    assert.equal(elements.get('pelagos-cost-status-tag').textContent, 'UNAVAILABLE');
+    assert.equal(elements.get('pelagos-cost-content').style.display, 'none');
+    assert.equal(elements.get('pelagos-cost-empty').style.display, 'block');
+    assert.match(
+      elements.get('pelagos-cost-empty').textContent,
+      /unmonitored/i,
+    );
+  } finally {
+    globalThis.fetch = origFetch;
+    controller.destroy();
+  }
+});
+
+test('Pelagos Voyage Freight Calculator prevents stale asynchronous responses from overwriting newer requests', async () => {
+  const { doc, elements } = createMockDom();
+  const viewer = createMockViewer();
+
+  const controller = new PelagosPanelController({ viewer, document: doc });
+  await controller.init();
+
+  let slowResolve;
+  const slowPromise = new Promise((resolve) => {
+    slowResolve = resolve;
+  });
+
+  const origFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url, options) => {
+      const payload = JSON.parse(options.body);
+      if (payload.origin === 'USSEA') {
+        // Slow initial request
+        await slowPromise;
+        return {
+          ok: true,
+          json: async () => ({
+            status: 'calculated',
+            gross_freight_cost: 1865500.0,
+            gross_freight_cost_currency: 'USD',
+            applicable_rate: { rate_value: 37.31, unit: 'USD/MT' },
+            cargo_tonnes: 50000.0,
+          }),
+        };
+      }
+      // Fast second request (USMSY)
+      return {
+        ok: true,
+        json: async () => ({
+          status: 'calculated',
+          gross_freight_cost: 4582800.0,
+          gross_freight_cost_currency: 'USD',
+          applicable_rate: { rate_value: 76.38, unit: 'USD/MT' },
+          cargo_tonnes: 60000.0,
+        }),
+      };
+    };
+
+    // 1. Fire slow calculation (Seattle)
+    elements.get('pelagos-origin-select').value = 'USSEA';
+    elements.get('pelagos-dest-select').value = 'JPYOK';
+    elements.get('pelagos-cargo-tonnes').value = '50000';
+    const p1 = controller.calculateVoyageCost();
+
+    // 2. Immediately switch to US Gulf and fire second request
+    elements.get('pelagos-origin-select').value = 'USMSY';
+    elements.get('pelagos-dest-select').value = 'JPYOK';
+    elements.get('pelagos-cargo-tonnes').value = '60000';
+    const p2 = controller.calculateVoyageCost();
+
+    await p2;
+    assert.equal(elements.get('pelagos-cost-val').textContent, '4,582,800.00');
+
+    // 3. Resolve slow request now
+    slowResolve();
+    await p1;
+
+    // Stale Seattle response MUST NOT overwrite US Gulf result!
+    assert.equal(elements.get('pelagos-cost-val').textContent, '4,582,800.00');
+  } finally {
+    globalThis.fetch = origFetch;
+    controller.destroy();
+  }
+});
+
+test('Pelagos Voyage Freight Calculator handles network error gracefully without breaking dashboard', async () => {
+  const { doc, elements } = createMockDom();
+  const viewer = createMockViewer();
+
+  const controller = new PelagosPanelController({ viewer, document: doc });
+  await controller.init();
+
+  elements.get('pelagos-origin-select').value = 'USSEA';
+  elements.get('pelagos-dest-select').value = 'JPYOK';
+  elements.get('pelagos-cargo-tonnes').value = '52000';
+
+  const origFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => {
+      throw new Error('Connection reset by peer');
+    };
+
+    const success = await controller.calculateVoyageCost();
+    assert.equal(success, false);
+
+    assert.equal(elements.get('pelagos-cost-status-tag').textContent, 'ERROR');
+    assert.equal(elements.get('pelagos-cost-content').style.display, 'none');
+    assert.equal(elements.get('pelagos-cost-empty').style.display, 'block');
+    assert.match(
+      elements.get('pelagos-cost-empty').textContent,
+      /Connection reset by peer/i,
+    );
+  } finally {
+    globalThis.fetch = origFetch;
+    controller.destroy();
+  }
+});
+
+test('Pelagos Candidate Vessel Suitability renders ranked candidate matches with particulars, distance, and unconfirmed laycan notice', async () => {
+  const { doc, elements } = createMockDom();
+  const viewer = createMockViewer();
+
+  const controller = new PelagosPanelController({ viewer, document: doc });
+  await controller.init();
+
+  elements.get('pelagos-origin-select').value = 'USSEA';
+  elements.get('pelagos-dest-select').value = 'JPYOK';
+  elements.get('pelagos-cargo-tonnes').value = '52000';
+
+  const origFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('/api/v1/calculator/vessel-suitability')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: 'matched',
+            corridor: {
+              route_code: 'PNW-JPN-BULK',
+              route_name: 'U.S. Pacific Northwest to Japan Bulk Grain Ocean Corridor',
+              origin_region: 'U.S. Pacific Northwest',
+              destination_region: 'Japan',
+              commodity: 'Agricultural Bulk Grain',
+              vessel_class: 'Panamax / Supramax',
+            },
+            loading_port_id: 'USSEA',
+            loading_port_name: 'Seattle',
+            cargo_tonnes: 52000.0,
+            target_vessel_class: 'Panamax / Supramax',
+            total_vessels_evaluated: 5,
+            potentially_suitable_count: 2,
+            candidates: [
+              {
+                mmsi: '636022875',
+                imo: '9745287',
+                vessel_name: 'MSC ATHOS',
+                vessel_type: 'Cargo - Hazardous A',
+                estimated_dimensional_class: 'Post-Panamax / Capesize',
+                suitability_status: 'potentially_suitable',
+                suitability_reason:
+                  'Dimensionally screened candidate. Classified as Post-Panamax / Capesize based on reported dimensions (LOA 300m, Beam 48m, Draft 10.3m). Vessel exceeds standard Panamax grain parcel envelope (52,000 MT); physical dimensional envelope indicates adequate scale, but actual DWT, hold suitability, and commercial cargo capacity are unverified from AIS alone.',
+                distance_to_load_port_nm: 139.7,
+                distance_qualification:
+                  'HISTORICAL_OBSERVATION_ONLY: Distance of 139.7 NM reflects vessel position at historical observation fix (2024-01-01). Current vessel position and proximity to loading port are unknown.',
+                length_meters: 300.0,
+                width_meters: 48.0,
+                draft_meters: 10.3,
+                speed_knots: 15.9,
+                course_degrees: 180.0,
+                is_stale: true,
+                laycan_feasibility: 'UNCONFIRMED',
+                commercial_availability: 'UNCONFIRMED',
+                cargo_capacity_status: 'UNVERIFIED',
+              },
+              {
+                mmsi: '212719000',
+                imo: '9300001',
+                vessel_name: 'TROODOS SUN',
+                vessel_type: 'Cargo',
+                estimated_dimensional_class: 'Panamax / Kamsarmax',
+                suitability_status: 'potentially_suitable',
+                suitability_reason:
+                  'Dimensionally screened candidate. Classified as Panamax / Kamsarmax based on reported dimensions (LOA 228m, Beam 35m, Draft 12.5m), which aligns with the physical envelope for 52,000 MT parcel. Verified deadweight tonnage (DWT), hold cleanliness, and commercial cargo capacity are unverified from AIS alone.',
+                distance_to_load_port_nm: 855.8,
+                distance_qualification:
+                  'HISTORICAL_OBSERVATION_ONLY: Distance of 855.8 NM reflects vessel position at historical observation fix (2024-01-01). Current vessel position and proximity to loading port are unknown.',
+                length_meters: 228.0,
+                width_meters: 35.0,
+                draft_meters: 12.5,
+                speed_knots: 10.4,
+                course_degrees: 180.0,
+                is_stale: true,
+                laycan_feasibility: 'UNCONFIRMED',
+                commercial_availability: 'UNCONFIRMED',
+                cargo_capacity_status: 'UNVERIFIED',
+              },
+            ],
+            disclaimers: [
+              'Potential vessel suitability is evaluated strictly as a dimensional screening.',
+              'Commercial open-tonnage status is NOT reported in AIS broadcasts.',
+            ],
+          }),
+        };
+      }
+      return { ok: false, status: 404 };
+    };
+
+    const success = await controller.matchSuitableVessels();
+    assert.equal(success, true);
+
+    // Verify tag and metrics
+    assert.equal(elements.get('pelagos-suitability-tag').textContent, '2 POTENTIALLY SUITABLE');
+    assert.equal(elements.get('pelagos-suitability-metrics').style.display, 'grid');
+    assert.equal(elements.get('pelagos-suitability-total-count').textContent, '5');
+    assert.equal(elements.get('pelagos-suitability-matched-count').textContent, '2');
+    assert.equal(elements.get('pelagos-suitability-incompatible-count').textContent, '3');
+
+    // Verify rendered candidate list items
+    const listEl = elements.get('pelagos-suitability-list');
+    assert.equal(listEl.children.length, 2);
+
+    const firstCand = listEl.children[0];
+    assert.equal(firstCand.dataset.mmsi, '636022875');
+    assert.match(firstCand.textContent, /MSC ATHOS/);
+    assert.match(firstCand.textContent, /Post-Panamax \/ Capesize/);
+    assert.match(firstCand.textContent, /POTENTIALLY SUITABLE/);
+    assert.match(firstCand.textContent, /139\.7 NM at fix \(Seattle · Historical\)/);
+    assert.match(firstCand.textContent, /300m LOA · 48m Beam · 10\.3m Draft/);
+    assert.match(firstCand.textContent, /DWT Capacity: UNVERIFIED/);
+    assert.match(firstCand.textContent, /Laycan: UNCONFIRMED/);
+    assert.match(firstCand.textContent, /Historical Fix/);
+  } finally {
+    globalThis.fetch = origFetch;
+    controller.destroy();
+  }
+});
+
+test('Pelagos Candidate Vessel Suitability handles vessels with missing particulars honestly as INSUFFICIENT DATA', async () => {
+  const { doc, elements } = createMockDom();
+  const viewer = createMockViewer();
+
+  const controller = new PelagosPanelController({ viewer, document: doc });
+  await controller.init();
+
+  elements.get('pelagos-origin-select').value = 'USSEA';
+  elements.get('pelagos-dest-select').value = 'JPYOK';
+
+  const origFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'matched',
+        loading_port_id: 'USSEA',
+        loading_port_name: 'Seattle',
+        cargo_tonnes: 52000.0,
+        total_vessels_evaluated: 1,
+        potentially_suitable_count: 0,
+        candidates: [
+          {
+            mmsi: '367121040',
+            vessel_name: 'AMERICAN COURAGE',
+            vessel_type: 'Cargo',
+            suitability_status: 'insufficient_data',
+            suitability_reason: 'Vessel classified as Cargo, but AIS broadcast lacks verified length and beam particulars; dimensional capacity cannot be confirmed.',
+            distance_to_load_port_nm: 1850.5,
+            length_meters: 194.0,
+            width_meters: null,
+            draft_meters: null,
+            is_stale: true,
+            laycan_feasibility: 'UNCONFIRMED',
+          },
+        ],
+      }),
+    });
+
+    const success = await controller.matchSuitableVessels();
+    assert.equal(success, true);
+
+    const listEl = elements.get('pelagos-suitability-list');
+    assert.equal(listEl.children.length, 1);
+    const item = listEl.children[0];
+    assert.match(item.textContent, /INSUFFICIENT DATA/);
+    assert.match(item.textContent, /lacks verified length and beam particulars/);
+  } finally {
+    globalThis.fetch = origFetch;
+    controller.destroy();
+  }
+});
+
+test('Pelagos Candidate Vessel Suitability displays unmonitored corridor status honestly', async () => {
+  const { doc, elements } = createMockDom();
+  const viewer = createMockViewer();
+
+  const controller = new PelagosPanelController({ viewer, document: doc });
+  await controller.init();
+
+  elements.get('pelagos-origin-select').value = 'NLRTM';
+  elements.get('pelagos-dest-select').value = 'SGSIN';
+
+  const origFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'unmonitored_corridor_matched',
+        loading_port_id: 'NLRTM',
+        loading_port_name: 'Rotterdam',
+        cargo_tonnes: 50000.0,
+        total_vessels_evaluated: 5,
+        potentially_suitable_count: 0,
+        candidates: [],
+      }),
+    });
+
+    await controller.matchSuitableVessels();
+    assert.equal(elements.get('pelagos-suitability-tag').textContent, 'UNMONITORED CORRIDOR');
+  } finally {
+    globalThis.fetch = origFetch;
+    controller.destroy();
+  }
+});
+
+test('Pelagos Candidate Vessel Suitability prevents stale asynchronous responses from overwriting newer requests', async () => {
+  const { doc, elements } = createMockDom();
+  const viewer = createMockViewer();
+
+  const controller = new PelagosPanelController({ viewer, document: doc });
+  await controller.init();
+
+  const origFetch = globalThis.fetch;
+  try {
+    let slowResolve;
+    const slowPromise = new Promise((resolve) => {
+      slowResolve = resolve;
+    });
+
+    globalThis.fetch = async (url, options) => {
+      const body = JSON.parse(options.body);
+      if (body.origin === 'USSEA') {
+        await slowPromise;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: 'matched',
+            loading_port_id: 'USSEA',
+            loading_port_name: 'Seattle',
+            cargo_tonnes: 52000.0,
+            total_vessels_evaluated: 10,
+            potentially_suitable_count: 5,
+            candidates: [],
+          }),
+        };
+      } else {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: 'matched',
+            loading_port_id: 'USMSY',
+            loading_port_name: 'New Orleans',
+            cargo_tonnes: 60000.0,
+            total_vessels_evaluated: 20,
+            potentially_suitable_count: 1,
+            candidates: [],
+          }),
+        };
+      }
+    };
+
+    // 1. Fire request 1 for Seattle
+    elements.get('pelagos-origin-select').value = 'USSEA';
+    elements.get('pelagos-dest-select').value = 'JPYOK';
+    const p1 = controller.matchSuitableVessels();
+
+    // 2. Immediately switch to US Gulf and fire request 2
+    elements.get('pelagos-origin-select').value = 'USMSY';
+    elements.get('pelagos-dest-select').value = 'JPYOK';
+    const p2 = controller.matchSuitableVessels();
+
+    await p2;
+    assert.equal(elements.get('pelagos-suitability-matched-count').textContent, '1');
+
+    // 3. Resolve slow Seattle request
+    slowResolve();
+    await p1;
+
+    // Stale Seattle response MUST NOT overwrite US Gulf result!
+    assert.equal(elements.get('pelagos-suitability-matched-count').textContent, '1');
+  } finally {
+    globalThis.fetch = origFetch;
+    controller.destroy();
+  }
+});
+
+test('Pelagos Candidate Vessel Suitability handles network error gracefully without crashing dashboard', async () => {
+  const { doc, elements } = createMockDom();
+  const viewer = createMockViewer();
+
+  const controller = new PelagosPanelController({ viewer, document: doc });
+  await controller.init();
+
+  elements.get('pelagos-origin-select').value = 'USSEA';
+  elements.get('pelagos-dest-select').value = 'JPYOK';
+
+  const origFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => {
+      throw new Error('503 Service Unavailable');
+    };
+
+    const success = await controller.matchSuitableVessels();
+    assert.equal(success, false);
+
+    assert.equal(elements.get('pelagos-suitability-tag').textContent, 'ERROR');
+    assert.equal(elements.get('pelagos-suitability-empty').style.display, 'block');
+    assert.match(
+      elements.get('pelagos-suitability-empty').textContent,
+      /503 Service Unavailable/i,
+    );
+  } finally {
+    globalThis.fetch = origFetch;
+    controller.destroy();
+  }
+});
+
+

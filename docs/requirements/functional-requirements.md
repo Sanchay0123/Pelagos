@@ -3,9 +3,9 @@ title: Pelagos Functional Requirements Specification
 document_id: REQ-FR-001
 type: requirements
 status: drafting
-version: 1.0.5
+version: 1.0.6
 created: 2026-10-12
-updated: 2026-10-14
+updated: 2026-10-24
 tags:
   - requirements
   - functional-requirements
@@ -182,15 +182,17 @@ Every requirement item adheres to the following structure:
 #### REQ-FR-FRF-001: Route-Conditioned Freight Rate Prediction
 * **Maturity:** Confirmed
 * **Priority:** High
-* **Statement:** The system SHALL calculate route-conditioned freight rate forecasts for specified commercial port pairs and vessel classes over configurable forward forecast horizons (with 7, 15, 30, and 60 days designated as proposed evaluation horizons). Predictive validity and prediction interval calibration SHALL be evaluated against genuine held-out historical observation periods (e.g., chronological out-of-sample split, rolling walk-forward evaluation) and benchmarked against standard baselines (e.g., historical moving average, persistence, and forward freight agreement curves) with verifiable data provenance. The system SHALL NOT claim forecast accuracy or predictive reliability prior to empirical measurement.
-* **Rationale:** Commercial charterers require forward-looking rate estimates to decide whether to fix voyages immediately or wait for favorable market movements. Unmeasured or synthetic accuracy claims create catastrophic financial exposure.
+* **Statement:** The system SHALL calculate route-conditioned freight rate forecasts for specified commercial port pairs and vessel classes over configurable forward forecast horizons. For freight-rate datasets sampled at monthly cadence, the system SHALL define forecast targets using discrete calendar-month horizons of T+1, T+3, and T+6 as candidate evaluation horizons. The system SHALL NOT represent these candidate horizons as validated or production-available forecasts unless the applicable data-sufficiency and model-validation requirements are satisfied. Daily forecast horizons SHALL remain outside the monthly-data scope. Daily forecasting may be considered under a separate requirements change when suitable genuine daily observations are available and the corresponding forecasting approach can be evaluated. Predictive validity and prediction interval calibration SHALL be evaluated against genuine held-out historical observation periods (e.g., chronological rolling walk-forward evaluation) independently for each horizon and benchmarked against standard baselines (e.g., persistence, moving average, and linear trend) with verifiable data provenance. The system SHALL NOT claim forecast accuracy or predictive reliability prior to empirical measurement.
+* **Rationale:** Commercial charterers require forward-looking rate estimates to decide whether to fix voyages immediately or wait for favorable market movements. Unmeasured or synthetic accuracy claims create catastrophic financial exposure. Temporal resolution of forecasts must strictly reflect the underlying observation cadence without synthetic daily fabrication.
 * **Acceptance Criteria:**
   1. Forecast outputs include predicted baseline rate (USD/tonne or USD/day), upper and lower confidence intervals, and key influencing driver factors.
   2. Predictions are conditioned on specific route characteristics and historical fixture evidence rather than an unconditioned global average.
   3. Model evaluation reports document out-of-sample error metrics (e.g., MAE, MAPE, RMSE) compared against defined baseline models on genuine held-out historical test windows.
-  4. Forward horizons (7, 15, 30, 60 days) are treated as proposed evaluation horizons; predictive validity and interval coverage must be evaluated independently for each horizon before operational use.
+  4. Candidate monthly horizons (T+1, T+3, T+6) are treated as intended evaluation horizons; predictive validity and interval coverage must be evaluated independently for each horizon on genuine observations before operational use.
+  5. The specification explicitly distinguishes observation period, data availability time, forecast execution time, forecast origin, and target period without temporal conflation.
+  6. Daily forecasting from monthly observation series is strictly prohibited; daily predictions shall not be synthesized or fabricated.
 * **Verification Method:** Analysis & Test
-* **Traceability:** Upstream: [PROJECT_OVERVIEW.md Section 1, 5](../PROJECT_OVERVIEW.md); Downstream: `ARCH-001` (Forecasting Engine), `ML-001`.
+* **Traceability:** Upstream: [PROJECT_OVERVIEW.md Section 1, 5](../PROJECT_OVERVIEW.md); Downstream: `ARCH-001` (Forecasting Engine), `ML-001`, `ROUT-006`.
 
 #### REQ-FR-FRF-002: Four-State Forecast Availability Lifecycle and Evaluation Gates
 * **Maturity:** Confirmed
@@ -506,3 +508,4 @@ Every requirement item adheres to the following structure:
 | 1.0.3 | 2026-10-14 | Project Agent | D2 final closure corrections: Updated REQ-FR-OMR-001 to remove universal constant canal limits and require dynamic evaluation against authoritative passage rules (vessel class, restriction conditions, provenance, effective date, freshness) with explicit unsupported or insufficient-data outcomes when unverified; updated verification procedure. Kept status drafting. |
 | 1.0.4 | 2026-10-14 | Project Agent | D2 final closure refinement: Governed forecasting evaluation thresholds in REQ-FR-FRF-002, distinguishing confirmed architectural requirements (four-state lifecycle, out-of-sample evaluation, baseline comparisons, interval calibration, automated drift demotion) from provisional proposed evaluation parameters (12-month data readiness, 90-day held-out test window, baseline performance margin, 80% p10–p90 interval coverage, and 1.25x rolling drift multiplier); updated OQ-FR-05, OQ-FR-06, and added OQ-FR-07. Kept status drafting. |
 | 1.0.5 | 2026-10-14 | Project Agent | Final D2 consistency pass: Reconciled REQ-FR-FRF-002 baseline comparison requirement by marking statistical significance tests, criteria, and margins as provisional parameters tracked in OQ-FR-05; consistently classified both 80% and 95% prediction interval coverage targets as provisional calibration targets in REQ-FR-FRF-002, REQ-FR-FRF-004, and OQ-FR-05; aligned drift threshold reference wording with OQ-FR-06. Kept status drafting. |
+| 1.0.6 | 2026-10-24 | Project Agent | Reconciled REQ-FR-FRF-001 forecasting horizons to candidate calendar-month horizons (T+1, T+3, T+6) following formal approval of OD-ROUT-06-01. Quarantined daily horizons outside monthly data scope, established explicit temporal semantics, and preserved REQ-FR-FRF-002 evaluation gates. Status: drafting. |

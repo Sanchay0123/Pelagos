@@ -995,3 +995,291 @@
   margin-top: 10px;
   font-size: 10px;
 }
+
+/* ── Voyage Freight Calculator Card (OPT-001) ── */
+.pelagos-cost-input-group {
+  margin-bottom: 10px;
+}
+
+.cost-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cost-input-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-secondary, #94a3b8);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.cost-input-wrap {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.cost-input-wrap input[type='number'] {
+  flex: 1;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.cost-input-wrap input[type='number']:focus {
+  border-color: var(--accent, #00d4ff);
+}
+
+.btn-calculate-cost {
+  background: rgba(0, 212, 255, 0.15);
+  border: 1px solid rgba(0, 212, 255, 0.4);
+  color: var(--accent, #00d4ff);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.btn-calculate-cost:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 0.25);
+  border-color: rgba(0, 212, 255, 0.6);
+  color: #ffffff;
+}
+
+.btn-calculate-cost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cost-display .currency-symbol {
+  color: #38bdf8;
+}
+
+.cost-formula-subtitle {
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-secondary, #94a3b8);
+  margin-top: -4px;
+  margin-bottom: 8px;
+}
+
+.meta-val-warning {
+  color: #fbbf24 !important;
+  font-size: 10px;
+}
+
+.cost-disclaimer-callout {
+  background: rgba(0, 212, 255, 0.06);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+/* ── Candidate Vessel Suitability Matching (OPT-002) ─────────────────── */
+.suitability-context-desc {
+  font-size: 11px;
+  color: var(--text-secondary, #94a3b8);
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.pelagos-suitability-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.suitability-metric-box {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.suitability-metric-k {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--text-secondary, #94a3b8);
+  letter-spacing: 0.4px;
+}
+
+.suitability-metric-v {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #f1f5f9;
+}
+
+.suitability-metric-v.highlight {
+  color: #38bdf8;
+}
+
+.pelagos-suitability-list-container {
+  max-height: 280px;
+  overflow-y: auto;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.4);
+  margin-bottom: 8px;
+}
+
+.pelagos-suitability-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.pelagos-candidate-item {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pelagos-candidate-item:last-child {
+  border-bottom: none;
+}
+
+.pelagos-candidate-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pelagos-candidate-item.is-selected {
+  background: rgba(0, 212, 255, 0.1);
+  border-left: 2px solid var(--accent, #00d4ff);
+}
+
+.candidate-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.candidate-name-group {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.candidate-name {
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.candidate-id-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.candidate-metrics-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #cbd5e1;
+}
+
+.candidate-distance {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.candidate-reason-box {
+  font-size: 10px;
+  color: #94a3b8;
+  line-height: 1.35;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px 6px;
+  border-radius: 4px;
+  border-left: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+.candidate-reason-box.suitable {
+  border-left-color: #22c55e;
+  color: #cbd5e1;
+}
+
+.pelagos-historical-banner {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin-bottom: 10px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #fbbf24;
+}
+
+.candidate-distance.distance-historical {
+  color: #fbbf24;
+  opacity: 0.9;
+}
+
+.candidate-meta-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.candidate-sub-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.candidate-sub-pill.capacity-unverified {
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.candidate-sub-pill.laycan-unconfirmed {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.candidate-laycan-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 600;
+  color: #fbbf24;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.suitability-disclaimer-callout {
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+

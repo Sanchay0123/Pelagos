@@ -277,7 +277,126 @@
             </div>
           </div>
 
-          <!-- 4. Freight Forecast Card -->
+          <!-- 4. Voyage Freight Estimate Card (D10 / OPT-001) -->
+          <div class="pelagos-card" id="pelagos-cost-card">
+            <div class="card-header">
+              <span class="card-title">VOYAGE FREIGHT ESTIMATE</span>
+              <span id="pelagos-cost-status-tag" class="pelagos-tag tag-model">CALCULATOR</span>
+            </div>
+            <div class="card-body">
+              <div class="pelagos-cost-input-group">
+                <div class="cost-input-row">
+                  <label for="pelagos-cargo-tonnes" class="cost-input-label">Cargo Tonnage (MT):</label>
+                  <div class="cost-input-wrap">
+                    <input
+                      type="number"
+                      id="pelagos-cargo-tonnes"
+                      class="pelagos-filter-input"
+                      min="1"
+                      step="500"
+                      value="52000"
+                      placeholder="e.g. 52000 MT"
+                    />
+                    <button type="button" id="pelagos-calculate-cost-btn" class="pelagos-btn btn-calculate-cost">
+                      <span class="btn-text">CALCULATE VOYAGE COST</span>
+                    </button>
+                  </div>
+                </div>
+                <div id="pelagos-cost-validation-msg" class="pelagos-validation-msg" style="display: none;"></div>
+              </div>
+
+              <div id="pelagos-cost-content" style="display: none;">
+                <div class="rate-display cost-display">
+                  <span class="currency-symbol">$</span>
+                  <span id="pelagos-cost-val" class="rate-large">—</span>
+                  <span id="pelagos-cost-currency" class="rate-unit">USD</span>
+                </div>
+                <div class="cost-formula-subtitle" id="pelagos-cost-formula">
+                  Gross Ocean Freight (Cargo Tonnes × Rate/MT)
+                </div>
+
+                <div class="pelagos-meta-list">
+                  <div class="meta-row">
+                    <span class="meta-key">Applicable Rate:</span>
+                    <span id="pelagos-cost-rate" class="meta-val">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Billed Cargo:</span>
+                    <span id="pelagos-cost-cargo" class="meta-val">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Rate Date & Source:</span>
+                    <span id="pelagos-cost-source" class="meta-val">—</span>
+                  </div>
+                  <div class="meta-row" id="pelagos-cost-dist-row">
+                    <span class="meta-key">Route Distance (Unverified):</span>
+                    <span id="pelagos-cost-distance" class="meta-val">—</span>
+                  </div>
+                  <div class="meta-row" id="pelagos-cost-dist-prov-row">
+                    <span class="meta-key">Distance Provenance:</span>
+                    <span id="pelagos-cost-distance-provenance" class="meta-val meta-val-warning">Prototype Benchmark (Unverified for navigation)</span>
+                  </div>
+                </div>
+
+                <div class="pelagos-disclaimer-callout cost-disclaimer-callout">
+                  ℹ <strong>Gross Freight Estimate:</strong> Reflects cargo tonnes × verified market benchmark rate. Excludes canal tolls, demurrage/despatch, port tariffs, insurance, and bunker fuel surcharges (BAF). Not a certified charter contract or spot fixture quote.
+                </div>
+              </div>
+
+              <div id="pelagos-cost-empty" class="pelagos-empty-state" style="display: none;">
+                Voyage freight calculation is unavailable for this unmonitored trade lane.
+              </div>
+            </div>
+          </div>
+
+          <!-- 4.5 Candidate Vessel Suitability Card (OPT-002) -->
+          <div class="pelagos-card" id="pelagos-suitability-card">
+            <div class="card-header">
+              <span class="card-title">CANDIDATE VESSEL SUITABILITY</span>
+              <span class="pelagos-tag tag-unmonitored" id="pelagos-suitability-tag">AWAITING ROUTE</span>
+            </div>
+            <div class="card-body">
+              <div class="suitability-context-desc" id="pelagos-suitability-context">
+                Select a freight corridor and cargo tonnage to evaluate physical vessel suitability.
+              </div>
+
+              <!-- Historical Telemetry Boundary Notice -->
+              <div class="pelagos-historical-banner" id="pelagos-suitability-historical-banner">
+                ℹ <strong>Historical Dataset Notice:</strong> Positions reflect historical AIS telemetry (January 1, 2024 sample). Stale observations demonstrate dimensional candidate screening only and do <em>not</em> represent current fleet positions or proximity to loading ports.
+              </div>
+
+              <!-- Suitability Metrics Grid -->
+              <div class="pelagos-suitability-metrics-grid" id="pelagos-suitability-metrics" style="display: none;">
+                <div class="suitability-metric-box">
+                  <span class="suitability-metric-k">TOTAL EVALUATED</span>
+                  <span class="suitability-metric-v" id="pelagos-suitability-total-count">0</span>
+                </div>
+                <div class="suitability-metric-box">
+                  <span class="suitability-metric-k">POTENTIALLY SUITABLE</span>
+                  <span class="suitability-metric-v highlight" id="pelagos-suitability-matched-count">0</span>
+                </div>
+                <div class="suitability-metric-box">
+                  <span class="suitability-metric-k">INSUFFICIENT / MISMATCH</span>
+                  <span class="suitability-metric-v" id="pelagos-suitability-incompatible-count">0</span>
+                </div>
+              </div>
+
+              <!-- Suitability Candidates List Container -->
+              <div class="pelagos-suitability-list-container" id="pelagos-suitability-list-container" style="display: none;">
+                <div class="pelagos-suitability-list" id="pelagos-suitability-list"></div>
+              </div>
+              <div class="pelagos-empty-state" id="pelagos-suitability-empty">
+                Calculate a corridor route above to match candidate vessels.
+              </div>
+
+              <!-- Scope & Laycan Feasibility Notice -->
+              <div class="pelagos-disclaimer-callout suitability-disclaimer-callout">
+                ℹ <strong>Commercial Scope:</strong> Evaluated strictly on physical criteria (reported AIS dimensions and vessel type). <em>Laycan arrival feasibility and open-tonnage availability are UNCONFIRMED</em> without commercial fixture lists.
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Freight Forecast Card -->
           <div class="pelagos-card" id="pelagos-forecast-card">
             <div class="card-header">
               <span class="card-title">FREIGHT FORECAST</span>
