@@ -1,6 +1,9 @@
 """Command line interface for Pelagos ingestion, coverage, and status audit."""
 
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import json
 import argparse
 import uuid
@@ -578,6 +581,197 @@ def handle_freight_forecast_baseline(args):
         db.close()
 
 
+def handle_ports_ingest(args):
+    """Ingest ports and aliases into canonical database tables."""
+    from pathlib import Path
+    from pelagos.ingestion.ports_ingest import ingest_ports_from_fixture
+
+    db = get_db_session(args.db_url)
+    try:
+        fixture_p = Path(args.fixture) if getattr(args, "fixture", None) else None
+        res = ingest_ports_from_fixture(db, fixture_path=fixture_p)
+        print(json.dumps(res, indent=2))
+        return 0 if res["status"] in ("completed", "partial") else 1
+    except Exception as e:
+        print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
+def handle_vessels_sync(args):
+    """Sync canonical Vessel registry entities from AIS positions."""
+    from pelagos.ingestion.vessel_registry import sync_vessels_from_positions
+
+    db = get_db_session(args.db_url)
+    try:
+        res = sync_vessels_from_positions(db)
+        print(json.dumps(res, indent=2))
+        return 0 if res["status"] in ("completed", "partial") else 1
+    except Exception as e:
+        print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
+def handle_trade_ingest(args):
+    """Ingest bilateral trade observations from official trade fixtures."""
+    from pathlib import Path
+    from pelagos.ingestion.trade_ingest import ingest_trade_observations
+
+    db = get_db_session(args.db_url)
+    try:
+        fixture_p = Path(args.fixture) if getattr(args, "fixture", None) else None
+        res = ingest_trade_observations(db, fixture_path=fixture_p)
+        print(json.dumps(res, indent=2))
+        return 0 if res["status"] in ("completed", "partial") else 1
+    except Exception as e:
+        print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
+def handle_env_ingest(args):
+    """Ingest oceanographic and marine meteorological buoy observations."""
+    from pathlib import Path
+    from pelagos.ingestion.environmental_ingest import ingest_environmental_observations
+
+    db = get_db_session(args.db_url)
+    try:
+        fixture_p = Path(args.fixture) if getattr(args, "fixture", None) else None
+        res = ingest_environmental_observations(db, fixture_path=fixture_p)
+        print(json.dumps(res, indent=2))
+        return 0 if res["status"] in ("completed", "partial") else 1
+    except Exception as e:
+        print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
+def handle_coverage_summary(args):
+    """Generate and display multi-source maritime data fusion coverage report."""
+    from pelagos.api.routes.coverage import get_coverage_summary
+
+    db = get_db_session(args.db_url)
+    try:
+        summary = get_coverage_summary(db)
+        print(json.dumps(summary, indent=2))
+        return 0
+    except Exception as e:
+        print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
+def handle_environmental_refresh(args):
+    """Acquire live buoy observations from NOAA NDBC or fallback to verified fixture."""
+    from pelagos.ingestion.acquisition.noaa_ndbc import refresh_environmental_observations
+
+    db = get_db_session(args.db_url)
+    try:
+        stations = [s.strip() for s in args.stations.split(",")] if getattr(args, "stations", None) else None
+        res = refresh_environmental_observations(
+            db=db,
+            station_ids=stations,
+            max_per_station=getattr(args, "max_observations", 12),
+            offline=getattr(args, "offline", False),
+        )
+        print(json.dumps(res, indent=2))
+        return 0 if res["status"] in ("completed", "partial") else 1
+    except Exception as e:
+        print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
+def handle_trade_refresh(args):
+    """Refresh bilateral trade observations with credential and source status audit."""
+    from pelagos.ingestion.acquisition.trade_adapter import refresh_trade_observations
+
+    db = get_db_session(args.db_url)
+    try:
+        res = refresh_trade_observations(
+            db=db,
+            api_key=getattr(args, "api_key", None),
+            offline=getattr(args, "offline", False),
+        )
+        print(json.dumps(res, indent=2))
+        return 0 if res["status"] in ("completed", "partial") else 1
+    except Exception as e:
+        print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
+def handle_ports_refresh(args):
+    """Reconcile canonical port directory and aliases without destructive deletion."""
+    from pathlib import Path
+    from pelagos.ingestion.acquisition.ports_adapter import refresh_ports_directory
+
+    db = get_db_session(args.db_url)
+    try:
+        fixture_p = Path(args.fixture) if getattr(args, "fixture", None) else None
+        res = refresh_ports_directory(
+            db=db,
+            fixture_path=fixture_p,
+            offline=getattr(args, "offline", False),
+        )
+        print(json.dumps(res, indent=2))
+        return 0 if res["status"] in ("completed", "partial") else 1
+    except Exception as e:
+        print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
+def handle_vessels_refresh(args):
+    """Synchronize canonical vessel registry and static specs from verified AIS positions."""
+    from pelagos.ingestion.acquisition.vessels_adapter import refresh_vessels_registry
+
+    db = get_db_session(args.db_url)
+    try:
+        res = refresh_vessels_registry(
+            db=db,
+            offline=getattr(args, "offline", False),
+        )
+        print(json.dumps(res, indent=2))
+        return 0 if res["status"] in ("completed", "partial") else 1
+    except Exception as e:
+        print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
+def handle_sources_refresh(args):
+    """Run combined multi-source automated acquisition and reconciliation."""
+    from pelagos.ingestion.acquisition.coordinator import run_sources_refresh
+
+    db = get_db_session(args.db_url)
+    try:
+        sources = [s.strip() for s in args.sources.split(",")] if getattr(args, "sources", None) else None
+        res = run_sources_refresh(
+            db=db,
+            sources=sources,
+            offline=getattr(args, "offline", False),
+            max_observations=getattr(args, "max_observations", 12),
+        )
+        print(json.dumps(res, indent=2))
+        return 0 if res["overall_status"] in ("completed", "partial_success") else 1
+    except Exception as e:
+        print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -784,6 +978,91 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional database connection URL override."
     )
 
+    # Ports Ingest
+    parser_ports = subparsers.add_parser(
+        "ports-ingest",
+        help="Ingest verified international and Indian ports directory into canonical tables."
+    )
+    parser_ports.add_argument("--fixture", default=None, help="Path to ports JSON fixture.")
+    parser_ports.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
+    # Vessels Sync
+    parser_vessels = subparsers.add_parser(
+        "vessels-sync",
+        help="Consolidate and synchronize canonical Vessel entities from AIS positions."
+    )
+    parser_vessels.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
+    # Trade Ingest
+    parser_trade = subparsers.add_parser(
+        "trade-ingest",
+        help="Ingest bilateral maritime commodity trade observations."
+    )
+    parser_trade.add_argument("--fixture", default=None, help="Path to trade flows JSON fixture.")
+    parser_trade.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
+    # Environmental Ingest
+    parser_env = subparsers.add_parser(
+        "env-ingest",
+        help="Ingest oceanographic and marine meteorological buoy observations."
+    )
+    parser_env.add_argument("--fixture", default=None, help="Path to environmental observations JSON fixture.")
+    parser_env.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
+    # Multi-Source Coverage Summary
+    parser_cov_sum = subparsers.add_parser(
+        "coverage-summary",
+        help="Display comprehensive multi-source data fusion coverage report."
+    )
+    parser_cov_sum.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
+    # Stage B Refresh Commands
+    # Environmental Refresh
+    parser_env_ref = subparsers.add_parser(
+        "environmental-refresh",
+        help="Acquire live NOAA NDBC buoy observations or fallback to verified fixture."
+    )
+    parser_env_ref.add_argument("--stations", default=None, help="Comma-separated NDBC station IDs (e.g. 46041,42001).")
+    parser_env_ref.add_argument("--max-observations", type=int, default=12, help="Max observations per station to ingest.")
+    parser_env_ref.add_argument("--offline", action="store_true", help="Operate in offline mode using verified fixtures.")
+    parser_env_ref.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
+    # Trade Refresh
+    parser_trade_ref = subparsers.add_parser(
+        "trade-refresh",
+        help="Refresh bilateral trade observations with credential and source status audit."
+    )
+    parser_trade_ref.add_argument("--api-key", default=None, help="Optional USDA FAS OpenData API key.")
+    parser_trade_ref.add_argument("--offline", action="store_true", help="Operate in offline mode using verified fixtures.")
+    parser_trade_ref.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
+    # Ports Refresh
+    parser_ports_ref = subparsers.add_parser(
+        "ports-refresh",
+        help="Reconcile canonical port directory and aliases without destructive deletion."
+    )
+    parser_ports_ref.add_argument("--fixture", default=None, help="Path to ports JSON fixture.")
+    parser_ports_ref.add_argument("--offline", action="store_true", help="Operate in offline mode.")
+    parser_ports_ref.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
+    # Vessels Refresh
+    parser_vessels_ref = subparsers.add_parser(
+        "vessels-refresh",
+        help="Synchronize canonical vessel registry and static specs from verified AIS positions."
+    )
+    parser_vessels_ref.add_argument("--offline", action="store_true", help="Operate in offline mode.")
+    parser_vessels_ref.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
+    # Combined Sources Refresh
+    parser_sources_ref = subparsers.add_parser(
+        "sources-refresh",
+        help="Run combined multi-source automated acquisition and reconciliation."
+    )
+    parser_sources_ref.add_argument("--sources", default=None, help="Comma-separated sources to refresh (environmental,trade,ports,vessels).")
+    parser_sources_ref.add_argument("--max-observations", type=int, default=12, help="Max observations per station/feed.")
+    parser_sources_ref.add_argument("--offline", action="store_true", help="Operate in offline mode.")
+    parser_sources_ref.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
     return parser
 
 
@@ -821,6 +1100,26 @@ def main():
         sys.exit(handle_freight_index(args))
     elif args.command == "freight-forecast-baseline":
         sys.exit(handle_freight_forecast_baseline(args))
+    elif args.command == "ports-ingest":
+        sys.exit(handle_ports_ingest(args))
+    elif args.command == "vessels-sync":
+        sys.exit(handle_vessels_sync(args))
+    elif args.command == "trade-ingest":
+        sys.exit(handle_trade_ingest(args))
+    elif args.command == "env-ingest":
+        sys.exit(handle_env_ingest(args))
+    elif args.command == "coverage-summary":
+        sys.exit(handle_coverage_summary(args))
+    elif args.command == "environmental-refresh":
+        sys.exit(handle_environmental_refresh(args))
+    elif args.command == "trade-refresh":
+        sys.exit(handle_trade_refresh(args))
+    elif args.command == "ports-refresh":
+        sys.exit(handle_ports_refresh(args))
+    elif args.command == "vessels-refresh":
+        sys.exit(handle_vessels_refresh(args))
+    elif args.command == "sources-refresh":
+        sys.exit(handle_sources_refresh(args))
     else:
         parser.print_help()
         sys.exit(1)
@@ -828,3 +1127,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -28,11 +28,14 @@ from pelagos.forecasting.schemas import (
     STATUS_FORECAST_GENERATED,
     STATUS_INSUFFICIENT_HISTORY,
     FLAG_TREND_NEGATIVE_CLAMP,
+    FLAG_EXPERIMENTAL_MODEL,
+    EXPERIMENTAL_MODEL_WARNING,
 )
 from pelagos.forecasting.baselines import (
     predict_persistence,
     predict_rolling_ma,
     predict_linear_trend,
+    predict_ridge_ar,
     predict_baseline,
     generate_baseline_forecast,
 )
@@ -399,3 +402,116 @@ def test_forecasting_service_duckdb_parquet(test_forecasting_db):
     assert fc["target_date"] == "2026-10-01"
     # Latest 3 PNW rates in fixture: Jul (35.95), Aug (36.75), Sep (37.31) -> mean = 36.67
     assert fc["predicted_value"] == 36.67
+
+
+def test_ridge_ar_fitted_parameters_and_exact_prediction():
+    """
+    Verifies that Ridge AR-1 dynamically fits parameters from historical training data
+    without hardcoding, and projects exact iterative predictions.
+    """
+    history_a = [20.0, 22.0, 24.2, 26.62]  # Steady ~10% upward growth
+    pred_a, flags_a, params_a = predict_ridge_ar(history_a, alpha=1.0, horizon=1)
+    assert flags_a == [FLAG_EXPERIMENTAL_MODEL]
+    assert params_a["n_training_pairs"] == 3
+    assert params_a["l2_alpha"] == 1.0
+    assert params_a["phi_1"] > 0.9  # Autoregressive persistence captured
+    assert pred_a > history_a[-1]  # Projected upward continuation
+
+    # Altering the training series must alter the fitted parameters (not hardcoded)
+    history_b = [30.0, 25.0, 20.0, 15.0]  # Downward slope
+    pred_b, _, params_b = predict_ridge_ar(history_b, alpha=1.0, horizon=1)
+    assert params_b["phi_1"] != params_a["phi_1"]
+    assert params_b["intercept"] != params_a["intercept"]
+    assert pred_b < history_b[-1]
+
+    # Multi-step projection h=3
+    pred_a_h3, _, _ = predict_ridge_ar(history_a, alpha=1.0, horizon=3)
+    assert pred_a_h3 > pred_a  # Multi-step iterated forward compounding
+
+
+def test_ridge_ar_insufficient_history_and_invalid_inputs():
+    """Verifies that Ridge AR-1 strictly enforces minimum training pairs (N >= 3)."""
+    # 1. Less than 3 observations raises ValueError
+    with pytest.raises(ValueError, match="requires at least 3 historical observations"):
+        predict_ridge_ar([35.0, 36.0], horizon=1)
+
+    with pytest.raises(ValueError, match="requires at least 3 historical observations"):
+        predict_ridge_ar([35.0], horizon=1)
+
+    # 2. Non-positive observations rejected
+    with pytest.raises(ValueError, match="must be strictly positive"):
+        predict_ridge_ar([35.0, -5.0, 30.0], horizon=1)
+
+    # 3. Horizon < 1 rejected
+    with pytest.raises(ValueError, match="must be >= 1"):
+        predict_ridge_ar([20.0, 25.0, 30.0], horizon=0)
+
+    # 4. generate_baseline_forecast reports insufficient_history honestly
+    res = generate_baseline_forecast(
+        route_code="PNW-JPN-BULK",
+        origin_date=date(2024, 11, 1),
+        target_date=date(2024, 12, 1),
+        history=[30.05, 29.25],  # N=2
+        model_type="ridge_ar",
+        horizon_months=1,
+    )
+    assert res.status == STATUS_INSUFFICIENT_HISTORY
+    assert res.predicted_value is None
+    assert res.is_experimental is True
+    assert res.model_family == "experimental_trained"
+    assert "requires at least 3" in res.notes
+
+
+def test_ridge_ar_negative_boundary_clamping():
+    """Verifies that steep dropping rates clamp to 0.10 USD/MT with physical boundary flags."""
+    collapsing = [50.0, 30.0, 10.0, 2.0]
+    pred_clamped, flags, _ = predict_ridge_ar(collapsing, alpha=0.1, horizon=2)
+    assert pred_clamped == 0.10
+    assert FLAG_EXPERIMENTAL_MODEL in flags
+    assert FLAG_TREND_NEGATIVE_CLAMP in flags
+
+
+def test_ridge_ar_walk_forward_evaluation(test_forecasting_db):
+    """
+    Verifies that Ridge AR-1 is evaluated out-of-sample in chronological walk-forward
+    with zero lookahead and produces empirical metrics comparing against persistence.
+    """
+    session, _, tmp_path = test_forecasting_db
+    res = evaluate_route_baseline_models(
+        db=session,
+        route_code="PNW-JPN-BULK",
+        burn_in_months=12,
+        storage_dir=tmp_path / "empty",
+    )
+    models = res["models"]
+    assert "ridge_ar" in models
+    r_ar = models["ridge_ar"]
+    assert r_ar["model_type"] == "ridge_ar"
+    assert r_ar["evaluation_steps_count"] == 12
+    # PNW Ridge AR-1 metrics
+    assert r_ar["mae"] == 1.11
+    assert r_ar["rmse"] == 1.49
+    assert r_ar["mape"] == 3.35
+    assert r_ar["relative_mae_vs_persistence"] == 0.99
+
+
+def test_forecasting_service_ridge_ar_experimental_metadata(test_forecasting_db):
+    """Verifies that service returns training_data_cutoff, is_experimental, and warnings for ridge_ar."""
+    session, _, tmp_path = test_forecasting_db
+    fc = forecast_next_route_rate(
+        db=session,
+        route_code="USG-JPN-BULK",
+        model_type="ridge_ar",
+        storage_dir=tmp_path / "empty",
+    )
+    assert fc["model_type"] == "ridge_ar"
+    assert fc["is_experimental"] is True
+    assert fc["model_family"] == "experimental_trained"
+    assert fc["training_data_cutoff"] == "2026-09-01"
+    assert fc["origin_date"] == "2026-09-01"
+    assert fc["target_date"] == "2026-10-01"
+    assert fc["predicted_value"] == 78.0604
+    assert fc["fitted_parameters"]["n_training_pairs"] == 23
+    assert fc["fitted_parameters"]["l2_alpha"] == 1.0
+    assert "Experimental trained candidate" in fc["notes"]
+

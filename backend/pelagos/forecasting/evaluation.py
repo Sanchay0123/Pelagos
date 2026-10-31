@@ -147,6 +147,7 @@ def evaluate_route_baselines(
         BaselineModelType.ROLLING_MA_3.value,
         BaselineModelType.ROLLING_MA_6.value,
         BaselineModelType.LINEAR_TREND_6.value,
+        BaselineModelType.RIDGE_AR.value,
     ]
 
     summaries: Dict[str, ModelEvaluationSummary] = {}

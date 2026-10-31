@@ -422,3 +422,73 @@ def test_endpoints_are_strictly_read_only(forecasting_api_db, client):
         for p in storage_dir.rglob("*.parquet")
     }
     assert parquet_files_after == parquet_files_before
+
+
+def test_forecast_ridge_ar_experimental_endpoint(client):
+    """
+    Verifies /freight/forecast with model_type=ridge_ar returns experimental trained candidate
+    with training cutoff, fitted parameters, and disclaimer warnings.
+    """
+    res = client.get("/api/v1/freight/forecast?route_code=USG-JPN-BULK&model_type=ridge_ar")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["route_code"] == "USG-JPN-BULK"
+    assert data["model_type"] == "ridge_ar"
+    assert data["model_family"] == "experimental_trained"
+    assert data["is_experimental"] is True
+    assert data["training_data_cutoff"] == "2026-09-01"
+    assert data["origin_date"] == "2026-09-01"
+    assert data["target_date"] == "2026-10-01"
+    assert data["predicted_value"] == 78.0604
+    assert "flag_experimental_model" in data["flags"]
+    assert "Experimental trained candidate" in data["notes"]
+    assert data["fitted_parameters"]["n_training_pairs"] == 23
+
+
+def test_forecast_ridge_ar_multi_horizon(client):
+    """Verifies Ridge AR-1 supports multi-step discrete horizons (T+3, T+6) with iterated projection."""
+    res_h3 = client.get("/api/v1/freight/forecast?route_code=PNW-JPN-BULK&model_type=ridge_ar&horizon_months=3")
+    assert res_h3.status_code == 200
+    d_h3 = res_h3.json()
+    assert d_h3["horizon_months"] == 3
+    assert d_h3["origin_date"] == "2026-09-01"
+    assert d_h3["target_date"] == "2026-12-01"
+    assert d_h3["training_data_cutoff"] == "2026-09-01"
+    assert isinstance(d_h3["predicted_value"], float)
+
+    res_h6 = client.get("/api/v1/freight/forecast?route_code=PNW-JPN-BULK&model_type=ridge_ar&horizon_months=6")
+    assert res_h6.status_code == 200
+    d_h6 = res_h6.json()
+    assert d_h6["horizon_months"] == 6
+    assert d_h6["target_date"] == "2027-03-01"
+    assert d_h6["training_data_cutoff"] == "2026-09-01"
+
+
+def test_forecast_ridge_ar_insufficient_history(client):
+    """Verifies that ridge_ar returns insufficient_history when origin has < 3 observations."""
+    res = client.get("/api/v1/freight/forecast?route_code=USG-JPN-BULK&origin_date=2024-11-01&model_type=ridge_ar")
+    assert res.status_code == 200
+    d = res.json()
+    assert d["status"] == "insufficient_history"
+    assert d["predicted_value"] is None
+    assert d["history_count_observed"] == 2
+    assert d["is_experimental"] is True
+    assert "requires at least 3" in d["notes"]
+
+
+def test_route_intelligence_preserves_persistence_default(client):
+    """
+    Verifies that /route-intelligence endpoint strictly preserves persistence
+    as its default baseline forecast model.
+    """
+    res = client.get("/api/v1/freight/route-intelligence?origin=USSEA&destination=JPYOK")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "monitored"
+    fc = data["baseline_forecast"]
+    assert fc is not None
+    assert fc["model_type"] == "persistence"
+    assert fc["predicted_value"] == 37.31
+    assert fc["is_experimental"] is False
+    assert fc["model_family"] == "deterministic_baseline"
+

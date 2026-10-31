@@ -255,7 +255,7 @@ class LatestObservationInfo(BaseModel):
 
 
 class BaselineForecastInfo(BaseModel):
-    """Deterministic baseline forecast for the next horizon."""
+    """Point forecast result for the next horizon."""
 
     model_config = {"protected_namespaces": ()}
 
@@ -267,7 +267,12 @@ class BaselineForecastInfo(BaseModel):
     unit: str = "USD/MT"
     status: str
     flags: List[str] = Field(default_factory=list)
+    training_data_cutoff: Optional[str] = None
+    is_experimental: bool = False
+    model_family: str = "deterministic_baseline"
+    fitted_parameters: Optional[Dict[str, float]] = None
     notes: Optional[str] = None
+    warning: Optional[str] = None
 
 
 class VesselAvailabilityInfo(BaseModel):
@@ -456,7 +461,12 @@ def _build_route_intelligence(
             unit=fc_dict.get("unit_of_measure", "USD/MT"),
             status=fc_dict.get("status", "forecast_generated"),
             flags=fc_dict.get("flags", []),
+            training_data_cutoff=str(fc_dict.get("training_data_cutoff")) if fc_dict.get("training_data_cutoff") else None,
+            is_experimental=bool(fc_dict.get("is_experimental", False)),
+            model_family=fc_dict.get("model_family", "deterministic_baseline"),
+            fitted_parameters=fc_dict.get("fitted_parameters"),
             notes=fc_dict.get("notes"),
+            warning=fc_dict.get("notes") if fc_dict.get("is_experimental") else None,
         )
     except Exception as exc:
         logger.warning("Could not generate forecast for corridor '%s': %s", corridor_code, exc)

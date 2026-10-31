@@ -26,14 +26,18 @@ from pelagos.forecasting.schemas import (
     RouteEvaluationReport,
     SUPPORTED_DIRECT_ROUTES,
     DISALLOWED_DERIVED_ROUTES,
+    EXPERIMENTAL_MODELS,
     STATUS_FORECAST_GENERATED,
     STATUS_INSUFFICIENT_HISTORY,
     FLAG_TREND_NEGATIVE_CLAMP,
+    FLAG_EXPERIMENTAL_MODEL,
+    EXPERIMENTAL_MODEL_WARNING,
 )
 from pelagos.forecasting.baselines import (
     predict_persistence,
     predict_rolling_ma,
     predict_linear_trend,
+    predict_ridge_ar,
     predict_baseline,
     generate_baseline_forecast,
 )
@@ -73,13 +77,17 @@ __all__ = [
     "RouteEvaluationReport",
     "SUPPORTED_DIRECT_ROUTES",
     "DISALLOWED_DERIVED_ROUTES",
+    "EXPERIMENTAL_MODELS",
     "STATUS_FORECAST_GENERATED",
     "STATUS_INSUFFICIENT_HISTORY",
     "FLAG_TREND_NEGATIVE_CLAMP",
+    "FLAG_EXPERIMENTAL_MODEL",
+    "EXPERIMENTAL_MODEL_WARNING",
     # Forecasting Baselines
     "predict_persistence",
     "predict_rolling_ma",
     "predict_linear_trend",
+    "predict_ridge_ar",
     "predict_baseline",
     "generate_baseline_forecast",
     # Evaluation

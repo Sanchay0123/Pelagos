@@ -84,6 +84,8 @@ class PortRecord(BaseModel):
     license: str
     access_limitations: str
     nearest_graph_node: Optional[str] = None
+    port_region: Optional[str] = None
+    subdivision: Optional[str] = None
 
 
 class PortSnappingDetail(BaseModel):

@@ -97,6 +97,27 @@ def ensure_schema_compatibility(target_engine=None):
             cols = {c["name"] for c in inspector.get_columns("freight_publications")}
             if "snapshot_watermark_id" not in cols:
                 conn.execute(text("ALTER TABLE freight_publications ADD COLUMN snapshot_watermark_id INTEGER"))
+
+        if "ports" not in table_names:
+            import pelagos.models
+            pelagos.models.Port.__table__.create(conn)
+
+        if "port_aliases" not in table_names:
+            import pelagos.models
+            pelagos.models.PortAlias.__table__.create(conn)
+
+        if "vessels" not in table_names:
+            import pelagos.models
+            pelagos.models.Vessel.__table__.create(conn)
+
+        if "trade_observations" not in table_names:
+            import pelagos.models
+            pelagos.models.TradeObservation.__table__.create(conn)
+
+        if "environmental_observations" not in table_names:
+            import pelagos.models
+            pelagos.models.EnvironmentalObservation.__table__.create(conn)
+
         conn.commit()
 
 

@@ -69,8 +69,8 @@ def calculate_route(
 def list_ports(
     engine: MaritimeRoutingEngine = Depends(get_routing_engine),
 ) -> List[PortRecord]:
-    """Return all traceable ports registered in the hydrographic fixture."""
-    return engine.port_repo.list_ports()
+    """Return all traceable ports registered in the canonical registry."""
+    return engine.port_repo.list_ports(include_canonical=True)
 
 
 @router.get("/health")

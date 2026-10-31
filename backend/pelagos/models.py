@@ -222,3 +222,151 @@ class FreightPublication(Base):
     published_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
 
+class Port(Base):
+    """
+    Authoritative maritime port directory entity.
+    Traces to REQ-FR-CRI-012, OD-ROUT-06-03, and DATA-001 Section 5.2.
+    """
+    __tablename__ = "ports"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    unlocode = Column(String(5), unique=True, index=True, nullable=False)
+    port_id = Column(String(32), unique=True, index=True, nullable=False)
+    source_id = Column(String(128), nullable=False)
+    name = Column(String(128), index=True, nullable=False)
+    country = Column(String(64), index=True, nullable=False)
+    country_code = Column(String(2), index=True, nullable=False)
+    subdivision = Column(String(8), nullable=True)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    crs = Column(String(16), nullable=False, default="EPSG:4326")
+    coordinate_type = Column(String(64), nullable=False, default="port_point")
+    port_region = Column(String(64), index=True, nullable=True)
+    is_monitored_corridor_eligible = Column(Boolean, nullable=False, default=False)
+    source_url = Column(String(256), nullable=True)
+    provenance = Column(Text, nullable=True)
+    license = Column(String(128), nullable=False, default="Public Domain / Open Data")
+    access_limitations = Column(Text, nullable=True)
+    nearest_graph_node = Column(String(64), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    __table_args__ = (
+        Index("idx_ports_lat_lon", "latitude", "longitude"),
+        Index("idx_ports_region", "port_region"),
+    )
+
+
+class PortAlias(Base):
+    """
+    Alternative naming, terminal designations, and local identifiers for ports.
+    Facilitates deterministic entity resolution and search disambiguation.
+    """
+    __tablename__ = "port_aliases"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    port_unlocode = Column(String(5), ForeignKey("ports.unlocode", ondelete="CASCADE"), index=True, nullable=False)
+    alias_name = Column(String(128), index=True, nullable=False)
+    alias_type = Column(String(32), nullable=False, default="alternative_name")  # historical_name | local_name | terminal_name | alternative_name | code_alias
+    source_name = Column(String(128), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint("port_unlocode", "alias_name", name="uq_port_alias_unlocode_name"),
+    )
+
+
+class Vessel(Base):
+    """
+    Canonical maritime vessel registry and static characteristics entity.
+    Traces to REQ-FR-DII-002 and REQ-FR-OMR-002.
+    """
+    __tablename__ = "vessels"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    mmsi = Column(String(32), unique=True, index=True, nullable=False)
+    imo = Column(String(32), index=True, nullable=True)
+    vessel_name = Column(String(128), index=True, nullable=False)
+    vessel_type = Column(String(64), nullable=False)
+    vessel_type_code = Column(Integer, nullable=True)
+    vessel_class = Column(String(64), nullable=True)  # Panamax | Supramax | Handymax | Capesize
+    dwt_tonnage = Column(Float, nullable=True)
+    gross_tonnage = Column(Float, nullable=True)
+    length_meters = Column(Float, nullable=True)
+    width_meters = Column(Float, nullable=True)
+    draft_max_meters = Column(Float, nullable=True)
+    built_year = Column(Integer, nullable=True)
+    flag_country = Column(String(64), nullable=True)
+    flag_code = Column(String(8), nullable=True)
+    source_name = Column(String(128), nullable=False)
+    commercial_status = Column(String(32), nullable=False, default="unknown")  # active | laid_up | unknown
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+
+class TradeObservation(Base):
+    """
+    Point-in-time bilateral maritime trade volume and value observation.
+    Traces to official foreign trade statistics (USDA FAS GATS, UN Comtrade, Indian DGCI&S).
+    """
+    __tablename__ = "trade_observations"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    reporter_country = Column(String(64), index=True, nullable=False)
+    reporter_iso2 = Column(String(2), index=True, nullable=False)
+    partner_country = Column(String(64), index=True, nullable=False)
+    partner_iso2 = Column(String(2), index=True, nullable=False)
+    commodity_code = Column(String(32), index=True, nullable=False)  # HS 6-digit code or commodity group
+    commodity_name = Column(String(128), nullable=False)
+    trade_flow = Column(String(32), nullable=False)  # Export | Import
+    period_date = Column(Date, index=True, nullable=False)
+    period_type = Column(String(16), nullable=False, default="monthly")
+    volume_metric_tons = Column(Float, nullable=True)
+    trade_value_usd = Column(Float, nullable=True)
+    unit_price_usd_per_mt = Column(Float, nullable=True)
+    source_name = Column(String(128), nullable=False)
+    license_type = Column(String(64), nullable=False, default="Public Domain / Open Government Data")
+    idempotency_key = Column(String(256), unique=True, index=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_trade_obs_idempotency_key"),
+        Index("idx_trade_obs_reporter_partner", "reporter_iso2", "partner_iso2", "commodity_code"),
+        Index("idx_trade_obs_period", "period_date"),
+    )
+
+
+class EnvironmentalObservation(Base):
+    """
+    Auditable oceanographic buoy and marine meteorological observation.
+    Traces to NOAA NDBC, INCOIS, and official hydro-oceanographic buoy networks.
+    """
+    __tablename__ = "environmental_observations"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    station_id = Column(String(32), index=True, nullable=False)
+    station_name = Column(String(128), nullable=False)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    sea_area = Column(String(64), index=True, nullable=False)
+    observation_time = Column(DateTime(timezone=True), index=True, nullable=False)
+    wave_height_meters = Column(Float, nullable=True)
+    wave_period_seconds = Column(Float, nullable=True)
+    wind_speed_knots = Column(Float, nullable=True)
+    wind_direction_degrees = Column(Float, nullable=True)
+    sea_surface_temp_c = Column(Float, nullable=True)
+    air_pressure_hpa = Column(Float, nullable=True)
+    source_name = Column(String(128), nullable=False)
+    license_type = Column(String(64), nullable=False, default="Public Domain / Open Government Data")
+    quality_status = Column(String(32), nullable=False, default="verified")  # verified | provisional | flagged
+    idempotency_key = Column(String(256), unique=True, index=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_env_obs_idempotency_key"),
+        Index("idx_env_obs_station_time", "station_id", "observation_time"),
+        Index("idx_env_obs_sea_area", "sea_area"),
+    )
+
+
+

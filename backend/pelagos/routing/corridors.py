@@ -35,6 +35,7 @@ class CorridorStatus(str, Enum):
 # Authoritative mapping of known ports in the Pelagos fixture to commercial trade regions.
 # Traces to REQ-FR-DII-005, REQ-FR-FRF-001, and DATA-001 Section 5.2.
 PORT_REGION_MAP: Dict[str, str] = {
+    # Baseline fixture ports
     "USSEA": "US Pacific Northwest",
     "USMSY": "US Gulf Coast",
     "JPYOK": "Japan",
@@ -43,6 +44,46 @@ PORT_REGION_MAP: Dict[str, str] = {
     "PAPAC": "Central America",
     "EGPSD": "Mediterranean",
     "CASP_TEST": "Caspian Sea",
+    # Regional Pacific Northwest Grain Loading Ports (OD-ROUT-06-03 / REQ-FR-CRI-012)
+    "USTAC": "US Pacific Northwest",
+    "USPDX": "US Pacific Northwest",
+    "USKAL": "US Pacific Northwest",
+    "USVAN": "US Pacific Northwest",
+    "USLWW": "US Pacific Northwest",
+    # Regional US Gulf Grain Export Terminals (OD-ROUT-06-03 / REQ-FR-CRI-012)
+    "USBTR": "US Gulf Coast",
+    "USHOU": "US Gulf Coast",
+    "USGAL": "US Gulf Coast",
+    "USMOB": "US Gulf Coast",
+    "USSPT": "US Gulf Coast",
+    # Japan Discharging Bulk Terminals
+    "JPCHB": "Japan",
+    "JPNGO": "Japan",
+    "JPUKB": "Japan",
+    "JPOSA": "Japan",
+    "JPKWS": "Japan",
+    # International Gateways & Chokepoints
+    "PACRI": "Central America",
+    "EGSUE": "Red Sea",
+    "AEJEA": "Persian Gulf",
+    "CNSHA": "East Asia",
+    # Major Indian Ports (Official Port Trust / Sagarmala Directory)
+    "INBOM": "India",
+    "INNSA": "India",
+    "INIXY": "India",
+    "INMUN": "India",
+    "INMAA": "India",
+    "INCOK": "India",
+    "INVTZ": "India",
+    "INPRT": "India",
+    "INCCU": "India",
+    "INTUT": "India",
+    "INMRM": "India",
+    "INNML": "India",
+    "INENN": "India",
+    "INPAV": "India",
+    "INKAT": "India",
+    "INHAL": "India",
 }
 
 # Monitored freight corridor registry definitions matching database records
@@ -118,10 +159,13 @@ class CorridorResolution:
 def resolve_port_region(port: PortRecord) -> Optional[str]:
     """Resolve a PortRecord to its commercial trade region.
 
-    Uses explicit PORT_REGION_MAP lookup; does not fabricate or guess regions.
+    Uses explicit port_region attribute from canonical registry or PORT_REGION_MAP;
+    does not fabricate or guess regions (OD-ROUT-06-03).
     """
     if not port or not port.port_id:
         return None
+    if getattr(port, "port_region", None):
+        return port.port_region
     return PORT_REGION_MAP.get(port.port_id.upper().strip())
 
 

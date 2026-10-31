@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     cleanup_grace_seconds: int = int(os.getenv("PELAGOS_CLEANUP_GRACE_SECONDS", "1800"))
     cleanup_lock_ttl_seconds: int = int(os.getenv("PELAGOS_CLEANUP_LOCK_TTL", "120"))
     export_lease_ttl_seconds: int = int(os.getenv("PELAGOS_EXPORT_LEASE_TTL", "300"))
+    routing_mode: str = os.getenv("PELAGOS_ROUTING_MODE", "prototype")
 
     model_config = SettingsConfigDict(
         env_prefix="PELAGOS_",

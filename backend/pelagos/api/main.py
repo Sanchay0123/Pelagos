@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from pelagos.config import settings
 from pelagos.database import init_db, get_db
-from pelagos.api.routes import health, vessels, ingestion, analytics, freight, routing, calculator
+from pelagos.api.routes import health, vessels, ingestion, analytics, freight, routing, calculator, coverage
 
 
 @asynccontextmanager
@@ -44,6 +44,7 @@ app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(freight.router, prefix="/api/v1")
 app.include_router(routing.router, prefix="/api/v1")
 app.include_router(calculator.router, prefix="/api/v1")
+app.include_router(coverage.router, prefix="/api/v1")
 
 # Convenience root aliases
 app.include_router(health.router)
