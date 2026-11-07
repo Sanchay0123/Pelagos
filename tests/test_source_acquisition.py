@@ -59,7 +59,7 @@ from pelagos.cli import (
     handle_trade_refresh,
     handle_vessels_refresh,
 )
-from pelagos.database import Base
+from pelagos.database import Base, ensure_schema_compatibility
 from pelagos.ingestion.acquisition.client import (
     AcquisitionError,
     AcquisitionHTTPError,
@@ -85,6 +85,7 @@ from pelagos.models import (
     IngestionRun,
     Port,
     PortAlias,
+    QuarantinedRecord,
     TradeObservation,
     Vessel,
     VesselPosition,
@@ -336,6 +337,8 @@ def test_ndbc_mocked_live_ingestion_and_idempotency(test_db):
     assert obs.observation_time.day == 30
     assert obs.observation_time.hour == 16
     assert obs.observation_time.minute == 30
+    assert obs.retrieval_time_utc is not None
+    assert obs.observation_time != obs.retrieval_time_utc
     assert obs.idempotency_key == "NOAA:NDBC:46041:2026-10-30T16:30:00+00:00"
 
     # Second refresh: exactly identical feed -> 100% deduplicated
@@ -356,9 +359,9 @@ def test_ndbc_preservation_of_existing_data_on_failed_refresh(test_db):
     # 1. Seed with an existing observation
     initial_obs = EnvironmentalObservation(
         station_id="46041",
-        station_name="Cape Disappointment",
-        latitude=46.107,
-        longitude=-124.502,
+        station_name="Cape Elizabeth",
+        latitude=47.351,
+        longitude=-124.741,
         sea_area="North Pacific",
         observation_time=datetime.datetime(2026, 10, 30, 12, 0, tzinfo=datetime.timezone.utc),
         wind_speed_knots=15.0,
@@ -613,9 +616,9 @@ def test_coverage_api_freshness_classification(test_db):
     # 1. Historical observation (30 days ago)
     old_obs = EnvironmentalObservation(
         station_id="46041",
-        station_name="Cape Disappointment",
-        latitude=46.107,
-        longitude=-124.502,
+        station_name="Cape Elizabeth",
+        latitude=47.351,
+        longitude=-124.741,
         sea_area="North Pacific",
         observation_time=now_utc - datetime.timedelta(days=30),
         source_name="NOAA NDBC",
@@ -632,9 +635,9 @@ def test_coverage_api_freshness_classification(test_db):
     # 2. Current observation (2 hours ago)
     recent_obs = EnvironmentalObservation(
         station_id="46041",
-        station_name="Cape Disappointment",
-        latitude=46.107,
-        longitude=-124.502,
+        station_name="Cape Elizabeth",
+        latitude=47.351,
+        longitude=-124.741,
         sea_area="North Pacific",
         observation_time=now_utc - datetime.timedelta(hours=2),
         source_name="NOAA NDBC",
@@ -747,3 +750,839 @@ def test_cli_coverage_summary_includes_acquisition_matrix(tmp_path, capsys):
     out = json.loads(capsys.readouterr().out)
     assert "source_acquisition" in out
     assert out["source_acquisition"]["environmental_buoys"]["integration_status"] == "automated_working"
+
+
+# =============================================================================
+# 9. Stage B.1 Acquisition Hardening Regression Tests (F-01 to F-06)
+# =============================================================================
+
+# --- F-01: NOAA NDBC Partial-Failure Reporting ---
+
+def test_f01_noaa_all_stations_succeed(test_db):
+    """F-01: Ingestion run is marked 'completed' when all requested stations succeed."""
+    mock_client = MagicMock(spec=ResilientHttpClient)
+    ret_time = datetime.datetime.now(datetime.timezone.utc)
+    mock_resp = AcquisitionResponse(
+        url="https://ndbc.noaa.gov/46041.txt",
+        status_code=200,
+        text=SAMPLE_NDBC_VALID_TEXT,
+        content=SAMPLE_NDBC_VALID_TEXT.encode(),
+        retrieval_time_utc=ret_time,
+        duration_seconds=0.1,
+        headers={},
+    )
+    mock_client.get.return_value = mock_resp
+
+    res = refresh_environmental_observations(
+        db=test_db,
+        station_ids=["46041", "42001"],
+        client=mock_client,
+    )
+    assert res["status"] == "completed"
+    assert res["accepted_count"] == 6  # 3 per station
+    assert res["unparseable_count"] == 0
+
+    run = test_db.query(IngestionRun).order_by(IngestionRun.id.desc()).first()
+    assert run.status == "completed"
+    assert run.error_details is None
+
+
+def test_f01_noaa_one_station_succeeds_one_fails_is_partial(test_db):
+    """F-01: Ingestion run is marked 'partial' when one station succeeds and another fails."""
+    mock_client = MagicMock(spec=ResilientHttpClient)
+    ret_time = datetime.datetime.now(datetime.timezone.utc)
+    valid_resp = AcquisitionResponse(
+        url="https://ndbc.noaa.gov/46041.txt",
+        status_code=200,
+        text=SAMPLE_NDBC_VALID_TEXT,
+        content=SAMPLE_NDBC_VALID_TEXT.encode(),
+        retrieval_time_utc=ret_time,
+        duration_seconds=0.1,
+        headers={},
+    )
+
+    def mock_get(url, **kwargs):
+        if "46041" in url:
+            return valid_resp
+        raise AcquisitionHTTPError("HTTP 500 Internal Server Error", status_code=500, url=url)
+
+    mock_client.get.side_effect = mock_get
+
+    res = refresh_environmental_observations(
+        db=test_db,
+        station_ids=["46041", "42001"],
+        client=mock_client,
+    )
+    # Crucial F-01 requirement: Must be partial, NOT completed
+    assert res["status"] == "partial"
+    assert res["accepted_count"] == 3
+    assert res["station_results"]["46041"]["status"] == "success"
+    assert res["station_results"]["42001"]["status"] == "error"
+    assert "error_details" in res
+    assert "Station 42001" in res["error_details"]
+
+    run = test_db.query(IngestionRun).order_by(IngestionRun.id.desc()).first()
+    assert run.status == "partial"
+    assert "Station 42001" in run.error_details
+
+
+def test_f01_noaa_all_stations_fail_is_failed(test_db):
+    """F-01: Ingestion run is marked 'failed' when all requested stations encounter errors."""
+    mock_client = MagicMock(spec=ResilientHttpClient)
+    mock_client.get.side_effect = AcquisitionHTTPError("HTTP 503 Service Unavailable", status_code=503, url="https://ndbc.noaa.gov")
+
+    res = refresh_environmental_observations(
+        db=test_db,
+        station_ids=["46041", "42001"],
+        client=mock_client,
+    )
+    assert res["status"] == "failed"
+    assert res["accepted_count"] == 0
+    assert "error" in res
+
+    run = test_db.query(IngestionRun).order_by(IngestionRun.id.desc()).first()
+    assert run.status == "failed"
+    assert "Station 46041" in run.error_details
+    assert "Station 42001" in run.error_details
+
+
+def test_f01_noaa_unparseable_records_present_is_partial(test_db):
+    """F-01: Ingestion run is marked 'partial' when unparseable records are detected."""
+    mock_client = MagicMock(spec=ResilientHttpClient)
+    ret_time = datetime.datetime.now(datetime.timezone.utc)
+    mock_resp = AcquisitionResponse(
+        url="https://ndbc.noaa.gov/46041.txt",
+        status_code=200,
+        text=SAMPLE_NDBC_MALFORMED_TEXT,
+        content=SAMPLE_NDBC_MALFORMED_TEXT.encode(),
+        retrieval_time_utc=ret_time,
+        duration_seconds=0.1,
+        headers={},
+    )
+    mock_client.get.return_value = mock_resp
+
+    res = refresh_environmental_observations(
+        db=test_db,
+        station_ids=["46041"],
+        client=mock_client,
+    )
+    assert res["status"] == "partial"
+    assert res["accepted_count"] == 1
+    assert res["unparseable_count"] == 2
+
+    run = test_db.query(IngestionRun).order_by(IngestionRun.id.desc()).first()
+    assert run.status == "partial"
+    assert run.unparseable_count == 2
+
+
+# --- F-02: Coordinator-Owned Independent Transactions ---
+
+def test_f02_successful_source_transaction_commits_all_intended_records(tmp_path):
+    """F-02: Successful source transaction commits all intended records to database."""
+    from pelagos.database import init_db
+
+    db_path = tmp_path / "f02_success.db"
+    engine = create_engine(f"sqlite:///{db_path}")
+    init_db(engine)
+
+    Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = Session()
+
+    try:
+        res = run_sources_refresh(
+            db=session,
+            sources=["environmental"],
+            offline=True,
+        )
+        assert res["overall_status"] == "completed"
+        assert res["results"]["environmental"]["status"] == "completed"
+    finally:
+        session.close()
+
+    # Verify records were actually committed in database using an independent session
+    verify_session = Session()
+    try:
+        obs_count = verify_session.query(EnvironmentalObservation).count()
+        assert obs_count > 0, "Committed environmental observations must exist in database"
+        run_record = verify_session.query(IngestionRun).filter(
+            IngestionRun.source_name.like("%NOAA%")
+        ).first()
+        assert run_record is not None
+        assert run_record.status == "completed"
+    finally:
+        verify_session.close()
+
+
+def test_f02_failure_midway_rolls_back_partial_records(tmp_path):
+    """F-02: Failure midway through an adapter rolls back its partial records cleanly."""
+    from pelagos.database import init_db
+
+    db_path = tmp_path / "f02_midway_fail.db"
+    engine = create_engine(f"sqlite:///{db_path}")
+    init_db(engine)
+
+    Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = Session()
+
+    mock_client = MagicMock(spec=ResilientHttpClient)
+    ret_time = datetime.datetime.now(datetime.timezone.utc)
+    mock_resp = AcquisitionResponse(
+        url="https://ndbc.noaa.gov/46041.txt",
+        status_code=200,
+        text=SAMPLE_NDBC_VALID_TEXT,
+        content=SAMPLE_NDBC_VALID_TEXT.encode(),
+        retrieval_time_utc=ret_time,
+        duration_seconds=0.1,
+        headers={},
+    )
+    mock_client.get.return_value = mock_resp
+
+    with patch(
+        "pelagos.ingestion.acquisition.noaa_ndbc.parse_ndbc_realtime_text",
+        side_effect=RuntimeError("Simulated unhandled processing crash midway through source"),
+    ):
+        try:
+            res = run_sources_refresh(
+                db=session,
+                sources=["environmental"],
+                offline=False,
+                client=mock_client,
+            )
+            assert res["overall_status"] == "failed"
+            assert res["results"]["environmental"]["status"] == "failed"
+        finally:
+            session.close()
+
+    # In independent session, verify ZERO partial observations were committed
+    verify_session = Session()
+    try:
+        count = verify_session.query(EnvironmentalObservation).count()
+        assert count == 0, "Partial records must be rolled back completely upon failure"
+    finally:
+        verify_session.close()
+
+
+def test_f02_earlier_successful_source_remains_committed_after_later_source_fails(tmp_path):
+    """F-02: Earlier successful source remains committed after a later source fails."""
+    from pelagos.database import init_db
+
+    db_path = tmp_path / "f02_independent_isolation.db"
+    engine = create_engine(f"sqlite:///{db_path}")
+    init_db(engine)
+
+    Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = Session()
+
+    try:
+        with patch(
+            "pelagos.ingestion.acquisition.coordinator.refresh_trade_observations",
+            side_effect=RuntimeError("Fatal trade database constraint failure"),
+        ):
+            res = run_sources_refresh(
+                db=session,
+                sources=["environmental", "trade"],
+                offline=True,
+            )
+
+        assert res["overall_status"] == "partial_success"
+        assert res["results"]["environmental"]["status"] == "completed"
+        assert res["results"]["trade"]["status"] == "failed"
+    finally:
+        session.close()
+
+    # Independent session verifies environmental remained committed and trade has 0 records
+    verify_session = Session()
+    try:
+        env_count = verify_session.query(EnvironmentalObservation).count()
+        assert env_count > 0, "Earlier source must remain committed"
+        trade_count = verify_session.query(TradeObservation).count()
+        assert trade_count == 0, "Failed source must have zero records"
+    finally:
+        verify_session.close()
+
+
+def test_f02_adapter_cannot_commit_unrelated_pending_session_changes(test_db):
+    """F-02: Adapters do not commit, ensuring unrelated pending session changes are never committed."""
+    unrelated_vessel = VesselPosition(
+        mmsi="999888777",
+        vessel_name="PENDING UNCOMMITTED SHIP",
+        vessel_type="Commercial",
+        latitude=25.0,
+        longitude=-80.0,
+        observation_time=datetime.datetime.now(datetime.timezone.utc),
+        source_name="Manual Unrelated",
+        license_type="Public Domain",
+        idempotency_key="UNRELATED:PENDING:1",
+    )
+    test_db.add(unrelated_vessel)
+
+    # Calling adapter directly does NOT commit the pending session changes
+    refresh_trade_observations(db=test_db, offline=True)
+
+    # Calling rollback rolls back the unrelated vessel, proving the adapter never committed it
+    test_db.rollback()
+    vessel_in_db = test_db.query(VesselPosition).filter(VesselPosition.mmsi == "999888777").first()
+    assert vessel_in_db is None, "Adapter must not commit caller's pending session changes"
+
+
+def test_f02_failed_ingestion_run_audit_survives_rollback(tmp_path):
+    """F-02: Failed IngestionRun audit record survives source rollback."""
+    from pelagos.database import init_db
+
+    db_path = tmp_path / "f02_audit_survival.db"
+    engine = create_engine(f"sqlite:///{db_path}")
+    init_db(engine)
+
+    Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = Session()
+
+    try:
+        with patch(
+            "pelagos.ingestion.acquisition.coordinator.refresh_environmental_observations",
+            side_effect=RuntimeError("Catastrophic environmental ingestion failure"),
+        ):
+            res = run_sources_refresh(
+                db=session,
+                sources=["environmental"],
+                offline=True,
+            )
+
+        assert res["overall_status"] == "failed"
+        assert res["results"]["environmental"]["status"] == "failed"
+    finally:
+        session.close()
+
+    verify_session = Session()
+    try:
+        failed_run = verify_session.query(IngestionRun).filter(
+            IngestionRun.status == "failed",
+            IngestionRun.source_partition == "realtime_buoy_stream",
+        ).first()
+        assert failed_run is not None, "Failed audit record must survive source rollback"
+        assert "Catastrophic environmental ingestion failure" in (failed_run.error_details or "")
+        assert verify_session.query(EnvironmentalObservation).count() == 0
+    finally:
+        verify_session.close()
+
+
+def test_f02_audit_persistence_failure_does_not_corrupt_or_commit_unrelated_data(test_db):
+    """F-02: Audit persistence failure does not corrupt session or commit unrelated source data."""
+    unrelated_obs = TradeObservation(
+        reporter_country="United States",
+        reporter_iso2="US",
+        partner_country="Japan",
+        partner_iso2="JP",
+        commodity_code="100190",
+        commodity_name="Wheat",
+        trade_flow="Export",
+        period_date=datetime.date(2026, 1, 1),
+        source_name="Unrelated Source",
+        idempotency_key="UNRELATED:TRADE:TEST",
+    )
+    test_db.add(unrelated_obs)
+
+    with patch(
+        "pelagos.ingestion.acquisition.coordinator.refresh_environmental_observations",
+        side_effect=RuntimeError("Primary adapter error"),
+    ):
+        with patch(
+            "pelagos.ingestion.acquisition.coordinator._persist_failed_source_audit",
+            side_effect=RuntimeError("Secondary audit disk full crash"),
+        ):
+            res = run_sources_refresh(
+                db=test_db,
+                sources=["environmental"],
+                offline=True,
+            )
+
+    assert res["overall_status"] == "failed"
+    err = res["results"]["environmental"]["error"]
+    assert "Primary adapter error" in err
+    assert "Secondary audit disk full crash" in err or "audit persistence failure" in err
+
+    # Unrelated trade observation was not committed
+    test_db.rollback()
+    assert test_db.query(TradeObservation).filter(TradeObservation.idempotency_key == "UNRELATED:TRADE:TEST").first() is None
+
+
+def test_f02_session_remains_usable_after_rollback(test_db):
+    """F-02: SQLAlchemy session remains fully usable to query and persist after a source rollback."""
+    with patch(
+        "pelagos.ingestion.acquisition.coordinator.refresh_environmental_observations",
+        side_effect=RuntimeError("Simulated transient failure"),
+    ):
+        res = run_sources_refresh(
+            db=test_db,
+            sources=["environmental"],
+            offline=True,
+        )
+    assert res["overall_status"] == "failed"
+
+    # Session must be immediately usable for subsequent queries and operations
+    new_port = Port(
+        unlocode="USXYZ",
+        port_id="USXYZ",
+        source_id="USXYZ (Test)",
+        name="Test Port After Rollback",
+        country="United States",
+        country_code="US",
+        latitude=30.0,
+        longitude=-90.0,
+        source_url="https://example.com",
+    )
+    test_db.add(new_port)
+    test_db.commit()
+
+    saved = test_db.query(Port).filter(Port.unlocode == "USXYZ").first()
+    assert saved is not None
+    assert saved.name == "Test Port After Rollback"
+
+
+def test_f02_overall_status_success_partial_and_total_failure(test_db):
+    """F-02: Coordinator accurately aggregates overall status for success, partial success, and failure."""
+    # 1. Total success
+    res_success = run_sources_refresh(
+        db=test_db,
+        sources=["ports", "vessels"],
+        offline=True,
+    )
+    assert res_success["overall_status"] == "completed"
+    assert len(res_success["failed_sources"]) == 0
+
+    # 2. Partial success
+    with patch(
+        "pelagos.ingestion.acquisition.coordinator.refresh_ports_directory",
+        side_effect=RuntimeError("Port authority offline"),
+    ):
+        res_partial = run_sources_refresh(
+            db=test_db,
+            sources=["ports", "vessels"],
+            offline=True,
+        )
+    assert res_partial["overall_status"] == "partial_success"
+    assert res_partial["failed_sources"] == ["ports"]
+
+    # 3. Total failure
+    with patch(
+        "pelagos.ingestion.acquisition.coordinator.refresh_ports_directory",
+        side_effect=RuntimeError("Port authority offline"),
+    ):
+        with patch(
+            "pelagos.ingestion.acquisition.coordinator.refresh_vessels_registry",
+            side_effect=RuntimeError("Vessel registry offline"),
+        ):
+            res_failed = run_sources_refresh(
+                db=test_db,
+                sources=["ports", "vessels"],
+                offline=True,
+            )
+    assert res_failed["overall_status"] == "failed"
+    assert set(res_failed["failed_sources"]) == {"ports", "vessels"}
+
+
+# --- F-03: Stable Trade Coverage Identification ---
+
+def test_f03_trade_coverage_queries_stable_partition_and_empty_db(test_db):
+    """F-03: Coverage summary accurately queries trade sync via partition or source name."""
+    # 1. Empty database behavior
+    summary_empty = get_coverage_summary(db=test_db)
+    trade_empty = summary_empty["source_acquisition"]["bilateral_trade"]
+    assert trade_empty["last_successful_sync"] is None
+    assert trade_empty["failed_refresh_attempts"] == 0
+
+    # 2. Add an IngestionRun with the actual source partition and USDA source name
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    success_run = IngestionRun(
+        run_type="remote",
+        source_name="USDA FAS GATS / Indian DGCI&S",
+        source_partition="trade_observations",
+        started_at=now_utc,
+        completed_at=now_utc,
+        status="completed",
+        accepted_count=13,
+    )
+    failed_run = IngestionRun(
+        run_type="remote",
+        source_name="USDA FAS GATS / Indian DGCI&S",
+        source_partition="trade_observations",
+        started_at=now_utc,
+        completed_at=now_utc,
+        status="failed",
+        error_details="HTTP 403 Forbidden",
+    )
+    test_db.add(success_run)
+    test_db.add(failed_run)
+    test_db.commit()
+
+    summary_populated = get_coverage_summary(db=test_db)
+    trade_pop = summary_populated["source_acquisition"]["bilateral_trade"]
+    assert trade_pop["last_successful_sync"] is not None
+    assert trade_pop["failed_refresh_attempts"] == 1
+
+
+# --- F-04: Persisted Retrieval Timestamps ---
+
+def test_f04_retrieval_timestamps_persisted_and_distinct(test_db):
+    """F-04: retrieval_time_utc is persisted and distinct from observation_time."""
+    mock_client = MagicMock(spec=ResilientHttpClient)
+    ret_time = datetime.datetime(2026, 10, 31, 14, 22, 10, tzinfo=datetime.timezone.utc)
+    mock_resp = AcquisitionResponse(
+        url="https://ndbc.noaa.gov/46041.txt",
+        status_code=200,
+        text=SAMPLE_NDBC_VALID_TEXT,
+        content=SAMPLE_NDBC_VALID_TEXT.encode(),
+        retrieval_time_utc=ret_time,
+        duration_seconds=0.1,
+        headers={},
+    )
+    mock_client.get.return_value = mock_resp
+
+    res = refresh_environmental_observations(
+        db=test_db,
+        station_ids=["46041"],
+        client=mock_client,
+    )
+    assert res["status"] == "completed"
+
+    obs = test_db.query(EnvironmentalObservation).filter(EnvironmentalObservation.station_id == "46041").first()
+    assert obs is not None
+    assert obs.retrieval_time_utc is not None
+    assert obs.retrieval_time_utc.year == 2026
+    assert obs.retrieval_time_utc.month == 10
+    assert obs.retrieval_time_utc.day == 31
+    assert obs.retrieval_time_utc.hour == 14
+    # Observation time is from payload (2026-10-30 16:30)
+    assert obs.observation_time != obs.retrieval_time_utc
+
+    # Offline fixture must have NULL retrieval timestamp (do not invent history)
+    res_off = refresh_environmental_observations(db=test_db, offline=True)
+    assert res_off["status"] == "completed"
+    fixture_obs = (
+        test_db.query(EnvironmentalObservation)
+        .filter(EnvironmentalObservation.observation_time < datetime.datetime(2025, 1, 1))
+        .first()
+    )
+    assert fixture_obs is not None
+    assert fixture_obs.retrieval_time_utc is None
+
+
+def test_f04_schema_compatibility_additive_column(tmp_path):
+    """F-04: ensure_schema_compatibility safely adds retrieval_time_utc to existing database."""
+    from sqlalchemy import text
+    db_file = tmp_path / "legacy_env.db"
+    legacy_engine = create_engine(f"sqlite:///{db_file}")
+
+    # Create legacy table without retrieval_time_utc
+    with legacy_engine.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE environmental_observations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                station_id VARCHAR(32) NOT NULL,
+                station_name VARCHAR(128) NOT NULL,
+                latitude FLOAT NOT NULL,
+                longitude FLOAT NOT NULL,
+                sea_area VARCHAR(64) NOT NULL,
+                observation_time DATETIME NOT NULL,
+                wave_height_meters FLOAT,
+                wave_period_seconds FLOAT,
+                wind_speed_knots FLOAT,
+                wind_direction_degrees FLOAT,
+                sea_surface_temp_c FLOAT,
+                air_pressure_hpa FLOAT,
+                source_name VARCHAR(128) NOT NULL,
+                license_type VARCHAR(64) NOT NULL,
+                quality_status VARCHAR(32) NOT NULL,
+                idempotency_key VARCHAR(256) UNIQUE NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+        """))
+        conn.execute(text("""
+            INSERT INTO environmental_observations (
+                station_id, station_name, latitude, longitude, sea_area, observation_time,
+                source_name, license_type, quality_status, idempotency_key, created_at
+            ) VALUES (
+                '46041', 'Cape Disappointment', 46.107, -124.502, 'North Pacific',
+                '2026-10-30 12:00:00', 'NOAA NDBC', 'Public Domain', 'verified',
+                'TEST:KEY:1', '2026-10-30 12:00:00'
+            )
+        """))
+        conn.commit()
+
+    # Run additive migration
+    ensure_schema_compatibility(legacy_engine)
+
+    # Verify column added and existing data intact
+    with legacy_engine.connect() as conn:
+        row = conn.execute(text("SELECT id, station_id, retrieval_time_utc FROM environmental_observations")).first()
+        assert row[0] == 1
+        assert row[1] == "46041"
+        assert row[2] is None  # Existing observation remains intact with null retrieval timestamp
+
+
+def test_f04_sqlite_migration_10_step_lifecycle(tmp_path):
+    """F-04: Rigorous 10-step verification of additive, idempotent retrieval_time_utc migration."""
+    from sqlalchemy import text
+    from pelagos.database import ensure_schema_compatibility, init_db
+
+    db_file = tmp_path / "legacy_migration_10step.db"
+    legacy_engine = create_engine(f"sqlite:///{db_file}")
+
+    # 1. Create a legacy schema without retrieval_time_utc
+    with legacy_engine.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE environmental_observations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                station_id VARCHAR(32) NOT NULL,
+                station_name VARCHAR(128) NOT NULL,
+                latitude FLOAT NOT NULL,
+                longitude FLOAT NOT NULL,
+                sea_area VARCHAR(64) NOT NULL,
+                observation_time DATETIME NOT NULL,
+                wave_height_meters FLOAT,
+                wave_period_seconds FLOAT,
+                wind_speed_knots FLOAT,
+                wind_direction_degrees FLOAT,
+                sea_surface_temp_c FLOAT,
+                air_pressure_hpa FLOAT,
+                source_name VARCHAR(128) NOT NULL,
+                license_type VARCHAR(64) NOT NULL,
+                quality_status VARCHAR(32) NOT NULL,
+                idempotency_key VARCHAR(256) UNIQUE NOT NULL,
+                created_at DATETIME NOT NULL
+            )
+        """))
+
+        # 2. Insert representative historical observations
+        conn.execute(text("""
+            INSERT INTO environmental_observations (
+                station_id, station_name, latitude, longitude, sea_area, observation_time,
+                wave_height_meters, source_name, license_type, quality_status, idempotency_key, created_at
+            ) VALUES
+            ('46041', 'Cape Disappointment', 46.107, -124.502, 'North Pacific', '2026-10-01 10:00:00', 2.5, 'NOAA NDBC', 'Public Domain', 'verified', 'HIST:1', '2026-10-01 10:00:00'),
+            ('42001', 'Mid Gulf', 25.897, -89.663, 'Gulf of Mexico', '2026-10-02 12:00:00', 1.8, 'NOAA NDBC', 'Public Domain', 'verified', 'HIST:2', '2026-10-02 12:00:00')
+        """))
+        conn.commit()
+
+    # 3. Run the migration
+    ensure_schema_compatibility(legacy_engine)
+
+    # 4. Verify the new column using PRAGMA table_info(environmental_observations)
+    with legacy_engine.connect() as conn:
+        table_info = conn.execute(text("PRAGMA table_info(environmental_observations)")).fetchall()
+        col_names = [row[1] for row in table_info]
+        assert "retrieval_time_utc" in col_names, "retrieval_time_utc column must be present in table info"
+
+        # 5. Verify existing records and row counts remain unchanged
+        rows = conn.execute(text("SELECT id, station_id, wave_height_meters, retrieval_time_utc FROM environmental_observations ORDER BY id")).fetchall()
+        assert len(rows) == 2, "Row count must remain exactly 2"
+        assert rows[0][1] == "46041"
+        assert rows[0][2] == 2.5
+        assert rows[1][1] == "42001"
+        assert rows[1][2] == 1.8
+
+        # 6. Verify historical retrieval timestamps are NULL
+        assert rows[0][3] is None, "Historical record 1 retrieval timestamp must be NULL"
+        assert rows[1][3] is None, "Historical record 2 retrieval timestamp must be NULL"
+
+    # 7. Run the migration a second time and verify idempotency
+    ensure_schema_compatibility(legacy_engine)
+    with legacy_engine.connect() as conn:
+        table_info_2 = conn.execute(text("PRAGMA table_info(environmental_observations)")).fetchall()
+        col_names_2 = [row[1] for row in table_info_2]
+        assert col_names_2.count("retrieval_time_utc") == 1
+        assert conn.execute(text("SELECT COUNT(*) FROM environmental_observations")).scalar() == 2
+
+    # 8. Insert a new observation with both timestamps
+    now_obs = datetime.datetime(2026, 11, 1, 14, 0, 0, tzinfo=datetime.timezone.utc)
+    now_ret = datetime.datetime(2026, 11, 1, 14, 2, 30, tzinfo=datetime.timezone.utc)
+    Session = sessionmaker(bind=legacy_engine)
+    with Session() as s:
+        new_obs = EnvironmentalObservation(
+            station_id="41009",
+            station_name="Canaveral",
+            latitude=28.508,
+            longitude=-80.185,
+            sea_area="Western North Atlantic",
+            observation_time=now_obs,
+            retrieval_time_utc=now_ret,
+            wave_height_meters=1.5,
+            source_name="NOAA NDBC",
+            license_type="Public Domain",
+            quality_status="verified",
+            idempotency_key="NEW:OBS:WITH:BOTH",
+        )
+        s.add(new_obs)
+        s.commit()
+
+    # 9. Verify both timestamps are persisted correctly
+    with Session() as s:
+        fetched = s.query(EnvironmentalObservation).filter(
+            EnvironmentalObservation.idempotency_key == "NEW:OBS:WITH:BOTH"
+        ).first()
+        assert fetched is not None
+        assert fetched.observation_time is not None
+        assert fetched.retrieval_time_utc is not None
+        assert fetched.observation_time != fetched.retrieval_time_utc
+        assert fetched.retrieval_time_utc.minute == 2
+
+    # 10. Verify a fresh database initializes successfully
+    fresh_db = tmp_path / "fresh_10step_db.db"
+    fresh_engine = create_engine(f"sqlite:///{fresh_db}")
+    init_db(fresh_engine)
+    with fresh_engine.connect() as conn:
+        fresh_info = conn.execute(text("PRAGMA table_info(environmental_observations)")).fetchall()
+        fresh_cols = [r[1] for r in fresh_info]
+        assert "retrieval_time_utc" in fresh_cols
+
+
+# --- F-05: HTTP 400 Fast-Fail ---
+
+def test_f05_http_400_fast_fail_no_retries():
+    """F-05: HTTP 400 Bad Request fast-fails immediately with exactly one request attempt."""
+    client = ResilientHttpClient(max_retries=3, backoff_factor=0.01)
+
+    mock_resp = MagicMock(spec=httpx.Response)
+    mock_resp.status_code = 400
+    mock_resp.text = "Bad Request: malformed station parameters"
+    mock_resp.url = "https://example.com/bad"
+
+    with patch("httpx.Client.get", return_value=mock_resp) as mock_get:
+        with pytest.raises(AcquisitionHTTPError) as exc_info:
+            client.get("https://example.com/bad")
+
+        assert exc_info.value.status_code == 400
+        # Exactly one request attempt must be made; no retry loop
+        assert mock_get.call_count == 1
+
+
+# --- F-06: Safe Station Metadata Handling ---
+
+def test_f06_unknown_ndbc_station_no_fabricated_zero_coordinates(test_db):
+    """F-06: Unknown NDBC stations never receive (0.0, 0.0) coordinates and are quarantined safely."""
+    ret_time = datetime.datetime.now(datetime.timezone.utc)
+    # Parse unverified station 99999
+    records, unparse, reasons = parse_ndbc_realtime_text(
+        text=SAMPLE_NDBC_VALID_TEXT,
+        station_id="99999",
+        retrieval_time_utc=ret_time,
+    )
+    assert len(records) == 3
+    # Coordinates must be None, NOT (0.0, 0.0)
+    for rec in records:
+        assert rec["latitude"] is None
+        assert rec["longitude"] is None
+        assert rec["latitude"] != 0.0
+        assert rec["longitude"] != 0.0
+
+    # Ingestion into database must quarantine unpositioned records rather than fabricating coordinates
+    mock_client = MagicMock(spec=ResilientHttpClient)
+    mock_resp = AcquisitionResponse(
+        url="https://ndbc.noaa.gov/99999.txt",
+        status_code=200,
+        text=SAMPLE_NDBC_VALID_TEXT,
+        content=SAMPLE_NDBC_VALID_TEXT.encode(),
+        retrieval_time_utc=ret_time,
+        duration_seconds=0.1,
+        headers={},
+    )
+    mock_client.get.return_value = mock_resp
+
+    res = refresh_environmental_observations(
+        db=test_db,
+        station_ids=["99999"],
+        client=mock_client,
+    )
+    assert res["status"] == "partial"
+    assert res["accepted_count"] == 0
+    assert res["quarantined_count"] == 3
+    assert res["station_results"]["99999"]["status"] == "quarantined"
+    assert "warning" in res["station_results"]["99999"]
+
+    # No environmental observations created with (0.0, 0.0)
+    zero_obs = test_db.query(EnvironmentalObservation).filter(
+        EnvironmentalObservation.station_id == "99999"
+    ).all()
+    assert len(zero_obs) == 0
+
+    # Records quarantined with proper reason
+    quarantined = test_db.query(QuarantinedRecord).filter(
+        QuarantinedRecord.error_code == "UNAVAILABLE_STATION_COORDINATES"
+    ).all()
+    assert len(quarantined) == 3
+
+
+def test_f06_known_ndbc_stations_work_correctly(test_db):
+    """F-06: Authoritative stations in KNOWN_NDBC_STATIONS retain verified coordinates."""
+    for st_id in ["46041", "42001", "46029", "41009", "44025"]:
+        assert st_id in KNOWN_NDBC_STATIONS
+        meta = KNOWN_NDBC_STATIONS[st_id]
+        assert meta["latitude"] is not None and meta["latitude"] != 0.0
+        assert meta["longitude"] is not None and meta["longitude"] != 0.0
+        assert meta["sea_area"] != "Unknown / Unresolved Coordinates"
+
+
+def test_f06_station_46041_verified_noaa_metadata():
+    """F-06 / Stage B.3: Station 46041 identity and coordinates match verified NOAA NDBC Cape Elizabeth metadata."""
+    assert "46041" in KNOWN_NDBC_STATIONS
+    meta = KNOWN_NDBC_STATIONS["46041"]
+
+    # Station name matches the verified NOAA identity
+    assert "Cape Elizabeth" in meta["station_name"]
+    assert "Aberdeen" in meta["station_name"]
+    assert "Disappointment" not in meta["station_name"]
+
+    # Coordinates match verified NOAA metadata within sensible tolerance (0.01 deg)
+    assert pytest.approx(meta["latitude"], abs=0.01) == 47.351
+    assert pytest.approx(meta["longitude"], abs=0.01) == -124.741
+
+    # Provenance source URL is explicit and traceable
+    assert "https://www.ndbc.noaa.gov/station_page.php?station=46041" in meta["provenance"]
+
+    # Parsing text with station 46041 applies the verified Cape Elizabeth metadata
+    records, unparseable, _ = parse_ndbc_realtime_text(
+        text=SAMPLE_NDBC_VALID_TEXT,
+        station_id="46041",
+        retrieval_time_utc=datetime.datetime.now(datetime.timezone.utc),
+    )
+    assert len(records) > 0
+    assert "Cape Elizabeth" in records[0]["station_name"]
+    assert pytest.approx(records[0]["latitude"], abs=0.01) == 47.351
+    assert pytest.approx(records[0]["longitude"], abs=0.01) == -124.741
+
+
+def test_f06_quarantined_observations_excluded_from_normal_environmental_queries(test_db):
+    """F-06: Quarantined unknown station observations are excluded from normal environmental queries."""
+    mock_client = MagicMock(spec=ResilientHttpClient)
+    ret_time = datetime.datetime.now(datetime.timezone.utc)
+    mock_resp = AcquisitionResponse(
+        url="https://ndbc.noaa.gov/UNKNOWN99.txt",
+        status_code=200,
+        text=SAMPLE_NDBC_VALID_TEXT,
+        content=SAMPLE_NDBC_VALID_TEXT.encode(),
+        retrieval_time_utc=ret_time,
+        duration_seconds=0.1,
+        headers={},
+    )
+    mock_client.get.return_value = mock_resp
+
+    res = refresh_environmental_observations(
+        db=test_db,
+        station_ids=["UNKNOWN99"],
+        client=mock_client,
+    )
+    assert res["status"] == "partial"
+    assert res["accepted_count"] == 0
+    assert res["quarantined_count"] == 3
+
+    # Normal environmental observations table must be completely empty
+    normal_obs = test_db.query(EnvironmentalObservation).all()
+    assert len(normal_obs) == 0, "Quarantined observations must NOT enter environmental_observations table"
+
+    # Quarantined table has the records, with original station ID preserved in raw_record_id and payload
+    quarantined = test_db.query(QuarantinedRecord).filter(
+        QuarantinedRecord.error_code == "UNAVAILABLE_STATION_COORDINATES"
+    ).all()
+    assert len(quarantined) == 3
+    for q in quarantined:
+        assert "UNKNOWN99" in q.raw_record_id
+        assert "UNKNOWN99" in q.raw_payload

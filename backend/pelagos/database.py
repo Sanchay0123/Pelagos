@@ -117,6 +117,10 @@ def ensure_schema_compatibility(target_engine=None):
         if "environmental_observations" not in table_names:
             import pelagos.models
             pelagos.models.EnvironmentalObservation.__table__.create(conn)
+        else:
+            cols = {c["name"] for c in inspector.get_columns("environmental_observations")}
+            if "retrieval_time_utc" not in cols:
+                conn.execute(text("ALTER TABLE environmental_observations ADD COLUMN retrieval_time_utc TIMESTAMP"))
 
         conn.commit()
 

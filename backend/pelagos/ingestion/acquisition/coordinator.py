@@ -28,6 +28,52 @@ logger = logging.getLogger(__name__)
 ALL_SOURCES = ["environmental", "trade", "ports", "vessels"]
 
 
+def _persist_failed_source_audit(
+    db: Session,
+    source_name: str,
+    source_partition: str,
+    error_message: str,
+    started_at: datetime.datetime,
+    run_type: str = "automated",
+) -> Optional[int]:
+    """Persist a failed IngestionRun in an isolated transaction.
+
+    Ensures the audit record survives source rollback without contaminating
+    or committing caller session state. If persistence fails, raises an
+    exception so coordinator can record it accurately without silent swallowing.
+    """
+    from pelagos.models import IngestionRun
+    from sqlalchemy.orm import sessionmaker
+
+    bind = db.get_bind()
+    AuditSession = sessionmaker(bind=bind, autocommit=False, autoflush=False)
+    audit_session = AuditSession()
+    try:
+        failed_run = IngestionRun(
+            run_type=run_type,
+            source_name=source_name,
+            source_partition=source_partition,
+            records_read=0,
+            accepted_count=0,
+            quarantined_count=0,
+            duplicate_count=0,
+            unparseable_count=0,
+            failed_count=1,
+            status="failed",
+            error_details=error_message,
+            started_at=started_at,
+            completed_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        audit_session.add(failed_run)
+        audit_session.commit()
+        return failed_run.id
+    except Exception as exc:
+        audit_session.rollback()
+        raise RuntimeError(f"Audit record persistence failed: {exc}") from exc
+    finally:
+        audit_session.close()
+
+
 def run_sources_refresh(
     db: Session,
     sources: Optional[List[str]] = None,
@@ -36,6 +82,13 @@ def run_sources_refresh(
     client: Optional[ResilientHttpClient] = None,
 ) -> Dict[str, Any]:
     """Execute multi-source data acquisition and reconciliation run.
+
+    Coordinator owns transaction boundaries:
+    - Begins independent transactions per source.
+    - Commits on source success; rolls back on source failure.
+    - Persists failed audit records in an isolated transaction so they survive rollback
+      without committing unrelated caller data.
+    - Aggregates overall status across all executed sources.
 
     Args:
         db: Active SQLAlchemy Session.
@@ -53,54 +106,109 @@ def run_sources_refresh(
 
     http_client = client or ResilientHttpClient()
 
+    def _execute_source(
+        source_key: str,
+        adapter_fn,
+        source_name: str,
+        source_partition: str,
+    ):
+        source_start = datetime.datetime.now(datetime.timezone.utc)
+        try:
+            res = adapter_fn()
+            if res.get("status") == "failed":
+                db.rollback()
+                err_msg = res.get("error") or res.get("error_details") or "Source adapter returned failed status"
+                audit_err = None
+                try:
+                    run_id = _persist_failed_source_audit(
+                        db=db,
+                        source_name=source_name,
+                        source_partition=source_partition,
+                        error_message=err_msg,
+                        started_at=source_start,
+                    )
+                    res["run_id"] = run_id
+                except Exception as a_exc:
+                    audit_err = str(a_exc)
+                    logger.error(f"Failed to persist failure audit record for {source_key}: {a_exc}")
+                if audit_err:
+                    res["error"] = f"{err_msg}; {audit_err}"
+                source_results[source_key] = res
+            else:
+                db.commit()
+                source_results[source_key] = res
+        except Exception as exc:
+            db.rollback()
+            err_msg = str(exc)
+            audit_err = None
+            try:
+                _persist_failed_source_audit(
+                    db=db,
+                    source_name=source_name,
+                    source_partition=source_partition,
+                    error_message=err_msg,
+                    started_at=source_start,
+                )
+            except Exception as a_exc:
+                audit_err = str(a_exc)
+                logger.error(f"Failed to persist failure audit record for {source_key}: {a_exc}")
+
+            final_err = f"{err_msg} (audit persistence failure: {audit_err})" if audit_err else err_msg
+            logger.error(f"{source_key.capitalize()} refresh failed: {final_err}")
+            source_results[source_key] = {"status": "failed", "error": final_err}
+
     # 1. Environmental
     if "environmental" in target_sources or "env" in target_sources:
-        try:
-            source_results["environmental"] = refresh_environmental_observations(
+        _execute_source(
+            source_key="environmental",
+            adapter_fn=lambda: refresh_environmental_observations(
                 db=db,
                 max_per_station=max_observations,
                 client=http_client,
                 offline=offline,
-            )
-        except Exception as exc:
-            logger.error(f"Environmental refresh failed: {exc}")
-            source_results["environmental"] = {"status": "failed", "error": str(exc)}
+            ),
+            source_name="NOAA National Data Buoy Center (NDBC)",
+            source_partition="realtime_buoy_stream",
+        )
 
     # 2. Trade
     if "trade" in target_sources:
-        try:
-            source_results["trade"] = refresh_trade_observations(
+        _execute_source(
+            source_key="trade",
+            adapter_fn=lambda: refresh_trade_observations(
                 db=db,
                 client=http_client,
                 offline=offline,
-            )
-        except Exception as exc:
-            logger.error(f"Trade refresh failed: {exc}")
-            source_results["trade"] = {"status": "failed", "error": str(exc)}
+            ),
+            source_name="USDA FAS GATS / Indian DGCI&S",
+            source_partition="trade_observations",
+        )
 
     # 3. Ports
     if "ports" in target_sources or "port" in target_sources:
-        try:
-            source_results["ports"] = refresh_ports_directory(
+        _execute_source(
+            source_key="ports",
+            adapter_fn=lambda: refresh_ports_directory(
                 db=db,
                 client=http_client,
                 offline=offline,
-            )
-        except Exception as exc:
-            logger.error(f"Ports refresh failed: {exc}")
-            source_results["ports"] = {"status": "failed", "error": str(exc)}
+            ),
+            source_name="UNECE UN/LOCODE / NGA WPI",
+            source_partition="genuine_ports_directory.json",
+        )
 
     # 4. Vessels
     if "vessels" in target_sources or "vessel" in target_sources:
-        try:
-            source_results["vessels"] = refresh_vessels_registry(
+        _execute_source(
+            source_key="vessels",
+            adapter_fn=lambda: refresh_vessels_registry(
                 db=db,
                 client=http_client,
                 offline=offline,
-            )
-        except Exception as exc:
-            logger.error(f"Vessels refresh failed: {exc}")
-            source_results["vessels"] = {"status": "failed", "error": str(exc)}
+            ),
+            source_name="NOAA MarineCadastre / USCG NAIS",
+            source_partition="vessel_positions",
+        )
 
     completed_time = datetime.datetime.now(datetime.timezone.utc)
     duration_sec = (completed_time - start_time).total_seconds()

@@ -140,7 +140,7 @@ class ResilientHttpClient:
                 logger.warning(f"Network error on {url} (attempt {attempt}/{self.max_retries}): {exc}")
             except AcquisitionHTTPError as exc:
                 last_exception = exc
-                if exc.status_code in (401, 403, 404):
+                if exc.status_code in (400, 401, 403, 404):
                     # Do not retry fatal client errors
                     raise
 

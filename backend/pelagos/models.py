@@ -350,6 +350,7 @@ class EnvironmentalObservation(Base):
     longitude = Column(Float, nullable=False)
     sea_area = Column(String(64), index=True, nullable=False)
     observation_time = Column(DateTime(timezone=True), index=True, nullable=False)
+    retrieval_time_utc = Column(DateTime(timezone=True), nullable=True)
     wave_height_meters = Column(Float, nullable=True)
     wave_period_seconds = Column(Float, nullable=True)
     wind_speed_knots = Column(Float, nullable=True)

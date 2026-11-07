@@ -67,10 +67,12 @@ def refresh_ports_directory(
             "error": f"Ports fixture not found at {fpath}",
         }
 
-    res = ingest_ports_from_fixture(db, fixture_path=fpath)
-
-    total_ports_count = db.query(Port).count()
-    total_aliases_count = db.query(PortAlias).count()
+    try:
+        res = ingest_ports_from_fixture(db, fixture_path=fpath, commit=False)
+        total_ports_count = db.query(Port).count()
+        total_aliases_count = db.query(PortAlias).count()
+    except Exception:
+        raise
 
     return {
         "status": res["status"],

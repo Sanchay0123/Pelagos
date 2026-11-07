@@ -59,6 +59,7 @@ def ingest_ports_from_fixture(
     db: Session,
     fixture_path: Optional[Path] = None,
     source_name: str = "UNECE UN/LOCODE / NGA WPI",
+    commit: bool = True,
 ) -> Dict[str, Any]:
     """Ingest ports and aliases idempotently into canonical relational tables.
 
@@ -186,7 +187,10 @@ def ingest_ports_from_fixture(
     ingestion_run.status = "completed" if quarantined_count == 0 else "partial"
     ingestion_run.completed_at = completed_time
 
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
 
     return {
         "run_id": ingestion_run.id,

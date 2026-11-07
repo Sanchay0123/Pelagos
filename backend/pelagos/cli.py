@@ -680,9 +680,14 @@ def handle_environmental_refresh(args):
             max_per_station=getattr(args, "max_observations", 12),
             offline=getattr(args, "offline", False),
         )
+        if res.get("status") in ("completed", "partial"):
+            db.commit()
+        else:
+            db.rollback()
         print(json.dumps(res, indent=2))
         return 0 if res["status"] in ("completed", "partial") else 1
     except Exception as e:
+        db.rollback()
         print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
         return 1
     finally:
@@ -700,9 +705,14 @@ def handle_trade_refresh(args):
             api_key=getattr(args, "api_key", None),
             offline=getattr(args, "offline", False),
         )
+        if res.get("status") in ("completed", "partial"):
+            db.commit()
+        else:
+            db.rollback()
         print(json.dumps(res, indent=2))
         return 0 if res["status"] in ("completed", "partial") else 1
     except Exception as e:
+        db.rollback()
         print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
         return 1
     finally:
@@ -722,9 +732,14 @@ def handle_ports_refresh(args):
             fixture_path=fixture_p,
             offline=getattr(args, "offline", False),
         )
+        if res.get("status") in ("completed", "partial"):
+            db.commit()
+        else:
+            db.rollback()
         print(json.dumps(res, indent=2))
         return 0 if res["status"] in ("completed", "partial") else 1
     except Exception as e:
+        db.rollback()
         print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
         return 1
     finally:
@@ -741,9 +756,14 @@ def handle_vessels_refresh(args):
             db=db,
             offline=getattr(args, "offline", False),
         )
+        if res.get("status") in ("completed", "partial"):
+            db.commit()
+        else:
+            db.rollback()
         print(json.dumps(res, indent=2))
         return 0 if res["status"] in ("completed", "partial") else 1
     except Exception as e:
+        db.rollback()
         print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
         return 1
     finally:

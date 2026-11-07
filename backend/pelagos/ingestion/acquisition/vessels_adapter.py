@@ -52,10 +52,12 @@ def refresh_vessels_registry(
         "Physical vessel suitability does NOT imply commercial spot charter availability."
     )
 
-    sync_res = sync_vessels_from_positions(db)
-
-    total_vessels_count = db.query(Vessel).count()
-    total_positions_count = db.query(VesselPosition).count()
+    try:
+        sync_res = sync_vessels_from_positions(db, commit=False)
+        total_vessels_count = db.query(Vessel).count()
+        total_positions_count = db.query(VesselPosition).count()
+    except Exception:
+        raise
 
     return {
         "status": sync_res["status"],

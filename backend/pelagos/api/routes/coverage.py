@@ -13,7 +13,7 @@ import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from pelagos.config import settings
@@ -183,7 +183,13 @@ def get_coverage_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
     last_trade_sync = (
         db.query(IngestionRun.completed_at)
         .filter(
-            IngestionRun.source_name.like("%Trade%"),
+            or_(
+                IngestionRun.source_partition == "trade_observations",
+                IngestionRun.source_name == "USDA FAS GATS / Indian DGCI&S",
+                IngestionRun.source_name.like("%USDA%"),
+                IngestionRun.source_name.like("%DGCI%"),
+                IngestionRun.source_name.like("%Trade%"),
+            ),
             IngestionRun.status.in_(["completed", "partial"]),
         )
         .order_by(IngestionRun.id.desc())
@@ -247,7 +253,16 @@ def get_coverage_summary(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 if trade_count > 0 and db.query(func.max(TradeObservation.period_date)).scalar() else None
             ),
             "last_successful_sync": last_trade_sync[0].isoformat() if last_trade_sync and last_trade_sync[0] else None,
-            "failed_refresh_attempts": db.query(IngestionRun).filter(IngestionRun.source_name.like("%Trade%"), IngestionRun.status == "failed").count(),
+            "failed_refresh_attempts": db.query(IngestionRun).filter(
+                or_(
+                    IngestionRun.source_partition == "trade_observations",
+                    IngestionRun.source_name == "USDA FAS GATS / Indian DGCI&S",
+                    IngestionRun.source_name.like("%USDA%"),
+                    IngestionRun.source_name.like("%DGCI%"),
+                    IngestionRun.source_name.like("%Trade%"),
+                ),
+                IngestionRun.status == "failed",
+            ).count(),
             "notes": "Automated retrieval requires USDA FAS OpenData API key (HTTP 403 without key); DGCI&S is published as periodic bulk portal downloads. Trade unit values reflect commodity pricing and are NOT freight rates.",
         },
         "ports_directory": {

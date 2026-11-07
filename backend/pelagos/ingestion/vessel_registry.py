@@ -48,6 +48,7 @@ def infer_vessel_class(
 def sync_vessels_from_positions(
     db: Session,
     source_name: str = "NOAA MarineCadastre / USCG NAIS",
+    commit: bool = True,
 ) -> Dict[str, Any]:
     """Populate canonical Vessel registry entities from existing vessel positions.
 
@@ -130,7 +131,10 @@ def sync_vessels_from_positions(
     ingestion_run.status = "completed"
     ingestion_run.completed_at = completed_time
 
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
 
     return {
         "run_id": ingestion_run.id,

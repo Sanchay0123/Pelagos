@@ -105,58 +105,61 @@ def refresh_trade_observations(
     duplicate_count = 0
 
     run_type = "remote" if source_status == "automated_working" else "bundled"
-    ingestion_run = IngestionRun(
-        run_type=run_type,
-        source_name="USDA FAS GATS / Indian DGCI&S",
-        source_partition="trade_observations",
-        records_read=records_read,
-        started_at=start_time,
-        status="running",
-    )
-    db.add(ingestion_run)
-    db.flush()
-
-    for item in observations:
-        period_dt = datetime.date.fromisoformat(item["period_date"])
-        idem_key = (
-            f"TRADE:{item['reporter_iso2']}:{item['partner_iso2']}:"
-            f"{item['commodity_code']}:{item['period_date']}:{item['trade_flow']}"
+    try:
+        ingestion_run = IngestionRun(
+            run_type=run_type,
+            source_name="USDA FAS GATS / Indian DGCI&S",
+            source_partition="trade_observations",
+            records_read=records_read,
+            started_at=start_time,
+            status="running",
         )
+        db.add(ingestion_run)
+        db.flush()
 
-        existing = db.query(TradeObservation).filter(
-            TradeObservation.idempotency_key == idem_key
-        ).first()
-
-        if existing:
-            duplicate_count += 1
-        else:
-            obs = TradeObservation(
-                reporter_country=item["reporter_country"],
-                reporter_iso2=item["reporter_iso2"],
-                partner_country=item["partner_country"],
-                partner_iso2=item["partner_iso2"],
-                commodity_code=item["commodity_code"],
-                commodity_name=item["commodity_name"],
-                trade_flow=item["trade_flow"],
-                period_date=period_dt,
-                period_type=item.get("period_type", "monthly"),
-                volume_metric_tons=item.get("volume_metric_tons"),
-                trade_value_usd=item.get("trade_value_usd"),
-                unit_price_usd_per_mt=item.get("unit_price_usd_per_mt"),
-                source_name=item.get("source_name", "USDA FAS GATS / Indian DGCI&S"),
-                license_type=item.get("license_type", "Public Domain / Open Data"),
-                idempotency_key=idem_key,
+        for item in observations:
+            period_dt = datetime.date.fromisoformat(item["period_date"])
+            idem_key = (
+                f"TRADE:{item['reporter_iso2']}:{item['partner_iso2']}:"
+                f"{item['commodity_code']}:{item['period_date']}:{item['trade_flow']}"
             )
-            db.add(obs)
-            accepted_count += 1
 
-    completed_time = datetime.datetime.now(datetime.timezone.utc)
-    ingestion_run.accepted_count = accepted_count
-    ingestion_run.duplicate_count = duplicate_count
-    ingestion_run.status = "completed"
-    ingestion_run.completed_at = completed_time
+            existing = db.query(TradeObservation).filter(
+                TradeObservation.idempotency_key == idem_key
+            ).first()
 
-    db.commit()
+            if existing:
+                duplicate_count += 1
+            else:
+                obs = TradeObservation(
+                    reporter_country=item["reporter_country"],
+                    reporter_iso2=item["reporter_iso2"],
+                    partner_country=item["partner_country"],
+                    partner_iso2=item["partner_iso2"],
+                    commodity_code=item["commodity_code"],
+                    commodity_name=item["commodity_name"],
+                    trade_flow=item["trade_flow"],
+                    period_date=period_dt,
+                    period_type=item.get("period_type", "monthly"),
+                    volume_metric_tons=item.get("volume_metric_tons"),
+                    trade_value_usd=item.get("trade_value_usd"),
+                    unit_price_usd_per_mt=item.get("unit_price_usd_per_mt"),
+                    source_name=item.get("source_name", "USDA FAS GATS / Indian DGCI&S"),
+                    license_type=item.get("license_type", "Public Domain / Open Data"),
+                    idempotency_key=idem_key,
+                )
+                db.add(obs)
+                accepted_count += 1
+
+        completed_time = datetime.datetime.now(datetime.timezone.utc)
+        ingestion_run.accepted_count = accepted_count
+        ingestion_run.duplicate_count = duplicate_count
+        ingestion_run.status = "completed"
+        ingestion_run.completed_at = completed_time
+
+        db.flush()
+    except Exception:
+        raise
 
     return {
         "status": "completed",
