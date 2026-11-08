@@ -11,8 +11,8 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
-from pelagos.models import FreightRoute, FreightObservation, IngestionRun
-from pelagos.ingestion.schemas import IngestionResult
+from pelagos.models import FreightRoute, FreightObservation, IngestionRun, QuarantinedRecord
+from pelagos.ingestion.schemas import IngestionResult, QuarantinedSummary
 from pelagos.ingestion.service import _safe_evict_failed_orm_object, is_idempotency_key_violation
 from pelagos.ingestion.freight_usda import normalize_usda_record, NormalizedFreightRecord
 
@@ -92,6 +92,7 @@ class FreightIngestionService:
         source_partition: str = "usda-vessel-rates",
         run_type: str = "usda_vessel_rates",
         dry_run: bool = False,
+        commit: bool = True,
     ) -> IngestionResult:
         """
         Ingests a batch of raw USDA AgTransport records into canonical freight tables.
@@ -109,22 +110,50 @@ class FreightIngestionService:
         failed = 0
 
         normalized_candidates: List[NormalizedFreightRecord] = []
+        quarantined_records_to_persist: List[QuarantinedRecord] = []
+        quarantined_summaries: List[QuarantinedSummary] = []
+        now_utc = datetime.now(timezone.utc)
 
-        # 1. Parsing & Normalization
+        # 1. Parsing, Normalization & Consistency Evaluation
         for raw in raw_records:
             try:
-                norm_recs, unp = normalize_usda_record(raw)
+                norm_res = normalize_usda_record(raw)
+                norm_recs = norm_res[0]
+                unp = norm_res[1]
+                q_items = getattr(norm_res, "quarantined", [])
+
                 normalized_candidates.extend(norm_recs)
                 unparseable += unp
+
+                for q in q_items:
+                    quarantined += 1
+                    quarantined_records_to_persist.append(
+                        QuarantinedRecord(
+                            source_name=q.source_name,
+                            source_partition=q.source_partition,
+                            raw_record_id=q.raw_record_id,
+                            error_code=q.error_code,
+                            error_details=q.error_details,
+                            raw_payload=q.raw_payload,
+                            ingestion_time=now_utc,
+                        )
+                    )
+                    quarantined_summaries.append(
+                        QuarantinedSummary(
+                            error_code=q.error_code,
+                            error_details=q.error_details,
+                            raw_record_id=q.raw_record_id,
+                            source_partition=q.source_partition,
+                        )
+                    )
             except Exception as e:
                 unparseable += 1
                 logger.warning(f"Unparseable USDA freight record: {e}")
 
         # Total domain observation candidates evaluated
-        records_read = len(normalized_candidates) + unparseable
+        records_read = len(normalized_candidates) + unparseable + len(quarantined_records_to_persist)
 
         # 2. Database Idempotency Check & Savepoint Insertion
-        now_utc = datetime.now(timezone.utc)
         dialect = getattr(self.db.bind.dialect, "name", "sqlite") if self.db.bind else "sqlite"
         accepted_observations: List[FreightObservation] = []
 
@@ -156,6 +185,10 @@ class FreightIngestionService:
                     license_type=rec.license_type,
                     raw_payload=rec.raw_payload,
                     idempotency_key=rec.idempotency_key,
+                    is_reconstructed=rec.is_reconstructed,
+                    original_rate_value=rec.original_rate_value,
+                    reconciliation_method=rec.reconciliation_method,
+                    reconciliation_metadata=rec.reconciliation_metadata,
                 )
 
                 if dry_run:
@@ -180,6 +213,29 @@ class FreightIngestionService:
                     failed += 1
                     logger.error(f"Unexpected freight insertion failure: {exc}")
 
+            # Persist quarantined records if not dry run
+            persisted_quarantined_objs = []
+            quarantine_persistence_failed = 0
+            quarantine_error_msgs = []
+
+            if not dry_run:
+                for q_obj in quarantined_records_to_persist:
+                    try:
+                        with self.db.begin_nested():
+                            self.db.add(q_obj)
+                            self.db.flush()
+                        persisted_quarantined_objs.append(q_obj)
+                    except Exception as exc:
+                        _safe_evict_failed_orm_object(self.db, q_obj)
+                        quarantine_persistence_failed += 1
+                        err_msg = f"Quarantine persistence failure for raw_record_id={q_obj.raw_record_id}: {exc}"
+                        logger.error(err_msg)
+                        quarantine_error_msgs.append(err_msg)
+
+            if quarantine_persistence_failed > 0:
+                quarantined -= quarantine_persistence_failed
+                failed += quarantine_persistence_failed
+
         completed_at = datetime.now(timezone.utc)
 
         if dry_run:
@@ -194,11 +250,19 @@ class FreightIngestionService:
                 duplicate_count=duplicate,
                 unparseable_count=unparseable,
                 failed_count=failed,
-                quarantined_records=[],
+                quarantined_records=quarantined_summaries,
             )
 
         # 3. Audit logging in IngestionRun
-        status_str = "completed" if (quarantined == 0 and unparseable == 0 and failed == 0) else "partial"
+        if quarantine_persistence_failed > 0:
+            status_str = "incomplete"
+        elif quarantined == 0 and unparseable == 0 and failed == 0:
+            status_str = "completed"
+        else:
+            status_str = "partial"
+
+        error_details = "; ".join(quarantine_error_msgs) if quarantine_error_msgs else None
+
         run_record = IngestionRun(
             source_name="USDA AgTransport",
             source_partition=source_partition,
@@ -211,6 +275,7 @@ class FreightIngestionService:
             unparseable_count=unparseable,
             failed_count=failed,
             status=status_str,
+            error_details=error_details,
             started_at=started_at,
             completed_at=completed_at,
         )
@@ -220,7 +285,13 @@ class FreightIngestionService:
         for obs in accepted_observations:
             obs.ingestion_run_id = run_record.id
 
-        self.db.commit()
+        for q_obj in persisted_quarantined_objs:
+            q_obj.ingestion_run_id = run_record.id
+
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
 
         return IngestionResult(
             source_partition=source_partition,
@@ -234,5 +305,6 @@ class FreightIngestionService:
             unparseable_count=unparseable,
             failed_count=failed,
             run_id=run_record.id,
-            quarantined_records=[],
+            error_details=error_details,
+            quarantined_records=quarantined_summaries,
         )

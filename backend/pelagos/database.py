@@ -89,6 +89,17 @@ def ensure_schema_compatibility(target_engine=None):
         if "freight_observations" not in table_names:
             import pelagos.models
             pelagos.models.FreightObservation.__table__.create(conn)
+        else:
+            cols = {c["name"] for c in inspector.get_columns("freight_observations")}
+            if "is_reconstructed" not in cols:
+                conn.execute(text("ALTER TABLE freight_observations ADD COLUMN is_reconstructed BOOLEAN NOT NULL DEFAULT 0"))
+            if "original_rate_value" not in cols:
+                conn.execute(text("ALTER TABLE freight_observations ADD COLUMN original_rate_value FLOAT"))
+            if "reconciliation_method" not in cols:
+                conn.execute(text("ALTER TABLE freight_observations ADD COLUMN reconciliation_method VARCHAR(64)"))
+            if "reconciliation_metadata" not in cols:
+                conn.execute(text("ALTER TABLE freight_observations ADD COLUMN reconciliation_metadata TEXT"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_freight_observations_is_reconstructed ON freight_observations (is_reconstructed)"))
 
         if "freight_publications" not in table_names:
             import pelagos.models

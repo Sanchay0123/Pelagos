@@ -84,11 +84,18 @@ class EvaluationStep:
     """Individual out-of-sample backtest step comparison."""
     origin_date: date
     target_date: date
-    actual_value: float
-    predicted_value: float
-    absolute_error: float
-    squared_error: float
-    percentage_error: float
+    actual_value: Optional[float] = None
+    predicted_value: Optional[float] = None
+    absolute_error: Optional[float] = None
+    squared_error: Optional[float] = None
+    percentage_error: Optional[float] = None
+    is_valid: bool = True
+    skip_reason: Optional[str] = None
+    training_scale: Optional[float] = None
+    step_mase: Optional[float] = None
+    actual_change: Optional[float] = None
+    predicted_change: Optional[float] = None
+    direction_concordant: Optional[bool] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
@@ -104,18 +111,48 @@ class ModelEvaluationSummary:
     route_code: str
     evaluation_steps_count: int
     burn_in_months: int
-    eval_start_date: date
-    eval_end_date: date
+    eval_start_date: Optional[date]
+    eval_end_date: Optional[date]
     mae: float
     rmse: float
     mape: float
+    valid_steps_count: int = 0
+    skipped_steps_count: int = 0
+    skipped_reasons: Dict[str, int] = field(default_factory=dict)
+    mase: Optional[float] = None
+    directional_accuracy_non_flat: Optional[float] = None
+    flat_prediction_rate: float = 0.0
+    actual_non_zero_movement_rate: float = 0.0
+    eligible_directional_steps_count: int = 0
     relative_mae_vs_persistence: Optional[float] = None
     relative_rmse_vs_persistence: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
-        d["eval_start_date"] = self.eval_start_date.isoformat()
-        d["eval_end_date"] = self.eval_end_date.isoformat()
+        d["eval_start_date"] = self.eval_start_date.isoformat() if self.eval_start_date else None
+        d["eval_end_date"] = self.eval_end_date.isoformat() if self.eval_end_date else None
+        return d
+
+
+@dataclass(frozen=True)
+class CommonSampleComparisonReport:
+    """Comparison report evaluated on the exact common intersection of target dates."""
+    route_code: str
+    horizon_months: int
+    common_target_dates_count: int
+    common_start_date: Optional[date]
+    common_end_date: Optional[date]
+    models: Dict[str, ModelEvaluationSummary]
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = {
+            "route_code": self.route_code,
+            "horizon_months": self.horizon_months,
+            "common_target_dates_count": self.common_target_dates_count,
+            "common_start_date": self.common_start_date.isoformat() if self.common_start_date else None,
+            "common_end_date": self.common_end_date.isoformat() if self.common_end_date else None,
+            "models": {k: v.to_dict() for k, v in self.models.items()},
+        }
         return d
 
 
@@ -125,10 +162,11 @@ class RouteEvaluationReport:
     route_code: str
     total_observations: int
     burn_in_months: int
-    eval_start_date: date
-    eval_end_date: date
+    eval_start_date: Optional[date]
+    eval_end_date: Optional[date]
     evaluation_steps_count: int
     models: Dict[str, ModelEvaluationSummary]
+    common_sample: Optional[CommonSampleComparisonReport] = None
     steps: Optional[Dict[str, List[EvaluationStep]]] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -136,11 +174,13 @@ class RouteEvaluationReport:
             "route_code": self.route_code,
             "total_observations": self.total_observations,
             "burn_in_months": self.burn_in_months,
-            "eval_start_date": self.eval_start_date.isoformat(),
-            "eval_end_date": self.eval_end_date.isoformat(),
+            "eval_start_date": self.eval_start_date.isoformat() if self.eval_start_date else None,
+            "eval_end_date": self.eval_end_date.isoformat() if self.eval_end_date else None,
             "evaluation_steps_count": self.evaluation_steps_count,
             "models": {k: v.to_dict() for k, v in self.models.items()},
         }
+        if self.common_sample:
+            d["common_sample"] = self.common_sample.to_dict()
         if self.steps:
             d["steps"] = {k: [s.to_dict() for s in v] for k, v in self.steps.items()}
         return d

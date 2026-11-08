@@ -43,13 +43,13 @@ class TestVoyageCalculatorApi:
         assert data["cargo_tonnes"] == 52000.0
         assert data["cargo_unit"] == "MT"
         assert data["route"]["route_code"] == "PNW-JPN-BULK"
-        assert data["applicable_rate"]["rate_value"] == 37.31
+        assert data["applicable_rate"]["rate_value"] == 38.00
         assert data["applicable_rate"]["unit"] == "USD/MT"
         assert data["applicable_rate"]["currency"] == "USD"
         assert "USDA" in data["applicable_rate"]["source_name"]
 
-        # 52000 * 37.31 = 1,940,120.00
-        assert data["gross_freight_cost"] == 1940120.0
+        # 52000 * 38.00 = 1,976,000.00
+        assert data["gross_freight_cost"] == 1976000.0
         assert data["gross_freight_cost_currency"] == "USD"
         assert data["calculation_formula"] == "gross_freight_cost = cargo_tonnes * rate_per_tonne"
 
@@ -76,9 +76,9 @@ class TestVoyageCalculatorApi:
         assert data["status"] == "calculated"
         assert data["cargo_tonnes"] == 65000.0
         assert data["route"]["route_code"] == "USG-JPN-BULK"
-        assert data["applicable_rate"]["rate_value"] == 76.38
-        # 65000 * 76.38 = 4,964,700.00
-        assert data["gross_freight_cost"] == 4964700.0
+        assert data["applicable_rate"]["rate_value"] == 76.00
+        # 65000 * 76.00 = 4,940,000.00
+        assert data["gross_freight_cost"] == 4940000.0
 
     def test_post_direct_route_code(self, client: TestClient) -> None:
         """POST with route_code directly calculates without requiring port endpoints."""
@@ -92,7 +92,7 @@ class TestVoyageCalculatorApi:
 
         assert data["status"] == "calculated"
         assert data["route"]["route_code"] == "PNW-JPN-BULK"
-        assert data["gross_freight_cost"] == round(40000.0 * 37.31, 2)
+        assert data["gross_freight_cost"] == round(40000.0 * 38.00, 2)
 
     def test_post_unmonitored_route_returns_unavailable(self, client: TestClient) -> None:
         """POST with unmonitored trade lane returns unavailable without inventing rates."""
@@ -129,7 +129,7 @@ class TestVoyageCalculatorApi:
 
         assert data["status"] == "calculated"
         assert data["cargo_tonnes"] == 50000.0
-        assert data["gross_freight_cost"] == 1865500.0
+        assert data["gross_freight_cost"] == 1900000.0
 
     def test_get_voyage_freight_zero_tonnes_rejected(self, client: TestClient) -> None:
         """GET /api/v1/calculator/voyage-freight with cargo_tonnes=0 is rejected with 422."""

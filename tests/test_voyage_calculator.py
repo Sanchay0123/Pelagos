@@ -37,7 +37,7 @@ class TestVoyageCalculatorArithmetic:
     """Deterministic arithmetic validation for gross freight cost."""
 
     def test_seattle_to_yokohama_gross_freight_cost(self, db_session: Session) -> None:
-        """50,000 MT Seattle (USSEA) -> Yokohama (JPYOK) at 37.31 USD/MT equals 1,865,500.00 USD."""
+        """50,000 MT Seattle (USSEA) -> Yokohama (JPYOK) at latest rate (38.00 USD/MT) equals 1,900,000.00 USD."""
         req = VoyageCalculationRequest(
             origin="USSEA",
             destination="JPYOK",
@@ -51,13 +51,13 @@ class TestVoyageCalculatorArithmetic:
         assert result.route is not None
         assert result.route.route_code == "PNW-JPN-BULK"
         assert result.applicable_rate is not None
-        assert result.applicable_rate.rate_value == 37.31
+        assert result.applicable_rate.rate_value == 38.00
         assert result.applicable_rate.currency == "USD"
         assert result.applicable_rate.unit == "USD/MT"
 
-        # Deterministic gross freight cost calculation: 50,000 * 37.31 = 1,865,500.00
-        expected_cost = round(50000.0 * 37.31, 2)
-        assert result.gross_freight_cost == 1865500.0
+        # Deterministic gross freight cost calculation: 50,000 * 38.00 = 1,900,000.00
+        expected_cost = round(50000.0 * 38.00, 2)
+        assert result.gross_freight_cost == 1900000.0
         assert result.gross_freight_cost == expected_cost
         assert result.gross_freight_cost_currency == "USD"
 
@@ -67,7 +67,7 @@ class TestVoyageCalculatorArithmetic:
         assert result.distance.distance_nm > 0
 
     def test_us_gulf_to_japan_gross_freight_cost(self, db_session: Session) -> None:
-        """60,000 MT US Gulf (USMSY) -> Yokohama (JPYOK) at 76.38 USD/MT equals 4,582,800.00 USD."""
+        """60,000 MT US Gulf (USMSY) -> Yokohama (JPYOK) at latest rate (76.00 USD/MT) equals 4,560,000.00 USD."""
         req = VoyageCalculationRequest(
             origin="USMSY",
             destination="JPYOK",
@@ -80,10 +80,10 @@ class TestVoyageCalculatorArithmetic:
         assert result.route is not None
         assert result.route.route_code == "USG-JPN-BULK"
         assert result.applicable_rate is not None
-        assert result.applicable_rate.rate_value == 76.38
+        assert result.applicable_rate.rate_value == 76.00
 
-        # Deterministic gross freight cost: 60,000 * 76.38 = 4,582,800.00
-        assert result.gross_freight_cost == 4582800.0
+        # Deterministic gross freight cost: 60,000 * 76.00 = 4,560,000.00
+        assert result.gross_freight_cost == 4560000.0
         assert result.gross_freight_cost_currency == "USD"
 
     def test_direct_route_code_calculation(self, db_session: Session) -> None:
@@ -97,7 +97,7 @@ class TestVoyageCalculatorArithmetic:
         assert result.status == CalculationStatus.CALCULATED
         assert result.route is not None
         assert result.route.route_code == "PNW-JPN-BULK"
-        assert result.gross_freight_cost == round(45000.0 * 37.31, 2)
+        assert result.gross_freight_cost == round(45000.0 * 38.00, 2)
 
     def test_as_of_date_historical_point_in_time(self, db_session: Session) -> None:
         """Specifying historical as_of_date retrieves rate as of that date with zero lookahead."""

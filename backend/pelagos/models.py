@@ -195,6 +195,12 @@ class FreightObservation(Base):
     raw_payload = Column(Text, nullable=True)
     idempotency_key = Column(String(256), unique=True, index=True, nullable=False)
     ingestion_run_id = Column(Integer, nullable=True)
+    
+    # Audit-grade reconciliation fields (C1.1)
+    is_reconstructed = Column(Boolean, nullable=False, default=False, server_default="0", index=True)
+    original_rate_value = Column(Float, nullable=True)
+    reconciliation_method = Column(String(64), nullable=True)
+    reconciliation_metadata = Column(Text, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("route_code", "observation_date", name="uq_freight_obs_route_date"),

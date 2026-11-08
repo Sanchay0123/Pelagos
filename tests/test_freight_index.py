@@ -331,7 +331,7 @@ def test_pegi_cli_subcommand(test_freight_db, capsys):
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
     assert payload["index_code"] == INDEX_CODE
-    assert payload["records_count"] == 4  # Jun, Jul, Aug, Sep 2026
+    assert payload["records_count"] == 5  # Jun, Jul, Aug, Sep, Oct 2026
 
     # Test Table mode
     FakeArgs.format = "table"
@@ -339,5 +339,5 @@ def test_pegi_cli_subcommand(test_freight_db, capsys):
     assert exit_code2 == 0
     captured2 = capsys.readouterr()
     assert "PEGI-USJPN" in captured2.out
-    assert "2026-09-01" in captured2.out
-    assert "56.8450" in captured2.out
+    assert "2026-10-01" in captured2.out
+    assert "57.0000" in captured2.out

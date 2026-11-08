@@ -41,17 +41,17 @@ class TestFreightRouteIntelligenceApi:
 
         # Observed rate from real database
         assert data["latest_observation"] is not None
-        assert data["latest_observation"]["rate_value"] == 37.31
+        assert data["latest_observation"]["rate_value"] == 38.00
         assert data["latest_observation"]["unit"] == "USD/MT"
-        assert data["latest_observation"]["observation_date"] == "2026-09-01"
+        assert data["latest_observation"]["observation_date"] == "2026-10-01"
         assert "USDA" in data["latest_observation"]["source_name"]
 
         # Baseline forecast from real database
         assert data["baseline_forecast"] is not None
         assert data["baseline_forecast"]["model_type"] == "persistence"
-        assert data["baseline_forecast"]["predicted_value"] == 37.31
-        assert data["baseline_forecast"]["origin_date"] == "2026-09-01"
-        assert data["baseline_forecast"]["target_date"] == "2026-10-01"
+        assert data["baseline_forecast"]["predicted_value"] == 38.00
+        assert data["baseline_forecast"]["origin_date"] == "2026-10-01"
+        assert data["baseline_forecast"]["target_date"] == "2026-11-01"
         assert data["baseline_forecast"]["horizon_months"] == 1
         assert data["baseline_forecast"]["status"] == "forecast_generated"
 
@@ -88,7 +88,7 @@ class TestFreightRouteIntelligenceApi:
 
         assert data["status"] == "monitored"
         assert data["corridor"]["route_code"] == "PNW-JPN-BULK"
-        assert data["latest_observation"]["rate_value"] == 37.31
+        assert data["latest_observation"]["rate_value"] == 38.00
 
     def test_get_intelligence_by_direct_route_code(self, client: TestClient) -> None:
         """Direct query by route_code returns corridor intelligence."""
@@ -114,7 +114,7 @@ class TestFreightRouteIntelligenceApi:
 
         assert data["status"] == "monitored"
         assert data["corridor"]["route_code"] == "PNW-JPN-BULK"
-        assert data["latest_observation"]["rate_value"] == 37.31
+        assert data["latest_observation"]["rate_value"] == 38.00
 
     def test_missing_endpoints_returns_unsupported_input(self, client: TestClient) -> None:
         """Query without origin or destination returns unsupported_input status."""

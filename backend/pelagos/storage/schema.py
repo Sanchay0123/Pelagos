@@ -53,6 +53,10 @@ FREIGHT_PARQUET_SCHEMA = pa.schema([
     pa.field("license_type", pa.string(), nullable=False),
     pa.field("idempotency_key", pa.string(), nullable=False),
     pa.field("ingestion_run_id", pa.int64(), nullable=True),
+    pa.field("is_reconstructed", pa.bool_(), nullable=False),
+    pa.field("original_rate_value", pa.float64(), nullable=True),
+    pa.field("reconciliation_method", pa.string(), nullable=True),
+    pa.field("reconciliation_metadata", pa.string(), nullable=True),
 ])
 
 
@@ -126,6 +130,10 @@ def freight_records_to_pyarrow_table(records: List[FreightObservation]) -> pa.Ta
         columns["license_type"].append(str(r.license_type))
         columns["idempotency_key"].append(str(r.idempotency_key))
         columns["ingestion_run_id"].append(int(r.ingestion_run_id) if r.ingestion_run_id is not None else None)
+        columns["is_reconstructed"].append(bool(r.is_reconstructed) if r.is_reconstructed is not None else False)
+        columns["original_rate_value"].append(float(r.original_rate_value) if r.original_rate_value is not None else None)
+        columns["reconciliation_method"].append(str(r.reconciliation_method) if r.reconciliation_method is not None else None)
+        columns["reconciliation_metadata"].append(str(r.reconciliation_metadata) if r.reconciliation_metadata is not None else None)
 
     arrays = []
     for field in FREIGHT_PARQUET_SCHEMA:
