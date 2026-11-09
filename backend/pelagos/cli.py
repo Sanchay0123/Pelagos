@@ -770,6 +770,33 @@ def handle_vessels_refresh(args):
         db.close()
 
 
+def handle_bunker_refresh(args):
+    """Acquire genuine bunker fuel price observations from Bunker Fuel Prices (bunkerfuelprices.com)."""
+    from pelagos.ingestion.acquisition.bunker_provider import refresh_bunker_prices
+
+    db = get_db_session(args.db_url)
+    try:
+        res = refresh_bunker_prices(
+            db=db,
+            offline=getattr(args, "offline", False),
+            fixture_path=getattr(args, "fixture", None),
+            grade=getattr(args, "grade", None),
+            port=getattr(args, "port", None),
+        )
+        if res.get("status") in ("completed", "partial"):
+            db.commit()
+        else:
+            db.rollback()
+        print(json.dumps(res, indent=2))
+        return 0 if res.get("status") in ("completed", "partial") else 1
+    except Exception as e:
+        db.rollback()
+        print(json.dumps({"status": "failed", "error": str(e)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        db.close()
+
+
 def handle_sources_refresh(args):
     """Run combined multi-source automated acquisition and reconciliation."""
     from pelagos.ingestion.acquisition.coordinator import run_sources_refresh
@@ -1073,12 +1100,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser_vessels_ref.add_argument("--offline", action="store_true", help="Operate in offline mode.")
     parser_vessels_ref.add_argument("--db-url", default=None, help="Optional database connection URL override.")
 
+    # Bunker Refresh
+    parser_bunker_ref = subparsers.add_parser(
+        "bunker-refresh",
+        help="Acquire genuine bunker fuel price observations from Bunker Fuel Prices (bunkerfuelprices.com)."
+    )
+    parser_bunker_ref.add_argument("--grade", default=None, help="Filter by fuel grade (VLSFO, HSFO, MGO).")
+    parser_bunker_ref.add_argument("--port", default=None, help="Filter by UN/LOCODE port code.")
+    parser_bunker_ref.add_argument("--offline", action="store_true", help="Operate in offline mode using verified fixtures.")
+    parser_bunker_ref.add_argument("--fixture", default=None, help="Optional path to bunker prices JSON fixture.")
+    parser_bunker_ref.add_argument("--db-url", default=None, help="Optional database connection URL override.")
+
     # Combined Sources Refresh
     parser_sources_ref = subparsers.add_parser(
         "sources-refresh",
         help="Run combined multi-source automated acquisition and reconciliation."
     )
-    parser_sources_ref.add_argument("--sources", default=None, help="Comma-separated sources to refresh (environmental,trade,ports,vessels).")
+    parser_sources_ref.add_argument("--sources", default=None, help="Comma-separated sources to refresh (environmental,trade,ports,vessels,bunker).")
     parser_sources_ref.add_argument("--max-observations", type=int, default=12, help="Max observations per station/feed.")
     parser_sources_ref.add_argument("--offline", action="store_true", help="Operate in offline mode.")
     parser_sources_ref.add_argument("--db-url", default=None, help="Optional database connection URL override.")
@@ -1140,6 +1178,8 @@ def main():
         sys.exit(handle_vessels_refresh(args))
     elif args.command == "sources-refresh":
         sys.exit(handle_sources_refresh(args))
+    elif args.command == "bunker-refresh":
+        sys.exit(handle_bunker_refresh(args))
     else:
         parser.print_help()
         sys.exit(1)

@@ -22,10 +22,11 @@ from pelagos.ingestion.acquisition.noaa_ndbc import refresh_environmental_observ
 from pelagos.ingestion.acquisition.ports_adapter import refresh_ports_directory
 from pelagos.ingestion.acquisition.trade_adapter import refresh_trade_observations
 from pelagos.ingestion.acquisition.vessels_adapter import refresh_vessels_registry
+from pelagos.ingestion.acquisition.bunker_provider import refresh_bunker_prices
 
 logger = logging.getLogger(__name__)
 
-ALL_SOURCES = ["environmental", "trade", "ports", "vessels"]
+ALL_SOURCES = ["environmental", "trade", "ports", "vessels", "bunker"]
 
 
 def _persist_failed_source_audit(
@@ -208,6 +209,19 @@ def run_sources_refresh(
             ),
             source_name="NOAA MarineCadastre / USCG NAIS",
             source_partition="vessel_positions",
+        )
+
+    # 5. Bunker Fuel
+    if "bunker" in target_sources or "fuel" in target_sources:
+        _execute_source(
+            source_key="bunker",
+            adapter_fn=lambda: refresh_bunker_prices(
+                db=db,
+                client=http_client,
+                offline=offline,
+            ),
+            source_name="Bunker Fuel Prices (bunkerfuelprices.com)",
+            source_partition="bunker_price_observations",
         )
 
     completed_time = datetime.datetime.now(datetime.timezone.utc)

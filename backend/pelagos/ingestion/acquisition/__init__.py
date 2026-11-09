@@ -16,6 +16,11 @@ from pelagos.ingestion.acquisition.noaa_ndbc import (
 from pelagos.ingestion.acquisition.ports_adapter import refresh_ports_directory
 from pelagos.ingestion.acquisition.trade_adapter import refresh_trade_observations
 from pelagos.ingestion.acquisition.vessels_adapter import refresh_vessels_registry
+from pelagos.ingestion.acquisition.bunker_provider import (
+    fetch_bunker_prices,
+    refresh_bunker_prices,
+    validate_bunker_record,
+)
 from pelagos.ingestion.acquisition.coordinator import run_sources_refresh
 
 __all__ = [
@@ -31,5 +36,8 @@ __all__ = [
     "refresh_ports_directory",
     "refresh_trade_observations",
     "refresh_vessels_registry",
+    "fetch_bunker_prices",
+    "refresh_bunker_prices",
+    "validate_bunker_record",
     "run_sources_refresh",
 ]

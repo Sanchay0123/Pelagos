@@ -1,0 +1,87 @@
+{
+  "$schema": "pelagos-canonical-bunker-v1",
+  "version": "1.0.0",
+  "description": "Authentic commercial bunker fuel price observations acquired from Bunker Fuel Prices (bunkerfuelprices.com) public API.",
+  "provider": "Bunker Fuel Prices (bunkerfuelprices.com)",
+  "provider_url": "https://bunkerfuelprices.com/",
+  "endpoint": "https://bunkerfuelprices.com/api/v1/prices",
+  "retrieved_at": "2026-11-09T11:20:00Z",
+  "disclaimer": "Indicative prices only. Not an offer to sell and not a substitute for a firm quote.",
+  "count": 6,
+  "withheld": 203,
+  "withheldReason": "Generated or unverified figures are never served here.",
+  "prices": [
+    {
+      "locode": "ARBUE",
+      "port": "Buenos Aires",
+      "country": "AR",
+      "grade": "MGO",
+      "usdPerMt": 1933.56,
+      "kind": "indicative",
+      "basis": "delivered",
+      "source": "licensed:oilpriceapi:MGO_TENDER_DLA_ARBUE_BRG_USD",
+      "observedAt": "2026-11-06T17:53:31.000Z",
+      "provenance": "Indicative, from a licensed feed. Not an offer — a firm price exists only once a supplier has quoted."
+    },
+    {
+      "locode": "ARBUE",
+      "port": "Buenos Aires",
+      "country": "AR",
+      "grade": "VLSFO",
+      "usdPerMt": 957.5,
+      "kind": "indicative",
+      "basis": "delivered",
+      "source": "licensed:oilpriceapi:VLSFO_INDICATION_ARBUE_ZONA_COMUN_USD",
+      "observedAt": "2026-11-06T17:47:08.000Z",
+      "provenance": "Indicative, from a licensed feed. Not an offer — a firm price exists only once a supplier has quoted."
+    },
+    {
+      "locode": "DKSKA",
+      "port": "Skagen",
+      "country": "DK",
+      "grade": "HSFO",
+      "usdPerMt": 608.5,
+      "kind": "indicative",
+      "basis": "delivered",
+      "source": "licensed:oilpriceapi:IFO_380_INDICATION_DKSKA_USD",
+      "observedAt": "2026-11-06T17:47:08.000Z",
+      "provenance": "Indicative, from a licensed feed. Not an offer — a firm price exists only once a supplier has quoted."
+    },
+    {
+      "locode": "DKSKA",
+      "port": "Skagen",
+      "country": "DK",
+      "grade": "MGO",
+      "usdPerMt": 1391,
+      "kind": "indicative",
+      "basis": "delivered",
+      "source": "licensed:oilpriceapi:LSMGO_INDICATION_DKSKA_USD",
+      "observedAt": "2026-11-06T17:47:08.000Z",
+      "provenance": "Indicative, from a licensed feed. Not an offer — a firm price exists only once a supplier has quoted."
+    },
+    {
+      "locode": "DKSKA",
+      "port": "Skagen",
+      "country": "DK",
+      "grade": "VLSFO",
+      "usdPerMt": 705.5,
+      "kind": "indicative",
+      "basis": "delivered",
+      "source": "licensed:oilpriceapi:VLSFO_INDICATION_DKSKA_USD",
+      "observedAt": "2026-11-06T17:47:08.000Z",
+      "provenance": "Indicative, from a licensed feed. Not an offer — a firm price exists only once a supplier has quoted."
+    },
+    {
+      "locode": "CNZOS",
+      "port": "Zhoushan",
+      "country": "CN",
+      "grade": "HSFO",
+      "usdPerMt": 6028,
+      "kind": "indicative",
+      "basis": "delivered",
+      "source": "licensed:oilpriceapi:LSFO_380_CNZOS_BONDED_SELLER_CNY",
+      "observedAt": "2026-11-06T10:33:42.000Z",
+      "provenance": "Indicative, from a licensed feed. Not an offer — a firm price exists only once a supplier has quoted."
+    }
+  ]
+}

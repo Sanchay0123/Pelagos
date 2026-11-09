@@ -156,16 +156,50 @@ class CorridorResolution:
         }
 
 
-def resolve_port_region(port: PortRecord) -> Optional[str]:
+def resolve_port_region(port: PortRecord, db: Optional[Any] = None) -> Optional[str]:
     """Resolve a PortRecord to its commercial trade region.
 
-    Uses explicit port_region attribute from canonical registry or PORT_REGION_MAP;
-    does not fabricate or guess regions (OD-ROUT-06-03).
+    Uses explicit port_region attribute from canonical registry or queries the
+    database ports directory directly; falls back to PORT_REGION_MAP.
+    Traces to OD-ROUT-06-03 and REQ-FR-CRI-012.
     """
     if not port or not port.port_id:
         return None
+
+    # 1. Direct attribute on PortRecord (from canonical database load)
     if getattr(port, "port_region", None):
         return port.port_region
+
+    # 2. Database query lookup if attribute missing
+    try:
+        from pelagos.database import SessionLocal
+        from pelagos.models import Port, PortAlias
+
+        session = db if db is not None else SessionLocal()
+        close_session = db is None
+
+        try:
+            pid = port.port_id.upper().strip()
+            # Direct Port match by unlocode or port_id
+            db_port = session.query(Port).filter(
+                (Port.unlocode == pid) | (Port.port_id == pid)
+            ).first()
+            if db_port and db_port.port_region:
+                return db_port.port_region
+
+            # Alias match
+            db_alias = session.query(PortAlias).filter(PortAlias.alias_name.ilike(pid)).first()
+            if db_alias:
+                aliased_port = session.query(Port).filter(Port.unlocode == db_alias.port_unlocode).first()
+                if aliased_port and aliased_port.port_region:
+                    return aliased_port.port_region
+        finally:
+            if close_session:
+                session.close()
+    except Exception as exc:
+        logger.debug("Database port region lookup failed for '%s': %s", port.port_id, exc)
+
+    # 3. Fallback to hardcoded dictionary
     return PORT_REGION_MAP.get(port.port_id.upper().strip())
 
 
@@ -253,6 +287,7 @@ def resolve_freight_corridor(
     destination: Union[str, PortIdentifierOrCoords, PortRecord, List[float], Tuple[float, float], Dict[str, Any], None],
     port_repo: Optional[PortRepository] = None,
     max_snap_distance_nm: float = 150.0,
+    db: Optional[Any] = None,
 ) -> CorridorResolution:
     """Resolve origin and destination endpoints to a commercial freight corridor.
 
@@ -261,6 +296,7 @@ def resolve_freight_corridor(
         destination: Destination port identifier, coordinates, or PortRecord.
         port_repo: Optional PortRepository instance (instantiated if omitted).
         max_snap_distance_nm: Snapping radius in NM to match coordinates to known ports.
+        db: Optional database session for canonical port and region lookup.
 
     Returns:
         CorridorResolution with status MONITORED or UNMONITORED.
@@ -291,8 +327,8 @@ def resolve_freight_corridor(
             reason=f"Destination could not be resolved to a recognized maritime port or coordinates ({dest_err or 'unknown'}).",
         )
 
-    orig_region = resolve_port_region(orig_port) if orig_port else None
-    dest_region = resolve_port_region(dest_port) if dest_port else None
+    orig_region = resolve_port_region(orig_port, db=db) if orig_port else None
+    dest_region = resolve_port_region(dest_port, db=db) if dest_port else None
 
     # Case: Coordinates did not resolve to a registered port with known commercial region
     if not orig_region or not dest_region:

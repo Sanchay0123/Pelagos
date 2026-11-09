@@ -140,8 +140,41 @@ Freight market data provides the grounding signals for freight rate forecasting 
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Baltic Exchange (BDI, BCI, BPI, BSI)** | **Candidate Source** | Secure FTP / Member API | Commercial Proprietary License (High commercial subscription fee; strict redistribution ban). | Global standard dry bulk benchmark indices; major international route fixtures. | Daily publication at 13:00 London time. | High cost barrier; strict legal restrictions prohibiting public display of raw Baltic data without commercial distributor agreements. |
 | **S&P Global Platts** | **Candidate Source** | Market Data API / Portal | Commercial Enterprise License (Paid subscription). | Comprehensive clean/dirty tanker, dry bulk, and bunker fuel spot assessments. | Daily spot updates. | Expensive commercial licensing; redistribution prohibited; access pending enterprise negotiation. |
+| **Bunker Fuel Prices (bunkerfuelprices.com)** | **Verified Source (Integrated)** | Public REST API (`GET /api/v1/prices`) | Free Public Indicative API / Licensed Display Feed (`licensed:oilpriceapi`). | Indicative delivered spot marine bunker prices (VLSFO, LSMGO, HSFO, MGO) at global bunkering ports in USD/MT. | Spot updates; mechanical withholding of unverified or non-redistributable rows. | Public feed actively serves select international hubs (`ARBUE`, `DKSKA`); corridor hubs (`USSEA`, `USPDX`, `JPYOK`, `USHOU`, `USMSY`, `PAPAC`) withheld/unquoted by provider; synthetic substitution strictly prohibited. |
 | **Public Shipping Market Reports (Banchero Costa, Fearnleys, Allied)** | **Verified Source** | Weekly published PDF / Web Market Reports | Public Reference / Fair Use for aggregated analysis. | Weekly fixture summaries, average earnings per vessel class, representative fixture lists. | Weekly publication. | Unstructured tabular text requiring specialized scrapers; weekly aggregation lacks daily spot volatility; historical depth requires manual curation. |
 | **Commodity Exchanges (SGX / EEX FFA)** | **Candidate Source** | Financial Data Feeds | Exchange Member License / Market Data Agreement. | Forward Freight Agreement (FFA) derivative forward curves across key corridors. | Daily end-of-day settlement. | Financial feed licensing costs; settlement curves may deviate from physical spot fixing conditions. |
+
+#### 5.2.1 Bunker Fuel Price Integration Specification (Stage C2.2)
+
+- **Provider & Endpoint:** Bunker Fuel Prices (`https://bunkerfuelprices.com/`), public pricing endpoint `GET https://bunkerfuelprices.com/api/v1/prices?limit=100`.
+- **Access Requirements:** Public REST API access; no API key required for GET price queries. No paid commercial subscriptions introduced.
+- **Data Fields & Units:**
+  - `locode`: 5-letter UN/LOCODE port identifier (e.g. `ARBUE`, `DKSKA`, `CNZOS`).
+  - `port`: Authoritative port name.
+  - `country`: ISO 3166-1 alpha-2 country code.
+  - `grade`: Marine fuel grade (`VLSFO`, `HSFO`, `MGO`, `LSMGO`, `IFO380`).
+  - `usdPerMt`: Price in USD per metric tonne (USD/MT).
+  - `kind`: Observation category (`indicative`, `transacted`, `supplier_submission`, `derived`, `manual`).
+  - `basis`: Commercial delivery terms (`delivered`, `ex_wharf`, `fob`), strictly preserved without inference.
+  - `source`: Upstream provider feed identifier (e.g. `licensed:oilpriceapi:VLSFO_INDICATION_...`).
+  - `observedAt`: ISO-8601 UTC observation timestamp.
+  - `provenance`: Detailed provider origin statement.
+- **Port & Grade Coverage:**
+  - Currently active in public feed: Buenos Aires (`ARBUE`: MGO, VLSFO) and Skagen (`DKSKA`: HSFO, MGO, VLSFO).
+  - Quarantined: Zhoushan (`CNZOS`: HSFO) isolated due to currency ticker mismatch (`..._CNY` ticker reported under `usdPerMt`).
+  - Monitored Corridor Bunkering Hubs: Seattle (`USSEA`), Portland (`USPDX`), Yokohama (`JPYOK`), Houston (`USHOU`), New Orleans (`USMSY`), Balboa/Cristobal (`PAPAC`/`PABLB`) are currently unquoted/withheld by the provider (203 rows withheld with reason *"Generated or unverified figures are never served here"*).
+- **Update Frequency & Freshness Rules:**
+  - $\le 24.0\text{ hours}$: `fresh` (active trading window).
+  - $\le 168.0\text{ hours}$ (7 days): `recent` (standard weekly indication).
+  - $> 168.0\text{ hours}$: `stale`.
+- **Licensing & Terms Restrictions:**
+  - Terms of service establish prices as *indicative* market indications, not firm quotes or offers to sell.
+  - Mechanical gate: provider automatically suppresses unverified demonstration data.
+- **Anti-Substitution & Integrity Policy:**
+  - Strict prohibition against synthetic bunker prices or substituting crude oil/agricultural commodity proxies (WTI, Brent).
+  - Regional benchmarks retain their authentic port UN/LOCODE identity and are never silently substituted for corridor hubs. Unquoted hubs explicitly report `status: "unavailable"`.
+  - Voyage fuel cost calculations are omitted until verified vessel daily consumption and stem quantities are supplied.
+
 
 ---
 

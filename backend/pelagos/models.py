@@ -376,4 +376,34 @@ class EnvironmentalObservation(Base):
     )
 
 
+class BunkerPriceObservation(Base):
+    """
+    Auditable marine bunker fuel price observation.
+    Traces to Bunker Fuel Prices (bunkerfuelprices.com) and commercial marine fuel benchmarks.
+    Strictly preserves genuine provider observations, timestamps, delivery basis, and pricing type.
+    """
+    __tablename__ = "bunker_price_observations"
 
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    port_code = Column(String(16), index=True, nullable=False)        # UN/LOCODE e.g. "ARBUE", "DKSKA", "USSEA"
+    port_name = Column(String(128), nullable=False)                  # Port name e.g. "Buenos Aires", "Skagen"
+    country_code = Column(String(8), nullable=True)                  # e.g. "AR", "DK", "US"
+    fuel_grade = Column(String(32), index=True, nullable=False)      # e.g. "VLSFO", "HSFO", "MGO"
+    price_value = Column(Float, nullable=False)                      # Numeric price in USD/MT
+    currency = Column(String(8), nullable=False, default="USD")
+    unit = Column(String(16), nullable=False, default="USD/MT")
+    pricing_type = Column(String(32), nullable=False, default="indicative")  # indicative | transacted | supplier_submission | derived
+    delivery_basis = Column(String(32), nullable=True)               # delivered | ex_wharf | fob
+    source_name = Column(String(128), nullable=False)                # Provider name
+    source_feed = Column(String(256), nullable=True)                 # Feed id / ticker
+    observation_time = Column(DateTime(timezone=True), index=True, nullable=False)
+    retrieval_time_utc = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    provenance_notes = Column(Text, nullable=True)
+    idempotency_key = Column(String(256), unique=True, index=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_bunker_obs_idempotency_key"),
+        Index("idx_bunker_obs_port_grade", "port_code", "fuel_grade"),
+        Index("idx_bunker_obs_time", "observation_time"),
+    )

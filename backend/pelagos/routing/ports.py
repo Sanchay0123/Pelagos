@@ -153,6 +153,10 @@ class PortRepository:
                     )
                     self._canonical_ports_by_id[p.port_id.upper().strip()] = record
                     self._canonical_ports_by_id[p.unlocode.upper().strip()] = record
+                    if p.port_id.upper().strip() in self._ports_by_id:
+                        self._ports_by_id[p.port_id.upper().strip()] = record
+                    if p.unlocode.upper().strip() in self._ports_by_id:
+                        self._ports_by_id[p.unlocode.upper().strip()] = record
 
                 aliases = db.query(PortAlias).all()
                 for a in aliases:
@@ -179,8 +183,13 @@ class PortRepository:
                 record = PortRecord(**clean_item)
                 key = record.port_id.upper().strip()
                 self._canonical_ports_by_id[key] = record
+                if key in self._ports_by_id:
+                    self._ports_by_id[key] = record
                 if "unlocode" in item and item["unlocode"]:
-                    self._canonical_ports_by_id[item["unlocode"].upper().strip()] = record
+                    unl = item["unlocode"].upper().strip()
+                    self._canonical_ports_by_id[unl] = record
+                    if unl in self._ports_by_id:
+                        self._ports_by_id[unl] = record
 
                 for a in item.get("aliases", []):
                     aname = a.get("alias_name")

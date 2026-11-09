@@ -13,7 +13,20 @@ from sqlalchemy.orm import Session
 from pelagos.database import get_db
 from pelagos.models import FreightRoute, FreightObservation
 from pelagos.storage.freight_analytics import get_freight_summary, get_freight_route_history
-from pelagos.routing.corridors import CorridorStatus, resolve_freight_corridor
+from pelagos.routing.corridors import (
+    CorridorStatus,
+    resolve_freight_corridor,
+    resolve_endpoint_to_port,
+)
+from pelagos.routing.ports import PortRepository
+from pelagos.routing.environmental import (
+    EnvironmentalConditionsSummary,
+    resolve_corridor_environmental_conditions,
+)
+from pelagos.routing.bunker import (
+    BunkerFuelSummary,
+    resolve_corridor_bunker_fuel_references,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -283,6 +296,29 @@ class VesselAvailabilityInfo(BaseModel):
     available_vessels_count: Optional[int] = None
 
 
+class DomainCoverageStatus(BaseModel):
+    """Coverage status and audit metadata for a specific domain facet."""
+
+    status: str  # "active" | "partial" | "unavailable" | "unmonitored"
+    details: Optional[str] = None
+    source: Optional[str] = None
+    record_count: Optional[int] = None
+    frequency: Optional[str] = None
+    as_of_date: Optional[str] = None
+
+
+class DataCoverageSummary(BaseModel):
+    """Consolidated multi-domain data coverage audit summary."""
+
+    status: str  # "active" | "partial" | "unmonitored"
+    corridor_code: Optional[str] = None
+    freight_market: DomainCoverageStatus
+    forecasts: DomainCoverageStatus
+    environmental: DomainCoverageStatus
+    bunker_fuel: DomainCoverageStatus
+    vessel_fleet: DomainCoverageStatus
+
+
 class RouteIntelligenceResponse(BaseModel):
     """Comprehensive route-level commercial freight intelligence."""
 
@@ -292,6 +328,12 @@ class RouteIntelligenceResponse(BaseModel):
     destination_port: Optional[Dict[str, Any]] = None
     latest_observation: Optional[LatestObservationInfo] = None
     baseline_forecast: Optional[BaselineForecastInfo] = None
+    forecasts: Optional[List[BaselineForecastInfo]] = None
+    multi_horizon_forecasts: Optional[Dict[str, BaselineForecastInfo]] = None
+    environmental_conditions: Optional[EnvironmentalConditionsSummary] = None
+    bunker_fuel_references: Optional[BunkerFuelSummary] = None
+    bunker_fuel: Optional[BunkerFuelSummary] = None
+    data_coverage: Optional[DataCoverageSummary] = None
     vessel_availability: VesselAvailabilityInfo = Field(default_factory=VesselAvailabilityInfo)
     disclaimers: List[str] = Field(default_factory=list)
     message: Optional[str] = None
@@ -306,10 +348,12 @@ class RouteIntelligenceRequest(BaseModel):
     destination: Optional[Union[str, List[float], Dict[str, Any]]] = None
     route_code: Optional[str] = None
     model_type: Optional[str] = None
+    horizon: Optional[int] = None
     origin_lon: Optional[float] = None
     origin_lat: Optional[float] = None
     dest_lon: Optional[float] = None
     dest_lat: Optional[float] = None
+    as_of: Optional[str] = None
 
 
 def _build_route_intelligence(
@@ -322,6 +366,8 @@ def _build_route_intelligence(
     dest_lat: Optional[float] = None,
     route_code: Optional[str] = None,
     model_type: Optional[str] = None,
+    horizon: Optional[int] = None,
+    as_of: Optional[str] = None,
 ) -> RouteIntelligenceResponse:
     """Internal resolver producing RouteIntelligenceResponse without duplicating logic."""
     from pelagos.forecasting.schemas import SUPPORTED_DIRECT_ROUTES
@@ -355,6 +401,19 @@ def _build_route_intelligence(
                 corridor=None,
                 latest_observation=None,
                 baseline_forecast=None,
+                forecasts=None,
+                multi_horizon_forecasts=None,
+                environmental_conditions=None,
+                bunker_fuel_references=None,
+                data_coverage=DataCoverageSummary(
+                    status="unmonitored",
+                    corridor_code=None,
+                    freight_market=DomainCoverageStatus(status="unmonitored", details=f"Route code '{route_code}' is not monitored."),
+                    forecasts=DomainCoverageStatus(status="unmonitored", details="Forecasting unavailable for unmonitored routes."),
+                    environmental=DomainCoverageStatus(status="unmonitored", details="Environmental buoy fusion unavailable for unmonitored routes."),
+                    bunker_fuel=DomainCoverageStatus(status="unmonitored", details="Bunker references unavailable for unmonitored routes."),
+                    vessel_fleet=DomainCoverageStatus(status="unmonitored", details="AIS fleet supply tracking unavailable for unmonitored routes."),
+                ),
                 vessel_availability=vessel_info,
                 disclaimers=["Freight market intelligence is unavailable for unmonitored trade routes."],
                 message=f"Route code '{route_code}' is not a monitored direct freight corridor. Supported direct corridors: {list(SUPPORTED_DIRECT_ROUTES)}.",
@@ -371,14 +430,21 @@ def _build_route_intelligence(
             return RouteIntelligenceResponse(
                 status="unsupported_input",
                 corridor=None,
+                origin_port=None,
+                destination_port=None,
                 latest_observation=None,
                 baseline_forecast=None,
+                forecasts=None,
+                multi_horizon_forecasts=None,
+                environmental_conditions=None,
+                bunker_fuel_references=None,
+                data_coverage=None,
                 vessel_availability=vessel_info,
                 disclaimers=["Both origin and destination endpoints (or a valid route_code) are required."],
                 message="Missing required origin and destination parameters.",
             )
 
-        resolution = resolve_freight_corridor(origin=origin, destination=destination)
+        resolution = resolve_freight_corridor(origin=origin, destination=destination, db=db)
 
         origin_port_dict = (
             {
@@ -407,6 +473,19 @@ def _build_route_intelligence(
                 destination_port=dest_port_dict,
                 latest_observation=None,
                 baseline_forecast=None,
+                forecasts=None,
+                multi_horizon_forecasts=None,
+                environmental_conditions=None,
+                bunker_fuel_references=None,
+                data_coverage=DataCoverageSummary(
+                    status="unmonitored",
+                    corridor_code=None,
+                    freight_market=DomainCoverageStatus(status="unmonitored", details="Trade corridor is not monitored for agricultural bulk grain rates."),
+                    forecasts=DomainCoverageStatus(status="unmonitored", details="Forecasting unavailable for unmonitored routes."),
+                    environmental=DomainCoverageStatus(status="unmonitored", details="Environmental buoy fusion is restricted to monitored freight corridors."),
+                    bunker_fuel=DomainCoverageStatus(status="unmonitored", details="Bunker fuel references are restricted to monitored corridors."),
+                    vessel_fleet=DomainCoverageStatus(status="unmonitored", details="AIS fleet supply tracking unavailable for unmonitored routes."),
+                ),
                 vessel_availability=vessel_info,
                 disclaimers=[
                     "Freight market intelligence is unavailable for unmonitored maritime trade routes.",
@@ -443,33 +522,161 @@ def _build_route_intelligence(
             is_derived=bool(latest_obs_record.is_derived),
         )
 
-    # Generate deterministic baseline forecast
-    fc_info = None
-    try:
-        fc_dict = forecast_next_route_rate(
-            db=db,
-            route_code=corridor_code,
-            model_type=model_type or "persistence",
-            horizon_months=1,
+    # Validate horizon if explicitly specified
+    supported_horizons = (1, 3, 6)
+    if horizon is not None and horizon not in supported_horizons:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported forecast horizon '{horizon}'. Supported horizons: {list(supported_horizons)} months.",
         )
-        fc_info = BaselineForecastInfo(
-            model_type=fc_dict["model_type"],
-            origin_date=str(fc_dict["origin_date"]),
-            target_date=str(fc_dict["target_date"]),
-            horizon_months=int(fc_dict["horizon_months"]),
-            predicted_value=round(float(fc_dict["predicted_value"]), 2) if fc_dict.get("predicted_value") is not None else None,
-            unit=fc_dict.get("unit_of_measure", "USD/MT"),
-            status=fc_dict.get("status", "forecast_generated"),
-            flags=fc_dict.get("flags", []),
-            training_data_cutoff=str(fc_dict.get("training_data_cutoff")) if fc_dict.get("training_data_cutoff") else None,
-            is_experimental=bool(fc_dict.get("is_experimental", False)),
-            model_family=fc_dict.get("model_family", "deterministic_baseline"),
-            fitted_parameters=fc_dict.get("fitted_parameters"),
-            notes=fc_dict.get("notes"),
-            warning=fc_dict.get("notes") if fc_dict.get("is_experimental") else None,
+
+    # Generate deterministic baseline forecasts across horizons
+    forecasts_list: List[BaselineForecastInfo] = []
+    multi_horizon_map: Dict[str, BaselineForecastInfo] = {}
+    primary_fc_info: Optional[BaselineForecastInfo] = None
+
+    target_horizons = [horizon] if horizon is not None else [1, 3, 6]
+
+    for h in target_horizons:
+        try:
+            fc_dict = forecast_next_route_rate(
+                db=db,
+                route_code=corridor_code,
+                model_type=model_type or "persistence",
+                horizon_months=h,
+            )
+            item = BaselineForecastInfo(
+                model_type=fc_dict["model_type"],
+                origin_date=str(fc_dict["origin_date"]),
+                target_date=str(fc_dict["target_date"]),
+                horizon_months=int(fc_dict["horizon_months"]),
+                predicted_value=round(float(fc_dict["predicted_value"]), 2) if fc_dict.get("predicted_value") is not None else None,
+                unit=fc_dict.get("unit_of_measure", "USD/MT"),
+                status=fc_dict.get("status", "forecast_generated"),
+                flags=fc_dict.get("flags", []),
+                training_data_cutoff=str(fc_dict.get("training_data_cutoff")) if fc_dict.get("training_data_cutoff") else None,
+                is_experimental=bool(fc_dict.get("is_experimental", False)),
+                model_family=fc_dict.get("model_family", "deterministic_baseline"),
+                fitted_parameters=fc_dict.get("fitted_parameters"),
+                notes=fc_dict.get("notes"),
+                warning=fc_dict.get("notes") if fc_dict.get("is_experimental") else None,
+            )
+            forecasts_list.append(item)
+            multi_horizon_map[f"T+{h}"] = item
+            if h == (horizon if horizon is not None else 1):
+                primary_fc_info = item
+        except Exception as exc:
+            logger.warning("Could not generate T+%s forecast for corridor '%s': %s", h, corridor_code, exc)
+
+    if primary_fc_info is None and forecasts_list:
+        primary_fc_info = forecasts_list[0]
+
+    # Resolve origin coordinates for local station distance calculation
+    origin_coords = None
+    if origin is not None and isinstance(origin, (list, tuple)) and len(origin) == 2:
+        try:
+            origin_coords = (float(origin[0]), float(origin[1]))
+        except (ValueError, TypeError):
+            pass
+    elif origin_port_dict and origin_port_dict.get("port_id"):
+        try:
+            port_repo = PortRepository()
+            port_rec = port_repo.get_port(origin_port_dict["port_id"])
+            if port_rec and port_rec.coordinates:
+                origin_coords = (float(port_rec.coordinates[0]), float(port_rec.coordinates[1]))
+        except Exception as exc:
+            logger.debug("Failed to lookup origin port coordinates: %s", exc)
+
+    # Resolve genuine environmental buoy observations
+    try:
+        env_summary = resolve_corridor_environmental_conditions(
+            db=db,
+            corridor_code=corridor_code,
+            origin_coords=origin_coords,
+            as_of=as_of,
         )
     except Exception as exc:
-        logger.warning("Could not generate forecast for corridor '%s': %s", corridor_code, exc)
+        logger.warning("Could not resolve environmental conditions for corridor '%s': %s", corridor_code, exc)
+        env_summary = None
+
+    # Resolve bunker fuel reference boundary
+    try:
+        bunker_summary = resolve_corridor_bunker_fuel_references(
+            corridor_code=corridor_code,
+            db=db,
+            as_of=as_of,
+        )
+    except Exception as exc:
+        logger.warning("Could not resolve bunker fuel references for corridor '%s': %s", corridor_code, exc)
+        bunker_summary = None
+
+    # Construct multi-domain data coverage audit summary
+    bunker_cov_status = "unavailable"
+    bunker_cov_details = "Commercial spot bunker price benchmark feeds connected (Bunker Fuel Prices); corridor hubs currently unquoted/withheld; synthesis strictly disallowed"
+    bunker_as_of = None
+    bunker_record_count = 0
+
+    if bunker_summary:
+        if bunker_summary.status in ("available", "partial"):
+            bunker_cov_status = "active" if bunker_summary.status == "available" else "partial"
+            bunker_cov_details = f"Bunker Fuel Prices: {bunker_summary.hubs_with_prices_count}/{len(bunker_summary.bunkering_hubs_in_scope)} corridor hubs quoted ({bunker_summary.status})"
+            if bunker_summary.latest_quotes:
+                bunker_record_count = len(bunker_summary.latest_quotes)
+                bunker_as_of = bunker_summary.latest_quotes[0].observation_time
+                if any(q.freshness == "stale" for q in bunker_summary.latest_quotes):
+                    bunker_cov_status = "stale"
+                    bunker_cov_details += " [stale observations]"
+        elif bunker_summary.regional_benchmarks:
+            bunker_cov_details = (
+                f"Bunker Fuel Prices connected ({len(bunker_summary.regional_benchmarks)} regional benchmark(s) available; "
+                f"corridor hubs unquoted/withheld; synthesis strictly disallowed)"
+            )
+
+    coverage_summary = DataCoverageSummary(
+        status="partial",
+        corridor_code=corridor_code,
+        freight_market=DomainCoverageStatus(
+            status="active" if latest_obs_record else "unavailable",
+            details="Canonical monthly ocean freight rates for agricultural dry bulk grain (Panamax/Supramax)",
+            source=latest_obs_record.source_name if latest_obs_record else "USDA Agricultural Marketing Service / O'Neil Commodity Consulting",
+            frequency="monthly",
+            as_of_date=str(latest_obs_record.observation_date) if latest_obs_record else None,
+        ),
+        forecasts=DomainCoverageStatus(
+            status="active" if forecasts_list else "unavailable",
+            details=f"Deterministic baseline forecasts across {len(forecasts_list)} horizon(s) ({', '.join('T+' + str(f.horizon_months) for f in forecasts_list)})",
+            source="Pelagos Baseline Forecasting Engine",
+            frequency="monthly",
+            as_of_date=primary_fc_info.origin_date if primary_fc_info else None,
+        ),
+        environmental=DomainCoverageStatus(
+            status=(
+                "active"
+                if (env_summary and env_summary.stations_count > 0 and env_summary.stations[0].freshness in ("fresh", "recent"))
+                else (env_summary.stations[0].freshness if (env_summary and env_summary.stations) else "unavailable")
+            ),
+            details=(
+                f"NOAA NDBC moored ocean buoys ({env_summary.coverage_status}, freshness: {env_summary.stations[0].freshness})"
+                if (env_summary and env_summary.stations)
+                else "No active moored ocean buoys"
+            ),
+            source="NOAA National Data Buoy Center (NDBC)",
+            record_count=env_summary.stations_count if env_summary else 0,
+            as_of_date=env_summary.stations[0].observation_time if (env_summary and env_summary.stations) else None,
+        ),
+        bunker_fuel=DomainCoverageStatus(
+            status=bunker_cov_status,
+            details=bunker_cov_details,
+            source="Bunker Fuel Prices (bunkerfuelprices.com)",
+            record_count=bunker_record_count,
+            as_of_date=bunker_as_of,
+        ),
+        vessel_fleet=DomainCoverageStatus(
+            status="unavailable",
+            details="Live AIS fleet telemetry and commercial tonnage lists are not connected (pelagos live_ais_connected: false)",
+            source=None,
+        ),
+    )
 
     corridor_info = CorridorInfo(
         route_code=corridor_code,
@@ -490,7 +697,13 @@ def _build_route_intelligence(
         origin_port=origin_port_dict,
         destination_port=dest_port_dict,
         latest_observation=obs_info,
-        baseline_forecast=fc_info,
+        baseline_forecast=primary_fc_info,
+        forecasts=forecasts_list if forecasts_list else None,
+        multi_horizon_forecasts=multi_horizon_map if multi_horizon_map else None,
+        environmental_conditions=env_summary,
+        bunker_fuel_references=bunker_summary,
+        bunker_fuel=bunker_summary,
+        data_coverage=coverage_summary,
         vessel_availability=vessel_info,
         disclaimers=commercial_disclaimers,
         message=f"Monitored freight intelligence retrieved for corridor {corridor_code}.",
@@ -507,14 +720,16 @@ def get_route_intelligence_endpoint(
     dest_lat: Optional[float] = Query(None, description="Explicit destination latitude"),
     route_code: Optional[str] = Query(None, description="Direct corridor route code (e.g. PNW-JPN-BULK)"),
     model_type: Optional[str] = Query(None, description="Baseline forecast model (default: persistence)"),
+    horizon: Optional[int] = Query(None, description="Forecast horizon in months: 1, 3, or 6 (default: returns all supported horizons)"),
+    as_of: Optional[str] = Query(None, description="Optional evaluation timestamp (ISO 8601) for deterministic freshness evaluation"),
     db: Session = Depends(get_db),
 ) -> RouteIntelligenceResponse:
-    """Retrieve commercial freight intelligence and baseline forecast for a maritime route.
+    """Retrieve commercial freight intelligence, environmental buoy observations, and multi-horizon forecasts.
 
-    Resolves origin and destination endpoints to monitored freight corridors (PNW-JPN-BULK, USG-JPN-BULK).
-    Returns latest observed rate, 1-month persistence baseline forecast, vessel availability status,
-    and authoritative scope disclaimers. Unsupported routes return explicit unmonitored status without
-    fabricating rates.
+    Resolves origin and destination endpoints to monitored freight corridors (PNW-JPN-BULK, USG-JPN-BULK)
+    using the canonical port directory and aliases.
+    Enriches freight market observations with genuine NOAA NDBC moored buoy observations, explicit bunker fuel
+    integration boundaries, and multi-horizon forecasts (T+1, T+3, T+6).
     """
     return _build_route_intelligence(
         db=db,
@@ -526,6 +741,8 @@ def get_route_intelligence_endpoint(
         dest_lat=dest_lat,
         route_code=route_code,
         model_type=model_type,
+        horizon=horizon,
+        as_of=as_of,
     )
 
 
@@ -545,4 +762,6 @@ def post_route_intelligence_endpoint(
         dest_lat=request.dest_lat,
         route_code=request.route_code,
         model_type=request.model_type,
+        horizon=request.horizon,
+        as_of=request.as_of,
     )

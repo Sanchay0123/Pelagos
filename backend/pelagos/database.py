@@ -133,6 +133,10 @@ def ensure_schema_compatibility(target_engine=None):
             if "retrieval_time_utc" not in cols:
                 conn.execute(text("ALTER TABLE environmental_observations ADD COLUMN retrieval_time_utc TIMESTAMP"))
 
+        if "bunker_price_observations" not in table_names:
+            import pelagos.models
+            pelagos.models.BunkerPriceObservation.__table__.create(conn)
+
         conn.commit()
 
 
