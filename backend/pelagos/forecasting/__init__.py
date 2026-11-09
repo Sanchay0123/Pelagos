@@ -54,6 +54,22 @@ from pelagos.forecasting.service import (
     evaluate_route_baseline_models,
     forecast_next_route_rate,
 )
+from pelagos.forecasting.features import (
+    FEATURE_CATALOG,
+    FEATURE_SUBSETS,
+    FeatureDefinition,
+    USABLE_FEATURE_NAMES,
+    EXCLUDED_FEATURE_NAMES,
+    extract_all_usable_features,
+)
+from pelagos.forecasting.dataset import (
+    ForecastDataset,
+    ForecastDatasetRow,
+    TemporalAvailabilityPolicy,
+    build_forecast_dataset,
+    generate_feature_inventory,
+    generate_route_feature_availability_matrix,
+)
 
 __all__ = [
     # Index Engine
@@ -101,4 +117,17 @@ __all__ = [
     "get_route_rate_observations",
     "evaluate_route_baseline_models",
     "forecast_next_route_rate",
+    # Features & Dataset (Stage C3.1 / C3.1.1)
+    "FEATURE_CATALOG",
+    "FEATURE_SUBSETS",
+    "FeatureDefinition",
+    "USABLE_FEATURE_NAMES",
+    "EXCLUDED_FEATURE_NAMES",
+    "extract_all_usable_features",
+    "ForecastDataset",
+    "ForecastDatasetRow",
+    "TemporalAvailabilityPolicy",
+    "build_forecast_dataset",
+    "generate_feature_inventory",
+    "generate_route_feature_availability_matrix",
 ]
