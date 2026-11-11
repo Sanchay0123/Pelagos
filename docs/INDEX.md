@@ -3,9 +3,9 @@ title: Pelagos Documentation Index
 document_id: DOC-003
 type: documentation_index
 status: approved
-version: 1.0.24
+version: 1.0.25
 created: 2026-10-10
-updated: 2026-10-24
+updated: 2026-11-11
 tags:
   - index
   - navigation
@@ -29,11 +29,11 @@ N/A
 
 ### Core Foundations
 * [Documentation Standard](./DOCUMENTATION_STANDARD.md) (v1.1.1, Status: Approved)
-* [Project Overview](./PROJECT_OVERVIEW.md) (v1.0.3, Status: Approved)
-* [Documentation Index](./INDEX.md) (v1.0.24, Status: Approved)
+* [Project Overview](./PROJECT_OVERVIEW.md) (v1.0.4, Status: Approved)
+* [Documentation Index](./INDEX.md) (v1.0.25, Status: Approved)
 
 ### Architecture and Decisions
-* [System Architecture Specification](./architecture/system-architecture.md) (v1.0.1, Status: Drafting)
+* [System Architecture Specification](./architecture/system-architecture.md) (v1.0.2, Status: Drafting)
 * Architecture Decision Records (ADRs):
   * [ADR-0001: Modular Monolith Backend Architecture](./architecture/adr/adr-0001-modular-monolith-architecture.md) (v1.0.0, Status: Drafting)
   * [ADR-0002: Dual-Tier Storage Strategy](./architecture/adr/adr-0002-dual-tier-storage-strategy.md) (v1.0.0, Status: Drafting)
@@ -42,12 +42,17 @@ N/A
   * [ADR-0005: Frontend Integration and Basemap Decoupling](./architecture/adr/adr-0005-frontend-integration-and-basemap-strategy.md) (v1.0.0, Status: Drafting)
 
 ### Product and Requirements
-* [Functional Requirements Specification](./requirements/functional-requirements.md) (v1.0.6, Status: Drafting)
+* [Functional Requirements Specification](./requirements/functional-requirements.md) (v1.0.7, Status: Drafting)
 * [Nonfunctional Requirements Specification](./requirements/nonfunctional-requirements.md) (v1.0.3, Status: Drafting)
 
 ### Data and Intelligence
 * [Data Architecture and Source Strategy](./data/data-architecture.md) (v1.0.0, Status: Drafting)
 * [Freight Index Specification and Baseline Forecasting Feasibility Assessment (ML-001)](./forecasting/freight-index-and-forecasting-specification.md) (v1.3.0, Status: Approved)
+* [Stage C3.1.2 Feature Coverage & Forecast Dataset Report (RES-C31-001)](./forecasting/c3-1-feature-coverage-and-forecast-dataset.md) (v1.2.0, Research Notes — Approved)
+* [Stage C3.2 Candidate ML Benchmarking Report (REPORT-C32-ML-BENCHMARK-001)](./forecasting/c3-2-candidate-ml-benchmarking-report.md) (v1.0.0, Research Notes — Approved; JSON: [c32_ml_benchmark_results.json](./forecasting/artifacts/c32_ml_benchmark_results.json))
+* [Stage C3.3 Implementation Specification (SPEC-C33-REGIME-001)](./forecasting/c3-3-implementation-specification.md) (v1.0.0, Research Notes — Approved)
+* [Stage C3.3 Regime-Aware Forecasting Investigation Report (REPORT-C33-REGIME-001)](./forecasting/c3-3-regime-aware-forecasting-report.md) (v1.0.0, Research Notes — Approved; JSON: [c33_regime_investigation_results.json](./forecasting/artifacts/c33_regime_investigation_results.json))
+* [Stage D: Vessel Suitability & Chartering Intelligence Specification (OPT-001)](./optimization/stage-d-vessel-suitability-and-chartering.md) (v1.0.0, Status: Under Review)
 * [Operational Maritime Routing Readiness Assessment (ROUT-001)](./routing/operational-maritime-routing-readiness.md) (v1.1.0, Status: Drafting)
 * [Real Maritime Routing Network Data Investigation (ROUT-002)](./routing/D9.3-real-network-data-investigation.md) (v1.0.1, Status: Under Review)
 * [Operational Maritime Routing Foundation Implementation Plan (ROUT-003)](./routing/D9.4-implementation-plan.md) (v1.0.0, Status: Under Review)
@@ -124,3 +129,4 @@ Links to established, governed documentation within the repository, and maps pla
 | 1.0.22 | 2026-10-21 | Implementation Agent | Milestone D9.5 launch: Registered Commercial Freight Route Intelligence Specification (ROUT-006) under drafting status. Synchronized index version reference. Kept status approved. |
 | 1.0.23 | 2026-10-21 | Implementation Agent | Synchronized ROUT-006 status reference to Accepted following independent final review and Project Owner formal specification acceptance. Synchronized index version reference. Kept status approved. |
 | 1.0.24 | 2026-10-24 | Implementation Agent | Registered OD-ROUT-06-01 decision record; synchronized Functional Requirements (v1.0.6), System Architecture (v1.0.1), and ROUT-006 (v1.0.1) following formal forecast cadence reconciliation. Status: approved. |
+| 1.0.25 | 2026-11-11 | Implementation Agent | Registered promoted Stage C3 research documentation (`RES-C31-001`, `REPORT-C32-ML-BENCHMARK-001`, `SPEC-C33-REGIME-001`, `REPORT-C33-REGIME-001` plus JSON artifacts) and Stage D specification (`OPT-001`); synchronized Project Overview (v1.0.4), System Architecture (v1.0.2), and Functional Requirements (v1.0.7). Status: approved. |

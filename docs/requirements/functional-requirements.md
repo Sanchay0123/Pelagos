@@ -3,9 +3,9 @@ title: Pelagos Functional Requirements Specification
 document_id: REQ-FR-001
 type: requirements
 status: drafting
-version: 1.0.6
+version: 1.0.7
 created: 2026-10-12
-updated: 2026-10-24
+updated: 2026-11-11
 tags:
   - requirements
   - functional-requirements
@@ -286,7 +286,7 @@ Every requirement item adheres to the following structure:
   1. Candidate vessel list filters out vessels whose ETA exceeds the cancelling date under operational speed assumptions.
   2. Vessels currently laden or undergoing drydock/repairs are excluded from spot laycan candidate lists.
 * **Verification Method:** Test
-* **Traceability:** Upstream: [PROJECT_OVERVIEW.md Section 2, 5](../PROJECT_OVERVIEW.md); Downstream: `ARCH-001`.
+* **Traceability:** Upstream: [PROJECT_OVERVIEW.md Section 2, 5](../PROJECT_OVERVIEW.md); Downstream: [`ARCH-001`](../architecture/system-architecture.md), [`OPT-001`](../optimization/stage-d-vessel-suitability-and-chartering.md) (`pelagos.optimization.chartering`: live open-tonnage availability currently `unavailable` without commercial fixture feeds).
 
 ---
 
@@ -301,7 +301,7 @@ Every requirement item adheres to the following structure:
   1. Recommendations provide a concrete action: Action Type (`Fix Now`, `Wait`, `Hedge`), Contract Structure (`Spot Single Voyage`, `Consecutive Voyage Charter (COA)`, `Time Charter (TC)`), Recommended Vessel Class, and Expected Cost Benefit.
   2. Each recommendation details the underlying cost-benefit calculation and market timing rationale.
 * **Verification Method:** Demonstration & Test
-* **Traceability:** Upstream: [PROJECT_OVERVIEW.md Section 1, 2](../PROJECT_OVERVIEW.md); Downstream: `ARCH-001` (Optimization Engine).
+* **Traceability:** Upstream: [PROJECT_OVERVIEW.md Section 1, 2](../PROJECT_OVERVIEW.md); Downstream: [`ARCH-001`](../architecture/system-architecture.md), [`OPT-001`](../optimization/stage-d-vessel-suitability-and-chartering.md) (`/api/v1/charter/recommend` six-gate fail-closed readiness interface).
 
 #### REQ-FR-CPO-002: Multi-Contract Horizon Optimization
 * **Maturity:** Confirmed
@@ -312,7 +312,7 @@ Every requirement item adheres to the following structure:
   1. Optimization engine outputs total projected cost, variance risk, and vessel utilization across each contract structure.
   2. Assumptions regarding bunker price escalation and port turnaround delays are explicitly parameterized.
 * **Verification Method:** Analysis
-* **Traceability:** Upstream: [PROJECT_OVERVIEW.md Section 2, 5](../PROJECT_OVERVIEW.md); Downstream: `ARCH-001`.
+* **Traceability:** Upstream: [PROJECT_OVERVIEW.md Section 2, 5](../PROJECT_OVERVIEW.md); Downstream: [`ARCH-001`](../architecture/system-architecture.md), [`OPT-001`](../optimization/stage-d-vessel-suitability-and-chartering.md).
 
 #### REQ-FR-CPO-003: Operational Voyage Constraint Evaluation
 * **Maturity:** Confirmed
@@ -323,7 +323,7 @@ Every requirement item adheres to the following structure:
   1. Any candidate vessel violating berth draft, beam, or LOA limits at either loading or discharging ports is automatically pruned from the recommendation set.
   2. Total cost calculation incorporates estimated bunker fuel consumption, canal tolls, and port disbursement costs.
 * **Verification Method:** Test
-* **Traceability:** Upstream: [PROJECT_OVERVIEW.md Section 2, 5](../PROJECT_OVERVIEW.md); Downstream: `ARCH-001`.
+* **Traceability:** Upstream: [PROJECT_OVERVIEW.md Section 2, 5](../PROJECT_OVERVIEW.md); Downstream: [`ARCH-001`](../architecture/system-architecture.md), [`OPT-001`](../optimization/stage-d-vessel-suitability-and-chartering.md) (`pelagos.optimization.matcher`, `chartering`: enforces documented port draft limits, canal lock geometry, verified DWT when present, and explicit missing-data pruning).
 
 ---
 
@@ -478,12 +478,12 @@ Every requirement item adheres to the following structure:
 * `REQ-FR-OMR-001` to `OMR-004` &larr; [DOC-002 Section 4, 5](../PROJECT_OVERVIEW.md) (Operational routing vs geometric lines, physical vessel constraints, evidence-conditioned feasibility).
 * `REQ-FR-GDS-001` to `GDS-002` &larr; [DOC-002 Section 4, 5](../PROJECT_OVERVIEW.md) (Geopolitical disruption factor family, explainable rerouting impact).
 
-### 10.2 Downstream Traceability to Future Specifications
-* All `REQ-FR-SAV` &rarr; Planned Architecture Specification `ARCH-001` (Visualization Subsystem).
-* All `REQ-FR-DII` &rarr; Planned Dataset Specification `DATA-001` and Test Specification `TEST-001`.
-* All `REQ-FR-FRF` &rarr; Planned ML Model Specification `ML-001`.
-* All `REQ-FR-OMR` &rarr; Planned Operational Maritime Routing Specification `ARCH-001` / Routing Module.
-* All `REQ-FR-CPO` &rarr; Planned Optimization Engine Specification `ARCH-001` / Optimization Module.
+### 10.2 Downstream Traceability to Specifications
+* All `REQ-FR-SAV` &rarr; [`ARCH-001`](../architecture/system-architecture.md) (Visualization Subsystem).
+* All `REQ-FR-DII` &rarr; [`DATA-001`](../data/data-architecture.md) and planned Test Specification `TEST-001`.
+* All `REQ-FR-FRF` &rarr; [`ML-001`](../forecasting/freight-index-and-forecasting-specification.md) and Stage C3 research evaluations ([`RES-C31-001`](../forecasting/c3-1-feature-coverage-and-forecast-dataset.md), [`REPORT-C32-ML-BENCHMARK-001`](../forecasting/c3-2-candidate-ml-benchmarking-report.md), [`SPEC-C33-REGIME-001`](../forecasting/c3-3-implementation-specification.md), [`REPORT-C33-REGIME-001`](../forecasting/c3-3-regime-aware-forecasting-report.md)).
+* All `REQ-FR-OMR` &rarr; [`ARCH-001`](../architecture/system-architecture.md) and Operational Maritime Routing Specifications (`ROUT-001`..`ROUT-006`).
+* All `REQ-FR-CPO` & `REQ-FR-CDV-002` &rarr; [`ARCH-001`](../architecture/system-architecture.md) and Stage D Specification [`OPT-001`](../optimization/stage-d-vessel-suitability-and-chartering.md) (`Milestone D10` / `D10.2` in `pelagos.optimization`).
 
 ---
 
@@ -509,3 +509,4 @@ Every requirement item adheres to the following structure:
 | 1.0.4 | 2026-10-14 | Project Agent | D2 final closure refinement: Governed forecasting evaluation thresholds in REQ-FR-FRF-002, distinguishing confirmed architectural requirements (four-state lifecycle, out-of-sample evaluation, baseline comparisons, interval calibration, automated drift demotion) from provisional proposed evaluation parameters (12-month data readiness, 90-day held-out test window, baseline performance margin, 80% p10–p90 interval coverage, and 1.25x rolling drift multiplier); updated OQ-FR-05, OQ-FR-06, and added OQ-FR-07. Kept status drafting. |
 | 1.0.5 | 2026-10-14 | Project Agent | Final D2 consistency pass: Reconciled REQ-FR-FRF-002 baseline comparison requirement by marking statistical significance tests, criteria, and margins as provisional parameters tracked in OQ-FR-05; consistently classified both 80% and 95% prediction interval coverage targets as provisional calibration targets in REQ-FR-FRF-002, REQ-FR-FRF-004, and OQ-FR-05; aligned drift threshold reference wording with OQ-FR-06. Kept status drafting. |
 | 1.0.6 | 2026-10-24 | Project Agent | Reconciled REQ-FR-FRF-001 forecasting horizons to candidate calendar-month horizons (T+1, T+3, T+6) following formal approval of OD-ROUT-06-01. Quarantined daily horizons outside monthly data scope, established explicit temporal semantics, and preserved REQ-FR-FRF-002 evaluation gates. Status: drafting. |
+| 1.0.7 | 2026-11-11 | Implementation Agent | Updated Section 5.4/5.5 and Section 10.2 downstream traceability to link implemented Stage C3 forecasting research notes (`ML-001`, C3.1–C3.3) and Stage D (`D10`/`D10.2` / `OPT-001`) vessel suitability and chartering readiness specifications. Kept status drafting. |

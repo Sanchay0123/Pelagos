@@ -3,9 +3,9 @@ title: Pelagos System Architecture Specification
 document_id: ARCH-001
 type: architecture_spec
 status: drafting
-version: 1.0.1
+version: 1.0.2
 created: 2026-10-14
-updated: 2026-10-24
+updated: 2026-11-11
 tags:
   - architecture
   - specification
@@ -134,11 +134,12 @@ graph TB
   * Layer overlays for maritime chokepoints, canals, ports, and Traffic Separation Schemes ([REQ-FR-SAV-004](../requirements/functional-requirements.md)).
   * Side-by-side visual route comparison under disruption scenarios ([REQ-FR-GDS-002](../requirements/functional-requirements.md)).
   * Display of non-navigation-grade safety banner ([REQ-NFR-SBL-001](../requirements/nonfunctional-requirements.md)).
-* **Integration Boundary:** Frontend connects to backend exclusively through:
-  * `GET /api/v1/vessels/snapshot`: Structured JSON snapshot of active vessels within viewport bounds (compatible with GEV `vesselSnapshot` parser).
-  * `WS /api/v1/telemetry/live`: Live delta feed emitting validated vessel position pings.
-  * `POST /api/v1/routes/evaluate`: Submits origin, destination, and vessel parameters; returns GeoJSON voyage trajectories and clearance profiles.
-  * `POST /api/v1/charter/recommend`: Submits laycan, cargo tonnage, and port pairs; returns ranked procurement decisions.
+* **Integration Boundary:** Frontend and analytical consumers connect to backend REST/WS interfaces, including:
+  * `GET /api/v1/vessels/snapshot`: Structured JSON snapshot of active/historical vessels within viewport bounds (compatible with GEV `vesselSnapshot` parser).
+  * `WS /api/v1/telemetry/live`: Planned live delta feed emitting validated vessel position pings (not currently connected; historical sample active).
+  * `POST /api/v1/routing/calculate` (implemented MARNET & prototype routing; originally scoped as `/api/v1/routes/evaluate`) and `GET`/`POST /api/v1/freight/route-intelligence`: Voyage corridor trajectories, rates, forecasts, buoy conditions, and bunker availability.
+  * `GET`/`POST /api/v1/calculator/voyage-freight` (`D10` / `OPT-001`) and `GET`/`POST /api/v1/calculator/vessel-suitability` (`D10.2` / `OPT-002`).
+  * `GET`/`POST /api/v1/charter/assess` and `GET`/`POST /api/v1/charter/recommend`: Vessel-to-cargo/route assessment and six-gate fail-closed chartering readiness recommendation endpoint ([OPT-001](../optimization/stage-d-vessel-suitability-and-chartering.md)).
 
 #### 2. Data Ingestion Subsystem (`pelagos.ingestion`)
 * **Responsibilities:**
@@ -168,19 +169,20 @@ graph TB
   * Continuous model drift monitoring with automated demotion back to `eligible` (`REASON_MODEL_DRIFT_DEGRADATION`) if rolling error exceeds degradation thresholds (provisional 1.25&times; multiplier).
   * Strict separation between baseline empirical forecasts and user-driven scenario simulations ([REQ-FR-FRF-003](../requirements/functional-requirements.md)).
 
-#### 5. Commercial Cargo & Laycan Subsystem (`pelagos.commercial`)
+#### 5. Commercial Cargo & Laycan Assessment (Implemented inside `pelagos.optimization` for Stage D; `pelagos.commercial` reserved)
 * **Responsibilities:**
-  * Regional and port-pair cargo volume demand estimation across commodity sectors ([REQ-FR-CDV-001](../requirements/functional-requirements.md)).
-  * Commercial fleet availability search filtering candidate vessels capable of meeting laycan cancelling dates ([REQ-FR-CDV-002](../requirements/functional-requirements.md)).
-  * Pruning vessels violating physical berth restrictions (draft, LOA, beam) or port equipment limitations at load/discharge ports ([REQ-FR-CPO-003](../requirements/functional-requirements.md)).
-  * Sanctions compliance screening flagging vessels on OFAC, EU, or UN watchlists ([REQ-NFR-SBL-002](../requirements/nonfunctional-requirements.md)).
+  * Regional and port-pair cargo volume demand estimation across commodity sectors ([REQ-FR-CDV-001](../requirements/functional-requirements.md)) — *unimplemented pending historical trade feeds*.
+  * Commercial fleet availability search filtering candidate vessels capable of meeting laycan cancelling dates ([REQ-FR-CDV-002](../requirements/functional-requirements.md)) — *implemented cleanly inside `pelagos.optimization.chartering` when verified fixture inputs are supplied; strictly `UNCONFIRMED`/`unavailable` on current historical AIS sample*.
+  * Pruning vessels violating physical berth limits (draft, LOA, beam) or documented channel limits (`USKAL`, `USBTR`, `INMUN`) and canal restrictions (`Panama Canal`) ([REQ-FR-CPO-003](../requirements/functional-requirements.md)) — *implemented in [`matcher.py`](../../backend/pelagos/optimization/matcher.py) and [`chartering.py`](../../backend/pelagos/optimization/chartering.py); missing vessel particulars and unverified berth limits are explicitly flagged*.
+  * Sanctions compliance screening flagging vessels on OFAC, EU, or UN watchlists ([REQ-NFR-SBL-002](../requirements/nonfunctional-requirements.md)) — *unimplemented*.
 
 #### 6. Charter Optimization Engine (`pelagos.optimization`)
 * **Responsibilities:**
-  * Evaluating total procurement and voyage costs across competing charter structures: Spot voyage charter, Consecutive Voyage Charter (CVC), and short-term Time Charter (TC) ([REQ-FR-CPO-001](../requirements/functional-requirements.md), [REQ-FR-CPO-002](../requirements/functional-requirements.md)).
-  * Quantitative incorporation of fuel consumption, canal tolls, demurrage exposure, and ballast repositioning costs.
-  * Deterministic, explainable ranking of candidate vessels outputting actionable commercial recommendations.
-  * Immutable persistence of optimization input snapshots for comprehensive decision replay and auditability ([REQ-NFR-OAS-002](../requirements/nonfunctional-requirements.md)).
+  * Deterministic gross ocean freight calculation (`D10` / `OPT-001` via [`calculator.py`](../../backend/pelagos/optimization/calculator.py)) and canonical vessel dimensional/cargo/route suitability screening (`D10.2` / `OPT-002` via [`matcher.py`](../../backend/pelagos/optimization/matcher.py)).
+  * Six-gate readiness audit and multi-contract procurement evaluation comparing Spot Single Voyage, Consecutive Voyage Charter (COA), and Time Charter (TC) ([REQ-FR-CPO-001](../requirements/functional-requirements.md), [REQ-FR-CPO-002](../requirements/functional-requirements.md)) via [`chartering.py`](../../backend/pelagos/optimization/chartering.py); strictly emits `insufficient_data` or `unavailable` when live commercial fixtures, verified DWT, corridor bunker quotes, or directional forecast signals are absent.
+  * Quantitative incorporation of bunker fuel consumption, canal tolls, and port disbursements when supplied in `VerifiedCharterInputs` (never fabricated from missing DB data).
+  * Deterministic ranking of candidate vessels without guessing unverified commercial openness ([Stage D Specification (`OPT-001`)](../optimization/stage-d-vessel-suitability-and-chartering.md)).
+  * Immutable persistence of optimization input snapshots for decision replay ([REQ-NFR-OAS-002](../requirements/nonfunctional-requirements.md)) — *planned / not yet persisted to `charter_audit_log`*.
 
 #### 7. Geopolitical Disruption Subsystem (`pelagos.disruption`)
 * **Responsibilities:**
@@ -395,10 +397,10 @@ graph TB
 ## 6. Dependencies and Interfaces
 
 ### 6.1 Internal Subsystem Interfaces
-* `pelagos.ingestion.contracts`: Pydantic models for raw and normalized telemetry observations.
-* `pelagos.routing.interface`: Service boundary taking route requests and returning `VoyagePlan` models with GeoJSON geometries and waypoint clearance tables.
-* `pelagos.forecasting.lifecycle`: State machine evaluating corridor state and returning `ForecastResult` distributions.
-* `pelagos.optimization.solver`: Optimization engine taking laycan constraints and returning ranked `CharterRecommendation` objects.
+* `pelagos.ingestion.contracts` / `pelagos.ingestion.schemas`: Pydantic contracts for raw and normalized telemetry, port, freight, trade, buoy, and bunker observations.
+* `pelagos.routing.service` (`MaritimeRoutingEngine`): Deterministic route service returning `RoutingResult` models with GeoJSON polyline geometries, antimeridian segments, canal transits, and documented limitations.
+* `pelagos.forecasting.service` / `dataset` / `ml_benchmarks` / `regime_experiments`: Multi-horizon forecasting baselines (active production `persistence`), strict-forward `ForecastDataset`, and empirical ML/regime benchmarking modules ([`ML-001`](../forecasting/freight-index-and-forecasting-specification.md), [`REPORT-C33-REGIME-001`](../forecasting/c3-3-regime-aware-forecasting-report.md)).
+* `pelagos.optimization` (`calculator`, `matcher`, `chartering`): Stage D optimization boundary providing `calculate_voyage_freight`, `match_suitable_vessels`, `assess_vessel_for_voyage`, and `recommend_charter_strategy` ([`OPT-001`](../optimization/stage-d-vessel-suitability-and-chartering.md)).
 
 ### 6.2 External System Interfaces
 * **AISStream WebSocket (`wss://stream.aisstream.io/v0/stream`):** Live AIS feed.
@@ -461,3 +463,4 @@ graph TB
 |---|---|---|---|
 | 1.0.0 | 2026-10-14 | Project Agent | Initial draft of Pelagos System Architecture Specification (ARCH-001) under Milestone D3. Defines modular monolith decomposition, GEV frontend integration, dual-tier storage, failure isolation, and container boundaries. Status: drafting. |
 | 1.0.1 | 2026-10-24 | Project Agent | Reconciled freight forecasting engine horizons to candidate monthly horizons (T+1, T+3, T+6) per OD-ROUT-06-01 resolution and REQ-FR-FRF-001. Kept status drafting. |
+| 1.0.2 | 2026-11-11 | Implementation Agent | Reconciled Section 5.2 and Section 6.1 module contracts and REST interfaces with completed Stage C3 forecasting benchmarks and Stage D (`D10`/`D10.2`) optimization/chartering endpoints (`OPT-001`). Kept status drafting. |

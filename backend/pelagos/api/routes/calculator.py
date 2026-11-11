@@ -85,6 +85,7 @@ def calculate_voyage_freight_get(
 def match_vessel_suitability_post(
     request: VesselSuitabilityRequest,
     db: Session = Depends(get_db),
+    routing_engine: MaritimeRoutingEngine = Depends(get_routing_engine),
 ) -> VesselSuitabilityResponse:
     """Evaluate candidate vessel suitability for corridor and cargo tonnage from JSON body.
 
@@ -92,7 +93,7 @@ def match_vessel_suitability_post(
     cargo parcel requirements, calculates Great-Circle distance to origin loading port,
     and returns transparent, evidence-backed candidate rankings.
     """
-    return match_suitable_vessels(db=db, request=request)
+    return match_suitable_vessels(db=db, request=request, routing_engine=routing_engine)
 
 
 @router.get("/vessel-suitability", response_model=VesselSuitabilityResponse)
@@ -101,8 +102,10 @@ def match_vessel_suitability_get(
     origin: Optional[str] = Query(None, description="Origin port UN/LOCODE (e.g. USSEA)"),
     destination: Optional[str] = Query(None, description="Destination port UN/LOCODE (e.g. JPYOK)"),
     route_code: Optional[str] = Query(None, description="Direct corridor code (e.g. PNW-JPN-BULK)"),
+    canal_policy: str = Query("allow", description="Routing canal policy ('allow', 'avoid_panama', 'avoid_suez', 'avoid_all')"),
     max_vessels: int = Query(50, ge=1, le=500, description="Maximum candidates to return"),
     db: Session = Depends(get_db),
+    routing_engine: MaritimeRoutingEngine = Depends(get_routing_engine),
 ) -> VesselSuitabilityResponse:
     """Evaluate candidate vessel suitability via query parameters."""
     req = VesselSuitabilityRequest(
@@ -110,7 +113,8 @@ def match_vessel_suitability_get(
         origin=origin,
         destination=destination,
         route_code=route_code,
+        canal_policy=canal_policy,
         max_vessels=max_vessels,
     )
-    return match_suitable_vessels(db=db, request=req)
+    return match_suitable_vessels(db=db, request=req, routing_engine=routing_engine)
 

@@ -379,9 +379,12 @@ class TestFeatureInventoryAndAvailabilityMatrix:
         assert freight_dom["missingness_rate_pct"] == 0.0
         assert "Sufficient" in freight_dom["monthly_modeling_sufficiency"]
 
-        # Trade domain is insufficient and excluded
+        # Trade domain is insufficient and excluded (13 verified rows in DB: 8 USDA FAS GATS + 5 Indian DGCI&S)
+        from pelagos.models import TradeObservation
+
         trade_dom = next(d for d in inv if d["domain_number"] == 2)
-        assert trade_dom["genuine_observations_count"] == 11
+        assert trade_dom["genuine_observations_count"] == 13
+        assert trade_dom["genuine_observations_count"] == db_session.query(TradeObservation).count()
         assert trade_dom["missingness_rate_pct"] > 99.0
         assert "Insufficient" in trade_dom["monthly_modeling_sufficiency"]
         assert "Excluded" in trade_dom["usability_status"]
@@ -857,3 +860,106 @@ class TestC312StrictForwardSemanticsAndAvailability:
         stats_2_at_11 = calculate_rolling_statistics(hist_2[:12])
 
         assert stats_1 == stats_2_at_11
+
+    def test_decision_timestamp_must_strictly_exceed_conservative_cutoff_boundary(self, db_session):
+        """Strict ordering (>): decision timestamps equal to or earlier than Day 14 cutoff must fail."""
+        equal_to_edt_policy = TemporalAvailabilityPolicy(
+            decision_hour_utc=16,
+            decision_minute_utc=0,
+            decision_second_utc=0,
+        )
+        with pytest.raises(AssertionError, match="Strict ordering violation"):
+            build_forecast_dataset(
+                db=db_session,
+                route_code="PNW-JPN-BULK",
+                horizon_months=1,
+                availability_policy=equal_to_edt_policy,
+            )
+
+        earlier_than_est_policy = TemporalAvailabilityPolicy(
+            decision_hour_utc=16,
+            decision_minute_utc=30,
+            decision_second_utc=0,
+        )
+        with pytest.raises(AssertionError, match="Strict ordering violation"):
+            build_forecast_dataset(
+                db=db_session,
+                route_code="PNW-JPN-BULK",
+                horizon_months=1,
+                availability_policy=earlier_than_est_policy,
+            )
+
+    def test_dst_transition_months_preserve_strict_timestamp_ordering(self, db_session):
+        """Spring-forward (EDT) and fall-back (EST) transitions keep strict > ordering on cutoffs and targets."""
+        policy = TemporalAvailabilityPolicy()
+        ds = build_forecast_dataset(
+            db=db_session,
+            route_code="PNW-JPN-BULK",
+            horizon_months=1,
+            availability_policy=policy,
+        )
+        rows_by_obs = {r.observation_date: r for r in ds.rows}
+
+        # Feb 2024 observation -> Day 14 cutoff on 2024-03-14 (EDT = UTC-4 -> 16:00 UTC)
+        feb_row = rows_by_obs[date(2024, 2, 1)]
+        assert feb_row.conservative_availability_cutoff == datetime(2024, 3, 14, 16, 0, 0, tzinfo=timezone.utc)
+        assert feb_row.decision_timestamp > feb_row.conservative_availability_cutoff
+
+        # Oct 2024 observation -> Day 14 cutoff on 2024-11-14 (EST = UTC-5 -> 17:00 UTC)
+        oct_row = rows_by_obs[date(2024, 10, 1)]
+        assert oct_row.conservative_availability_cutoff == datetime(2024, 11, 14, 17, 0, 0, tzinfo=timezone.utc)
+        assert oct_row.decision_timestamp > oct_row.conservative_availability_cutoff
+
+        for row in ds.rows:
+            tgt_period_start_utc = datetime(
+                row.target_period_start.year,
+                row.target_period_start.month,
+                row.target_period_start.day,
+                tzinfo=timezone.utc,
+            )
+            tgt_cutoff_utc = policy.calculate_conservative_availability_cutoff(row.target_date)
+            assert row.decision_timestamp > row.conservative_availability_cutoff
+            assert tgt_period_start_utc > row.decision_timestamp
+            assert tgt_cutoff_utc > row.decision_timestamp
+
+    def test_cross_corridor_exclusion_enforces_strict_timestamp_cutoff(self, monkeypatch):
+        """Cross-corridor filtering uses strict cutoff < decision_timestamp, excluding exact-equality boundaries."""
+        own_series = [(add_months_to_date(date(2024, 1, 1), k), 40.0) for k in range(14)]
+        other_series = [(add_months_to_date(date(2024, 1, 1), k), 80.0) for k in range(14)] + [
+            (date(2025, 3, 1), 999.0),
+        ]
+
+        def fake_get_obs(db=None, route_code="", storage_dir=None, exclude_reconstructed=True):
+            if route_code == "PNW-JPN-BULK":
+                return own_series, "mock"
+            if route_code == "USG-JPN-BULK":
+                return other_series, "mock"
+            raise ValueError(f"Unexpected route {route_code}")
+
+        monkeypatch.setattr("pelagos.forecasting.dataset.get_route_rate_observations", fake_get_obs)
+
+        class ExactCutoffBoundaryPolicy(TemporalAvailabilityPolicy):
+            """Policy where competitor month 2025-03-01 shares dec_date and hits exact cutoff == dec_dt equality."""
+
+            def calculate_availability_date(self, observation_date: date) -> date:
+                if observation_date == date(2025, 3, 1):
+                    return date(2025, 3, 14)
+                return super().calculate_availability_date(observation_date)
+
+            def calculate_conservative_availability_cutoff(self, observation_date: date) -> datetime:
+                if observation_date == date(2025, 3, 1):
+                    return datetime(2025, 3, 14, 23, 59, 59, tzinfo=timezone.utc)
+                return super().calculate_conservative_availability_cutoff(observation_date)
+
+        ds = build_forecast_dataset(
+            db=MagicMock(),
+            route_code="PNW-JPN-BULK",
+            horizon_months=1,
+            burn_in_months=12,
+            availability_policy=ExactCutoffBoundaryPolicy(),
+        )
+        latest_row = ds.rows[-1]
+        assert latest_row.observation_date == date(2025, 2, 1)
+        assert latest_row.decision_timestamp == datetime(2025, 3, 14, 23, 59, 59, tzinfo=timezone.utc)
+        assert latest_row.features["competitor_rate_lag_0"] == 80.0
+        assert latest_row.features["corridor_spread_lag_0"] == 40.0

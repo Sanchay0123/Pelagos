@@ -17,19 +17,26 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union
 from sqlalchemy.orm import Session
 
-from pelagos.models import VesselPosition
+from pelagos.models import Vessel, VesselPosition
 from pelagos.routing.ports import PortRepository
 from pelagos.routing.corridors import (
+    CorridorResolution,
     CorridorStatus,
     PortRecord,
     resolve_freight_corridor,
     resolve_endpoint_to_port,
 )
+from pelagos.routing.schemas import RoutingRequest, RoutingStatus
 from pelagos.optimization.schemas import (
+    CargoCompatibilityAssessment,
+    ParticularsCompletenessSummary,
+    PortConstraintEvaluation,
+    RouteCompatibilityAssessment,
     SuitabilityStatus,
     VesselCandidateMatch,
     VesselSuitabilityRequest,
@@ -42,6 +49,17 @@ logger = logging.getLogger(__name__)
 
 # Mean Earth spherical radius in nautical miles (6,371.0088 km / 1.852 km/NM)
 EARTH_RADIUS_NM: float = 3440.065
+
+# Structural Panama Canal lock envelopes (historical Panamax vs Neopanamax chambers;
+# live draft/slot advisories from ACP are dynamic and NOT connected).
+TRADITIONAL_PANAMAX_MAX_BEAM_M: float = 32.31
+NEOPANAMAX_MAX_BEAM_M: float = 51.25
+NEOPANAMAX_MAX_LOA_M: float = 366.0
+
+_PORT_DRAFT_METERS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*m(?:eters?)?\s*draft\b", re.IGNORECASE)
+_PORT_DRAFT_FEET_RE = re.compile(
+    r"(\d+(?:\.\d+)?)[-\s]*(?:foot|ft)\s*(?:draft|project\s*depth)\b", re.IGNORECASE
+)
 
 # Non-cargo vessel classification keywords
 NON_CARGO_KEYWORDS = {
@@ -178,15 +196,584 @@ def is_dry_bulk_compatible_type(
     return False, f"Vessel type '{vessel_type}' is not recognized as a dry bulk carrier."
 
 
+def extract_port_draft_limit_meters(
+    port: Optional[PortRecord],
+) -> Tuple[Optional[float], Optional[str]]:
+    """Extract an explicit draft/channel-depth limit strictly from verified port metadata.
+
+    Only parses explicit draft or project-depth clauses present in PortRecord.access_limitations.
+    Returns (None, None) when no verified numeric limit is recorded; never fabricates berth specs.
+    """
+    if port is None or not getattr(port, "access_limitations", None):
+        return None, None
+
+    text = str(port.access_limitations)
+    m_match = _PORT_DRAFT_METERS_RE.search(text)
+    if m_match:
+        return round(float(m_match.group(1)), 2), m_match.group(0)
+
+    ft_match = _PORT_DRAFT_FEET_RE.search(text)
+    if ft_match:
+        feet_val = float(ft_match.group(1))
+        return round(feet_val * 0.3048, 2), f"{ft_match.group(0)} ({round(feet_val * 0.3048, 2):.2f}m)"
+
+    return None, None
+
+
+def build_particulars_completeness(
+    vessel: VesselPosition,
+    registry_vessel: Optional[Vessel] = None,
+    hold_cleanliness_verified: Optional[bool] = None,
+) -> ParticularsCompletenessSummary:
+    """Explicitly account for verified vs. missing vessel physical and commercial particulars."""
+    verified: List[str] = []
+    missing: List[str] = []
+    sources: List[str] = []
+
+    if getattr(vessel, "source_name", None):
+        sources.append(str(vessel.source_name))
+    if registry_vessel is not None and getattr(registry_vessel, "source_name", None):
+        src = str(registry_vessel.source_name)
+        if src not in sources:
+            sources.append(src)
+
+    imo_val = getattr(vessel, "imo", None) or (getattr(registry_vessel, "imo", None) if registry_vessel else None)
+    if imo_val:
+        verified.append("imo")
+    else:
+        missing.append("imo")
+
+    if getattr(vessel, "vessel_type", None):
+        verified.append("vessel_type")
+    else:
+        missing.append("vessel_type")
+
+    eff_length = vessel.length_meters if (vessel.length_meters and vessel.length_meters > 0) else (
+        registry_vessel.length_meters if (registry_vessel and registry_vessel.length_meters and registry_vessel.length_meters > 0) else None
+    )
+    eff_width = vessel.width_meters if (vessel.width_meters and vessel.width_meters > 0) else (
+        registry_vessel.width_meters if (registry_vessel and registry_vessel.width_meters and registry_vessel.width_meters > 0) else None
+    )
+    eff_draft = vessel.draft_meters if (vessel.draft_meters and vessel.draft_meters > 0) else (
+        registry_vessel.draft_max_meters if (registry_vessel and registry_vessel.draft_max_meters and registry_vessel.draft_max_meters > 0) else None
+    )
+
+    for fname, val in (
+        ("length_meters", eff_length),
+        ("width_meters", eff_width),
+        ("draft_meters", eff_draft),
+    ):
+        if val is not None:
+            verified.append(fname)
+        else:
+            missing.append(fname)
+
+    if registry_vessel is not None and registry_vessel.dwt_tonnage is not None and registry_vessel.dwt_tonnage > 0:
+        verified.append("dwt_tonnage")
+    else:
+        missing.append("dwt_tonnage")
+
+    for reg_field in ("gross_tonnage", "built_year", "flag_country"):
+        reg_val = getattr(registry_vessel, reg_field, None) if registry_vessel is not None else None
+        if reg_val:
+            verified.append(reg_field)
+        else:
+            missing.append(reg_field)
+
+    if hold_cleanliness_verified is True:
+        verified.append("hold_cleanliness")
+    else:
+        missing.append("hold_cleanliness")
+
+    missing.append("grain_cubic_capacity")
+    missing.append("commercial_fixture_status")
+
+    has_core_dims = eff_length is not None and eff_width is not None and eff_draft is not None
+    if has_core_dims and "dwt_tonnage" in verified and hold_cleanliness_verified is True:
+        completeness = "complete"
+    elif eff_length is not None and eff_width is not None:
+        completeness = "partial"
+    else:
+        completeness = "insufficient_data"
+
+    return ParticularsCompletenessSummary(
+        completeness_status=completeness,
+        verified_particulars=verified,
+        missing_particulars=missing,
+        registry_vessel_class=registry_vessel.vessel_class if registry_vessel else None,
+        registry_commercial_status=registry_vessel.commercial_status if registry_vessel else None,
+        data_sources=sources,
+    )
+
+
+def evaluate_cargo_compatibility(
+    vessel_type: Optional[str],
+    vessel_type_code: Optional[int],
+    dim_class: Optional[str],
+    target_cargo_tonnes: float,
+    commodity: str = "Agricultural Bulk Grain",
+    verified_dwt_tonnes: Optional[float] = None,
+    hold_cleanliness_verified: Optional[bool] = None,
+) -> CargoCompatibilityAssessment:
+    """Evaluate vessel-to-cargo compatibility without assuming unverified DWT or hold cleanliness."""
+    reasons: List[str] = []
+    missing_req: List[str] = []
+
+    type_ok, type_reason = is_dry_bulk_compatible_type(vessel_type, vessel_type_code)
+    reasons.append(type_reason)
+
+    if not type_ok:
+        return CargoCompatibilityAssessment(
+            status="incompatible",
+            cargo_tonnes=target_cargo_tonnes,
+            commodity=commodity,
+            verified_dwt_tonnes=verified_dwt_tonnes,
+            capacity_check_basis="verified_dwt" if verified_dwt_tonnes else "ais_dimensional_envelope_only",
+            reasons=reasons,
+            missing_requirements=[],
+        )
+
+    raw_type_lower = (vessel_type or "").lower()
+    if vessel_type_code == 71 or "hazardous" in raw_type_lower:
+        reasons.append(
+            "AIS classification 'Cargo - Hazardous A' (code 71) does not confirm clean dry-bulk / grain-clean hold capability."
+        )
+
+    if verified_dwt_tonnes is not None and verified_dwt_tonnes > 0:
+        if target_cargo_tonnes > verified_dwt_tonnes:
+            reasons.append(
+                f"Requested cargo parcel ({target_cargo_tonnes:,.0f} MT) exceeds verified deadweight tonnage ({verified_dwt_tonnes:,.0f} DWT)."
+            )
+            return CargoCompatibilityAssessment(
+                status="incompatible",
+                cargo_tonnes=target_cargo_tonnes,
+                commodity=commodity,
+                verified_dwt_tonnes=round(verified_dwt_tonnes, 1),
+                capacity_check_basis="verified_dwt",
+                reasons=reasons,
+                missing_requirements=[],
+            )
+        reasons.append(
+            f"Requested cargo parcel ({target_cargo_tonnes:,.0f} MT) fits within verified capacity ({verified_dwt_tonnes:,.0f} DWT)."
+        )
+        if hold_cleanliness_verified is True:
+            return CargoCompatibilityAssessment(
+                status="compatible",
+                cargo_tonnes=target_cargo_tonnes,
+                commodity=commodity,
+                verified_dwt_tonnes=round(verified_dwt_tonnes, 1),
+                capacity_check_basis="verified_dwt",
+                reasons=reasons,
+                missing_requirements=[],
+            )
+        missing_req.extend(["hold_cleanliness", "grain_cubic_capacity"])
+        return CargoCompatibilityAssessment(
+            status="potentially_compatible_unverified_capacity",
+            cargo_tonnes=target_cargo_tonnes,
+            commodity=commodity,
+            verified_dwt_tonnes=round(verified_dwt_tonnes, 1),
+            capacity_check_basis="verified_dwt",
+            reasons=reasons,
+            missing_requirements=missing_req,
+        )
+
+    # No verified DWT: screen only by reported AIS dimensional envelope
+    missing_req.extend(["dwt_tonnage", "hold_cleanliness", "grain_cubic_capacity"])
+    if dim_class is None:
+        reasons.append("Vessel dimensions (LOA/beam) missing; cargo envelope cannot be screened.")
+        return CargoCompatibilityAssessment(
+            status="insufficient_data",
+            cargo_tonnes=target_cargo_tonnes,
+            commodity=commodity,
+            verified_dwt_tonnes=None,
+            capacity_check_basis="ais_dimensional_envelope_only",
+            reasons=reasons,
+            missing_requirements=["length_meters", "width_meters"] + missing_req,
+        )
+
+    if target_cargo_tonnes <= 35000:
+        allowed = {"Small / Coastal Cargo", "Handysize", "Handymax / Supramax"}
+    elif target_cargo_tonnes <= 65000:
+        allowed = {"Handymax / Supramax", "Panamax / Kamsarmax", "Post-Panamax / Capesize"}
+    elif target_cargo_tonnes <= 85000:
+        allowed = {"Panamax / Kamsarmax", "Post-Panamax / Capesize"}
+    else:
+        allowed = {"Post-Panamax / Capesize"}
+
+    if dim_class in allowed:
+        reasons.append(
+            f"Dimensional class '{dim_class}' aligns with standard physical parcel envelope ({target_cargo_tonnes:,.0f} MT), pending verified DWT."
+        )
+        return CargoCompatibilityAssessment(
+            status="potentially_compatible_unverified_capacity",
+            cargo_tonnes=target_cargo_tonnes,
+            commodity=commodity,
+            verified_dwt_tonnes=None,
+            capacity_check_basis="ais_dimensional_envelope_only",
+            reasons=reasons,
+            missing_requirements=missing_req,
+        )
+
+    reasons.append(
+        f"Dimensional class '{dim_class}' is mismatched for a {target_cargo_tonnes:,.0f} MT {commodity} parcel."
+    )
+    return CargoCompatibilityAssessment(
+        status="incompatible",
+        cargo_tonnes=target_cargo_tonnes,
+        commodity=commodity,
+        verified_dwt_tonnes=None,
+        capacity_check_basis="ais_dimensional_envelope_only",
+        reasons=reasons,
+        missing_requirements=missing_req,
+    )
+
+
+def evaluate_port_compatibility(
+    port: Optional[PortRecord],
+    role: str,
+    vessel_draft_m: Optional[float],
+    vessel_length_m: Optional[float],
+    vessel_width_m: Optional[float],
+    explicit_max_draft_m: Optional[float] = None,
+    explicit_max_loa_m: Optional[float] = None,
+    explicit_max_beam_m: Optional[float] = None,
+) -> Optional[PortConstraintEvaluation]:
+    """Evaluate vessel physical compatibility against a port's documented or verified limits."""
+    if port is None:
+        return None
+
+    doc_draft_m, limit_clause = extract_port_draft_limit_meters(port)
+    effective_draft_limit = explicit_max_draft_m if explicit_max_draft_m is not None else doc_draft_m
+    reasons: List[str] = []
+    missing_req: List[str] = []
+
+    if effective_draft_limit is not None:
+        if vessel_draft_m is None or vessel_draft_m <= 0:
+            missing_req.append("vessel_draft_meters")
+            reasons.append(
+                f"{port.name} ({port.port_id}) documents a {effective_draft_limit:.2f}m draft limit, "
+                "but vessel draft is missing."
+            )
+            return PortConstraintEvaluation(
+                port_id=port.port_id,
+                port_name=port.name,
+                role=role,
+                status="insufficient_data",
+                documented_draft_limit_meters=effective_draft_limit,
+                limit_source_note=limit_clause or "explicit_verified_port_limit",
+                vessel_draft_meters=vessel_draft_m,
+                access_limitations=port.access_limitations or None,
+                reasons=reasons,
+                missing_requirements=missing_req,
+            )
+        if vessel_draft_m > effective_draft_limit:
+            reasons.append(
+                f"Vessel reported draft ({vessel_draft_m:.1f}m) exceeds {port.name} ({port.port_id}) "
+                f"documented limit ({effective_draft_limit:.2f}m)."
+            )
+            return PortConstraintEvaluation(
+                port_id=port.port_id,
+                port_name=port.name,
+                role=role,
+                status="incompatible",
+                documented_draft_limit_meters=effective_draft_limit,
+                limit_source_note=limit_clause or "explicit_verified_port_limit",
+                vessel_draft_meters=vessel_draft_m,
+                access_limitations=port.access_limitations or None,
+                reasons=reasons,
+                missing_requirements=[],
+            )
+        reasons.append(
+            f"Vessel reported draft ({vessel_draft_m:.1f}m) is within {port.name} ({port.port_id}) "
+            f"documented limit ({effective_draft_limit:.2f}m)."
+        )
+    else:
+        missing_req.append(f"{role}_verified_berth_draft_limit_meters")
+        reasons.append(
+            f"No verified numeric berth draft limit stored for {port.name} ({port.port_id})."
+        )
+
+    # Evaluate explicit LOA and beam limits when provided
+    for label, limit_val, v_val, req_key in (
+        ("LOA", explicit_max_loa_m, vessel_length_m, f"{role}_verified_berth_max_loa_meters"),
+        ("beam", explicit_max_beam_m, vessel_width_m, f"{role}_verified_berth_max_beam_meters"),
+    ):
+        if limit_val is not None:
+            if v_val is None or v_val <= 0:
+                missing_req.append(f"vessel_{label.lower()}_meters")
+                reasons.append(f"Port documents max {label} ({limit_val:.1f}m) but vessel {label} is missing.")
+            elif v_val > limit_val:
+                reasons.append(f"Vessel {label} ({v_val:.1f}m) exceeds {port.name} max {label} ({limit_val:.1f}m).")
+                return PortConstraintEvaluation(
+                    port_id=port.port_id,
+                    port_name=port.name,
+                    role=role,
+                    status="incompatible",
+                    documented_draft_limit_meters=effective_draft_limit,
+                    limit_source_note=limit_clause or "explicit_verified_port_limit",
+                    vessel_draft_meters=vessel_draft_m,
+                    access_limitations=port.access_limitations or None,
+                    reasons=reasons,
+                    missing_requirements=[],
+                )
+            else:
+                reasons.append(f"Vessel {label} ({v_val:.1f}m) satisfies {port.name} max {label} ({limit_val:.1f}m).")
+        else:
+            missing_req.append(req_key)
+
+    status = "compatible" if not missing_req else "insufficient_data"
+    return PortConstraintEvaluation(
+        port_id=port.port_id,
+        port_name=port.name,
+        role=role,
+        status=status,
+        documented_draft_limit_meters=effective_draft_limit,
+        limit_source_note=limit_clause or ("explicit_verified_port_limit" if explicit_max_draft_m else None),
+        vessel_draft_meters=vessel_draft_m,
+        access_limitations=port.access_limitations or None,
+        reasons=reasons,
+        missing_requirements=missing_req,
+    )
+
+
+def evaluate_route_compatibility(
+    origin_port: Optional[PortRecord],
+    destination_port: Optional[PortRecord],
+    route_eval: Optional[Dict[str, Any]],
+    vessel_draft_m: Optional[float],
+    vessel_length_m: Optional[float],
+    vessel_width_m: Optional[float],
+    explicit_limits: Optional[Dict[str, Optional[float]]] = None,
+) -> RouteCompatibilityAssessment:
+    """Evaluate vessel-to-route navigational, canal, and terminal compatibility."""
+    limits = explicit_limits or {}
+    orig_eval = evaluate_port_compatibility(
+        origin_port,
+        "origin_load_port",
+        vessel_draft_m,
+        vessel_length_m,
+        vessel_width_m,
+        explicit_max_draft_m=limits.get("origin_max_draft_meters"),
+        explicit_max_loa_m=limits.get("origin_max_loa_meters"),
+        explicit_max_beam_m=limits.get("origin_max_beam_meters"),
+    )
+    dest_eval = evaluate_port_compatibility(
+        destination_port,
+        "destination_discharge_port",
+        vessel_draft_m,
+        vessel_length_m,
+        vessel_width_m,
+        explicit_max_draft_m=limits.get("destination_max_draft_meters"),
+        explicit_max_loa_m=limits.get("destination_max_loa_meters"),
+        explicit_max_beam_m=limits.get("destination_max_beam_meters"),
+    )
+
+    route_navigable = route_eval.get("route_navigable") if route_eval else None
+    routing_status = route_eval.get("routing_status") if route_eval else None
+    routing_mode = route_eval.get("routing_mode") if route_eval else None
+    route_dist = route_eval.get("route_distance_nm") if route_eval else None
+    canals = list(route_eval.get("canals_transited", [])) if route_eval else []
+    routing_error = route_eval.get("error_message") if route_eval else None
+
+    reasons: List[str] = []
+    missing_req: List[str] = []
+    canal_notes: List[str] = []
+    incompatible = False
+
+    if route_navigable is False:
+        incompatible = True
+        reasons.append(routing_error or "Operational maritime route is disconnected/unnavigable under active constraints.")
+
+    for pe in (orig_eval, dest_eval):
+        if pe is not None:
+            missing_req.extend(pe.missing_requirements)
+            if pe.status == "incompatible":
+                incompatible = True
+                reasons.extend(pe.reasons)
+
+    # Evaluate dynamic passage boundaries for any canals transited (REQ-FR-OMR-001)
+    for canal in canals:
+        c_low = canal.lower()
+        if "panama" in c_low:
+            if vessel_width_m is not None and vessel_width_m > NEOPANAMAX_MAX_BEAM_M:
+                incompatible = True
+                msg = (
+                    f"Vessel beam ({vessel_width_m:.1f}m) exceeds Panama Canal Neopanamax structural beam envelope "
+                    f"({NEOPANAMAX_MAX_BEAM_M:.2f}m)."
+                )
+                canal_notes.append(msg)
+                reasons.append(msg)
+            elif vessel_length_m is not None and vessel_length_m > NEOPANAMAX_MAX_LOA_M:
+                incompatible = True
+                msg = (
+                    f"Vessel LOA ({vessel_length_m:.1f}m) exceeds Panama Canal Neopanamax structural LOA envelope "
+                    f"({NEOPANAMAX_MAX_LOA_M:.1f}m)."
+                )
+                canal_notes.append(msg)
+                reasons.append(msg)
+            elif vessel_width_m is not None and vessel_width_m > TRADITIONAL_PANAMAX_MAX_BEAM_M:
+                canal_notes.append(
+                    f"Route transits Panama Canal: beam ({vessel_width_m:.1f}m) exceeds traditional Panamax locks "
+                    f"({TRADITIONAL_PANAMAX_MAX_BEAM_M:.2f}m); requires Neopanamax locks and verified live ACP draft/slot rules."
+                )
+                missing_req.append("panama_canal_acp_neopanamax_draft_and_slot_rules")
+            else:
+                canal_notes.append(
+                    "Route transits Panama Canal: passage clearance requires live ACP draft advisories and transit booking verification."
+                )
+                missing_req.append("panama_canal_acp_live_draft_advisories")
+        elif "suez" in c_low:
+            canal_notes.append(
+                "Route transits Suez Canal: passage clearance requires live SCA convoy scheduling, draft tables, and regional security advisories."
+            )
+            missing_req.append("suez_canal_sca_live_convoy_rules")
+
+    if vessel_draft_m is None:
+        missing_req.append("vessel_draft_meters")
+
+    # Deduplicate missing requirements while preserving deterministic order
+    seen_missing = set()
+    unique_missing: List[str] = []
+    for item in missing_req:
+        if item not in seen_missing:
+            seen_missing.add(item)
+            unique_missing.append(item)
+
+    if incompatible:
+        status = "incompatible"
+    elif route_navigable is None or vessel_draft_m is None or vessel_length_m is None or vessel_width_m is None:
+        status = "insufficient_data"
+    elif not unique_missing and (orig_eval is None or orig_eval.status == "compatible") and (dest_eval is None or dest_eval.status == "compatible"):
+        status = "compatible"
+    else:
+        status = "conditionally_compatible_unverified_limits"
+
+    return RouteCompatibilityAssessment(
+        status=status,
+        route_navigable=route_navigable,
+        routing_status=routing_status,
+        routing_mode=routing_mode,
+        route_distance_nm=route_dist,
+        canals_transited=canals,
+        canal_compatibility_notes=canal_notes,
+        origin_port=orig_eval,
+        destination_port=dest_eval,
+        missing_requirements=unique_missing,
+        reasons=reasons,
+    )
+
+
+def resolve_corridor_and_ports(
+    origin: Optional[Union[str, List[float], Dict[str, Any]]],
+    destination: Optional[Union[str, List[float], Dict[str, Any]]],
+    route_code: Optional[str],
+    port_repo: Optional[PortRepository] = None,
+    db: Optional[Session] = None,
+) -> Tuple[
+    Any,
+    CorridorResolution,
+    Optional[PortRecord],
+    Optional[PortRecord],
+    Any,
+    Any,
+]:
+    """Resolve corridor code, origin port, and destination port uniformly without duplication."""
+    repo = port_repo or PortRepository()
+    origin_input = origin
+    dest_input = destination
+
+    if route_code and (not origin_input or not dest_input):
+        clean_code = str(route_code).strip().upper()
+        if clean_code == "PNW-JPN-BULK":
+            origin_input = origin_input or "USSEA"
+            dest_input = dest_input or "JPYOK"
+        elif clean_code == "USG-JPN-BULK":
+            origin_input = origin_input or "USMSY"
+            dest_input = dest_input or "JPYOK"
+
+    corridor_res = resolve_freight_corridor(origin_input, dest_input, port_repo=repo, db=db)
+    orig_port, orig_coords, _ = resolve_endpoint_to_port(origin_input, repo)
+    dest_port, dest_coords, _ = resolve_endpoint_to_port(dest_input, repo)
+
+    return repo, corridor_res, orig_port, dest_port, orig_coords, dest_coords
+
+
+def run_operational_route_check(
+    origin_input: Any,
+    destination_input: Any,
+    canal_policy: str = "allow",
+    port_repo: Optional[PortRepository] = None,
+    routing_engine: Optional[Any] = None,
+) -> Optional[Dict[str, Any]]:
+    """Run deterministic sea-lane connectivity and canal check when both endpoints exist."""
+    if not origin_input or not destination_input:
+        return None
+    try:
+        from pelagos.routing.service import MaritimeRoutingEngine
+
+        engine = routing_engine or MaritimeRoutingEngine(port_repo=port_repo)
+        res = engine.calculate_route(
+            RoutingRequest(
+                origin=origin_input,
+                destination=destination_input,
+                canal_policy=canal_policy,
+                routing_mode="prototype",
+            )
+        )
+        return {
+            "route_navigable": res.status == RoutingStatus.CALCULATED,
+            "routing_status": res.status.value,
+            "routing_mode": res.routing_mode,
+            "route_distance_nm": res.summary.total_distance_nm if res.summary else None,
+            "canals_transited": list(res.summary.canals_transited) if res.summary else [],
+            "error_message": res.error_message,
+        }
+    except Exception as exc:
+        logger.debug("Operational route check skipped: %s", exc)
+        return None
+
+
 def evaluate_vessel_suitability(
     vessel: VesselPosition,
     target_cargo_tonnes: float,
     load_port_coords: Optional[Tuple[float, float]],
     now_utc: Optional[datetime] = None,
+    registry_vessel: Optional[Vessel] = None,
+    origin_port: Optional[PortRecord] = None,
+    destination_port: Optional[PortRecord] = None,
+    route_eval: Optional[Dict[str, Any]] = None,
+    commodity: str = "Agricultural Bulk Grain",
+    hold_cleanliness_verified: Optional[bool] = None,
+    explicit_limits: Optional[Dict[str, Optional[float]]] = None,
 ) -> VesselCandidateMatch:
-    """Evaluate an individual genuine vessel observation for corridor cargo suitability."""
+    """Evaluate an individual genuine vessel observation for cargo and route suitability."""
     if now_utc is None:
         now_utc = datetime.now(timezone.utc)
+
+    # Effective dimensions reconcile AIS telemetry and canonical Vessel registry without fabrication
+    eff_length = vessel.length_meters if (vessel.length_meters and vessel.length_meters > 0) else (
+        registry_vessel.length_meters if (registry_vessel and registry_vessel.length_meters and registry_vessel.length_meters > 0) else None
+    )
+    eff_width = vessel.width_meters if (vessel.width_meters and vessel.width_meters > 0) else (
+        registry_vessel.width_meters if (registry_vessel and registry_vessel.width_meters and registry_vessel.width_meters > 0) else None
+    )
+    eff_draft = vessel.draft_meters if (vessel.draft_meters and vessel.draft_meters > 0) else (
+        registry_vessel.draft_max_meters if (registry_vessel and registry_vessel.draft_max_meters and registry_vessel.draft_max_meters > 0) else None
+    )
+    verified_dwt = (
+        float(registry_vessel.dwt_tonnage)
+        if (registry_vessel is not None and registry_vessel.dwt_tonnage is not None and registry_vessel.dwt_tonnage > 0)
+        else None
+    )
+    cap_status = "VERIFIED" if verified_dwt is not None else "UNVERIFIED"
+    reg_class = registry_vessel.vessel_class if registry_vessel else None
+    reg_comm_status = registry_vessel.commercial_status if registry_vessel else None
+
+    particulars_summary = build_particulars_completeness(
+        vessel=vessel,
+        registry_vessel=registry_vessel,
+        hold_cleanliness_verified=hold_cleanliness_verified,
+    )
 
     # 1. Loading port distance via Great-Circle Haversine formula
     load_lat = load_port_coords[0] if load_port_coords else None
@@ -224,77 +811,133 @@ def evaluate_vessel_suitability(
             f"CURRENT_PROXIMITY: Great-Circle distance of {dist_nm:.1f} NM based on recent AIS position fix (<30m age)."
         )
 
+    # Route compatibility pre-computation (port draft/canal/navigability)
+    route_compat = evaluate_route_compatibility(
+        origin_port=origin_port,
+        destination_port=destination_port,
+        route_eval=route_eval,
+        vessel_draft_m=eff_draft,
+        vessel_length_m=eff_length,
+        vessel_width_m=eff_width,
+        explicit_limits=explicit_limits,
+    )
+
     # 3. Vessel Type Check
     type_compatible, type_reason = is_dry_bulk_compatible_type(
         vessel.vessel_type, vessel.vessel_type_code
     )
+    dim_class = infer_dimensional_class(eff_length, eff_width)
+    cargo_compat = evaluate_cargo_compatibility(
+        vessel_type=vessel.vessel_type,
+        vessel_type_code=vessel.vessel_type_code,
+        dim_class=dim_class,
+        target_cargo_tonnes=target_cargo_tonnes,
+        commodity=commodity,
+        verified_dwt_tonnes=verified_dwt,
+        hold_cleanliness_verified=hold_cleanliness_verified,
+    )
 
-    if not type_compatible:
+    def _build_candidate(
+        status: SuitabilityStatus,
+        reason: str,
+        stage: str,
+        est_class: Optional[str],
+    ) -> VesselCandidateMatch:
         return VesselCandidateMatch(
             mmsi=str(vessel.mmsi),
             imo=str(vessel.imo) if vessel.imo else None,
             vessel_name=str(vessel.vessel_name or f"MMSI {vessel.mmsi}"),
             vessel_type=str(vessel.vessel_type or "Unknown"),
             vessel_type_code=vessel.vessel_type_code,
-            suitability_status=SuitabilityStatus.UNSUITABLE_TYPE,
-            suitability_reason=type_reason,
+            suitability_status=status,
+            suitability_reason=reason,
             distance_to_load_port_nm=dist_nm,
             distance_qualification=dist_qual,
-            latitude=vessel.latitude,
-            longitude=vessel.longitude,
+            latitude=vessel.latitude if (vessel.latitude is not None and math.isfinite(vessel.latitude)) else None,
+            longitude=vessel.longitude if (vessel.longitude is not None and math.isfinite(vessel.longitude)) else None,
             speed_knots=vessel.speed_knots,
             course_degrees=vessel.course_degrees,
-            draft_meters=vessel.draft_meters,
-            length_meters=vessel.length_meters,
-            width_meters=vessel.width_meters,
-            estimated_dimensional_class=None,
-            verified_cargo_capacity_dwt=None,
-            cargo_capacity_status="UNVERIFIED",
-            screening_stage="type_screened_incompatible",
+            draft_meters=eff_draft,
+            length_meters=eff_length,
+            width_meters=eff_width,
+            estimated_dimensional_class=est_class,
+            verified_cargo_capacity_dwt=round(verified_dwt, 1) if verified_dwt is not None else None,
+            cargo_capacity_status=cap_status,
+            screening_stage=stage,
             observation_time=obs_time_iso,
             observation_age_seconds=round(age_sec, 1) if age_sec is not None else None,
             is_stale=is_stale,
             data_mode=data_mode,
+            missing_particulars=particulars_summary.missing_particulars,
+            registry_vessel_class=reg_class,
+            registry_commercial_status=reg_comm_status,
+            particulars_completeness=particulars_summary,
+            cargo_compatibility=cargo_compat,
+            route_compatibility=route_compat,
+        )
+
+    if not type_compatible:
+        return _build_candidate(
+            status=SuitabilityStatus.UNSUITABLE_TYPE,
+            reason=type_reason,
+            stage="type_screened_incompatible",
+            est_class=None,
         )
 
     # 4. Dimension & Capacity Particulars Check
-    dim_class = infer_dimensional_class(vessel.length_meters, vessel.width_meters)
-
     if dim_class is None:
-        return VesselCandidateMatch(
-            mmsi=str(vessel.mmsi),
-            imo=str(vessel.imo) if vessel.imo else None,
-            vessel_name=str(vessel.vessel_name or f"MMSI {vessel.mmsi}"),
-            vessel_type=str(vessel.vessel_type or "Cargo"),
-            vessel_type_code=vessel.vessel_type_code,
-            suitability_status=SuitabilityStatus.INSUFFICIENT_DATA,
-            suitability_reason=(
+        return _build_candidate(
+            status=SuitabilityStatus.INSUFFICIENT_DATA,
+            reason=(
                 "Vessel reported as cargo type, but AIS broadcast lacks verified length and beam particulars; "
                 "dimensional capacity envelope cannot be determined without physical particulars."
             ),
-            distance_to_load_port_nm=dist_nm,
-            distance_qualification=dist_qual,
-            latitude=vessel.latitude,
-            longitude=vessel.longitude,
-            speed_knots=vessel.speed_knots,
-            course_degrees=vessel.course_degrees,
-            draft_meters=vessel.draft_meters,
-            length_meters=vessel.length_meters,
-            width_meters=vessel.width_meters,
-            estimated_dimensional_class=None,
-            verified_cargo_capacity_dwt=None,
-            cargo_capacity_status="UNVERIFIED",
-            screening_stage="missing_dimensional_particulars",
-            observation_time=obs_time_iso,
-            observation_age_seconds=round(age_sec, 1) if age_sec is not None else None,
-            is_stale=is_stale,
-            data_mode=data_mode,
+            stage="missing_dimensional_particulars",
+            est_class=None,
+        )
+
+    # 4b. Route & Port Physical Constraint Pruning (REQ-FR-CPO-003 / REQ-FR-OMR-001)
+    if route_compat.status == "incompatible":
+        reason_detail = "; ".join(route_compat.reasons) if route_compat.reasons else "Route or port constraint violation."
+        return _build_candidate(
+            status=SuitabilityStatus.DIMENSION_MISMATCH,
+            reason=f"Route/port incompatibility: {reason_detail}",
+            stage="route_or_port_constraint_violation",
+            est_class=dim_class,
+        )
+
+    # Documented channel draft limit present on origin/destination port requires reported draft
+    has_port_draft_rule = any(
+        pe is not None and pe.documented_draft_limit_meters is not None
+        for pe in (route_compat.origin_port, route_compat.destination_port)
+    )
+    if has_port_draft_rule and eff_draft is None:
+        return _build_candidate(
+            status=SuitabilityStatus.INSUFFICIENT_DATA,
+            reason=(
+                "Cargo vessel classified as "
+                f"{dim_class}, but vessel draft is missing and cannot be cleared against documented port channel draft limit."
+            ),
+            stage="missing_draft_for_port_clearance",
+            est_class=dim_class,
+        )
+
+    # 4c. Verified DWT cargo capacity enforcement when canonical registry DWT exists
+    if verified_dwt is not None and target_cargo_tonnes > verified_dwt:
+        return _build_candidate(
+            status=SuitabilityStatus.DIMENSION_MISMATCH,
+            reason=(
+                f"Capacity mismatch. Verified deadweight tonnage ({verified_dwt:,.0f} DWT) is below "
+                f"requested {target_cargo_tonnes:,.0f} MT cargo parcel."
+            ),
+            stage="verified_dwt_insufficient",
+            est_class=dim_class,
         )
 
     # 5. Class & Capacity Match against requested cargo tonnage
-    loa = float(vessel.length_meters)
-    beam_str = f", Beam {vessel.width_meters:.0f}m" if vessel.width_meters else ""
-    draft_str = f", Draft {vessel.draft_meters:.1f}m" if vessel.draft_meters else ""
+    loa = float(eff_length)
+    beam_str = f", Beam {eff_width:.0f}m" if eff_width else ""
+    draft_str = f", Draft {eff_draft:.1f}m" if eff_draft else ", Draft missing"
 
     # Commercial dry bulk target parcel envelopes
     if target_cargo_tonnes <= 35000:
@@ -306,19 +949,30 @@ def evaluate_vessel_suitability(
     else:
         target_classes = {"Post-Panamax / Capesize"}
 
+    dwt_clause = (
+        f"Verified DWT ({verified_dwt:,.0f} MT) covers requested parcel; hold cleanliness and commercial availability require broker verification."
+        if verified_dwt is not None
+        else "Verified deadweight tonnage (DWT), hold cleanliness, and commercial cargo capacity are unverified from AIS alone."
+    )
+
     if dim_class in target_classes:
         status = SuitabilityStatus.POTENTIALLY_SUITABLE
         screening_stage = "dimensionally_screened"
         reason = (
             f"Dimensionally screened candidate. Classified as {dim_class} based on reported dimensions "
             f"(LOA {loa:.0f}m{beam_str}{draft_str}), which aligns with the physical envelope for {target_cargo_tonnes:,.0f} MT parcel. "
-            f"Verified deadweight tonnage (DWT), hold cleanliness, and commercial cargo capacity are unverified from AIS alone."
+            f"{dwt_clause}"
         )
     elif dim_class == "Post-Panamax / Capesize" and target_cargo_tonnes <= 65000:
         status = SuitabilityStatus.POTENTIALLY_SUITABLE
         screening_stage = "dimensionally_screened_oversized"
         reason = (
             f"Dimensionally screened candidate. Classified as Post-Panamax / Capesize based on reported dimensions "
+            f"(LOA {loa:.0f}m{beam_str}{draft_str}). Vessel exceeds standard Panamax grain parcel envelope "
+            f"({target_cargo_tonnes:,.0f} MT); physical dimensional envelope indicates adequate scale, "
+            f"but verified DWT, hold suitability, and commercial cargo capacity require confirmation."
+            if verified_dwt is not None
+            else f"Dimensionally screened candidate. Classified as Post-Panamax / Capesize based on reported dimensions "
             f"(LOA {loa:.0f}m{beam_str}{draft_str}). Vessel exceeds standard Panamax grain parcel envelope "
             f"({target_cargo_tonnes:,.0f} MT); physical dimensional envelope indicates adequate scale, but actual DWT, "
             f"hold suitability, and commercial cargo capacity are unverified from AIS alone."
@@ -338,37 +992,18 @@ def evaluate_vessel_suitability(
             f"(LOA {loa:.0f}m{beam_str}{draft_str}); does not align with the standard physical envelope for {target_cargo_tonnes:,.0f} MT parcel."
         )
 
-    return VesselCandidateMatch(
-        mmsi=str(vessel.mmsi),
-        imo=str(vessel.imo) if vessel.imo else None,
-        vessel_name=str(vessel.vessel_name or f"MMSI {vessel.mmsi}"),
-        vessel_type=str(vessel.vessel_type or "Cargo"),
-        vessel_type_code=vessel.vessel_type_code,
-        suitability_status=status,
-        suitability_reason=reason,
-        distance_to_load_port_nm=dist_nm,
-        distance_qualification=dist_qual,
-        latitude=vessel.latitude,
-        longitude=vessel.longitude,
-        speed_knots=vessel.speed_knots,
-        course_degrees=vessel.course_degrees,
-        draft_meters=vessel.draft_meters,
-        length_meters=vessel.length_meters,
-        width_meters=vessel.width_meters,
-        estimated_dimensional_class=dim_class,
-        verified_cargo_capacity_dwt=None,
-        cargo_capacity_status="UNVERIFIED",
-        screening_stage=screening_stage,
-        observation_time=obs_time_iso,
-        observation_age_seconds=round(age_sec, 1) if age_sec is not None else None,
-        is_stale=is_stale,
-        data_mode=data_mode,
+    return _build_candidate(
+        status=status,
+        reason=reason,
+        stage=screening_stage,
+        est_class=dim_class,
     )
 
 
 def match_suitable_vessels(
     db: Session,
     request: Union[VesselSuitabilityRequest, Dict[str, Any]],
+    routing_engine: Optional[Any] = None,
 ) -> VesselSuitabilityResponse:
     """Evaluate and rank candidate vessels for a commercial freight corridor.
 
@@ -398,32 +1033,39 @@ def match_suitable_vessels(
             message="Invalid request type.",
         )
 
-    # 2. Resolve Corridor and Origin Loading Port
-    origin_input = req.origin
-    dest_input = req.destination
-
-    if req.route_code and (not origin_input or not dest_input):
-        if req.route_code == "PNW-JPN-BULK":
-            origin_input = origin_input or "USSEA"
-            dest_input = dest_input or "JPYOK"
-        elif req.route_code == "USG-JPN-BULK":
-            origin_input = origin_input or "USMSY"
-            dest_input = dest_input or "JPYOK"
-
-    port_repo = PortRepository()
-    corridor_res = resolve_freight_corridor(origin_input, dest_input, port_repo=port_repo)
+    # 2. Resolve Corridor, Origin Loading Port, Destination Port, and Route Connectivity
+    port_repo, corridor_res, orig_port, dest_port, orig_coords, dest_coords = resolve_corridor_and_ports(
+        origin=req.origin,
+        destination=req.destination,
+        route_code=req.route_code,
+        db=db,
+    )
     is_monitored = corridor_res.status == CorridorStatus.MONITORED
 
-    orig_port, orig_coords, _ = resolve_endpoint_to_port(origin_input, port_repo)
     load_port_id = corridor_res.origin_port_id or (orig_port.port_id if orig_port else None)
     load_port_name = corridor_res.origin_port_name or (orig_port.name if orig_port else None)
+    dest_port_id = corridor_res.destination_port_id or (dest_port.port_id if dest_port else None)
+    dest_port_name = corridor_res.destination_port_name or (dest_port.name if dest_port else None)
+
     load_port_coords: Optional[Tuple[float, float]] = None
     load_port_coords_list: Optional[List[float]] = None
+    dest_port_coords_list: Optional[List[float]] = None
 
     if orig_coords and len(orig_coords) >= 2:
-        # orig_coords is [lon, lat]
         load_port_coords = (float(orig_coords[1]), float(orig_coords[0]))
         load_port_coords_list = [float(orig_coords[0]), float(orig_coords[1])]
+    if dest_coords and len(dest_coords) >= 2:
+        dest_port_coords_list = [float(dest_coords[0]), float(dest_coords[1])]
+
+    route_origin_in = req.origin or load_port_id
+    route_dest_in = req.destination or dest_port_id
+    route_eval = run_operational_route_check(
+        origin_input=route_origin_in,
+        destination_input=route_dest_in,
+        canal_policy=req.canal_policy,
+        port_repo=port_repo,
+        routing_engine=routing_engine,
+    )
 
     corridor_info: Optional[VoyageCorridorInfo] = None
     target_class = "Panamax / Supramax"
@@ -433,18 +1075,25 @@ def match_suitable_vessels(
             route_name=corridor_res.route_name or "Trade Corridor",
             origin_region=corridor_res.origin_region or "Origin",
             destination_region=corridor_res.destination_region or "Destination",
-            commodity=corridor_res.commodity or "Agricultural Bulk Grain",
+            commodity=corridor_res.commodity or req.commodity,
             vessel_class=corridor_res.vessel_class or "Panamax / Supramax",
         )
         target_class = corridor_res.vessel_class or target_class
 
-    # 3. Retrieve genuine vessel records from database
-    # Deduplicate by MMSI (keep freshest observation)
+    # 3. Retrieve genuine vessel position records and canonical Vessel registry rows
     raw_vessels = (
         db.query(VesselPosition)
         .order_by(VesselPosition.observation_time.desc(), VesselPosition.id.desc())
         .all()
     )
+    registry_by_mmsi: Dict[str, Vessel] = {}
+    try:
+        for rv in db.query(Vessel).all():
+            rm = str(rv.mmsi).strip()
+            if rm:
+                registry_by_mmsi[rm] = rv
+    except Exception:
+        registry_by_mmsi = {}
 
     by_mmsi: Dict[str, VesselPosition] = {}
     for v in raw_vessels:
@@ -461,19 +1110,24 @@ def match_suitable_vessels(
     potentially_suitable_count = 0
 
     for v in distinct_vessels:
+        reg_v = registry_by_mmsi.get(str(v.mmsi).strip())
         match = evaluate_vessel_suitability(
             vessel=v,
             target_cargo_tonnes=req.cargo_tonnes,
             load_port_coords=load_port_coords,
             now_utc=now_utc,
+            registry_vessel=reg_v,
+            origin_port=orig_port,
+            destination_port=dest_port,
+            route_eval=route_eval,
+            commodity=req.commodity,
         )
         if match.suitability_status == SuitabilityStatus.POTENTIALLY_SUITABLE:
             potentially_suitable_count += 1
         candidates.append(match)
 
     # 5. Deterministic, transparent ranking
-    def rank_key(cand: VesselCandidateMatch) -> Tuple[int, float, str, str]:
-        # Tier priority (1 to 4)
+    def rank_key(cand: VesselCandidateMatch) -> Tuple[int, float, float, str]:
         tier_prio = {
             SuitabilityStatus.POTENTIALLY_SUITABLE: 1,
             SuitabilityStatus.INSUFFICIENT_DATA: 2,
@@ -481,13 +1135,20 @@ def match_suitable_vessels(
             SuitabilityStatus.UNSUITABLE_TYPE: 4,
         }.get(cand.suitability_status, 5)
 
-        # Distance: finite distance first, None sorted at infinity
         dist = cand.distance_to_load_port_nm if cand.distance_to_load_port_nm is not None else 1e9
 
-        # Reverse observation time string so newer sorts earlier
-        obs_inv = cand.observation_time or ""
+        # Negative timestamp so newer fixes sort earlier deterministically
+        obs_sort = 0.0
+        if cand.observation_time:
+            try:
+                obs_dt = datetime.fromisoformat(cand.observation_time.replace("Z", "+00:00"))
+                if obs_dt.tzinfo is None:
+                    obs_dt = obs_dt.replace(tzinfo=timezone.utc)
+                obs_sort = -obs_dt.timestamp()
+            except Exception:
+                obs_sort = 0.0
 
-        return (tier_prio, dist, obs_inv, cand.mmsi)
+        return (tier_prio, dist, obs_sort, cand.mmsi)
 
     candidates.sort(key=rank_key)
 
@@ -503,11 +1164,31 @@ def match_suitable_vessels(
         else "Telemetry stream includes active live AIS fixes (<30m age)."
     )
 
-    status_str = "matched" if is_monitored else "unmonitored_corridor_matched"
-    msg = (
-        f"Evaluated {total_evaluated} genuine vessel observations for {req.cargo_tonnes:,.0f} MT "
-        f"on {corridor_res.route_name or 'corridor'}. Found {potentially_suitable_count} potentially suitable candidate(s)."
-    )
+    orig_limit_m, orig_limit_src = extract_port_draft_limit_meters(orig_port)
+    dest_limit_m, dest_limit_src = extract_port_draft_limit_meters(dest_port)
+    route_compat_summary = {
+        "route_navigable": route_eval.get("route_navigable") if route_eval else None,
+        "routing_status": route_eval.get("routing_status") if route_eval else None,
+        "route_distance_nm": route_eval.get("route_distance_nm") if route_eval else None,
+        "canals_transited": route_eval.get("canals_transited", []) if route_eval else [],
+        "origin_documented_draft_limit_meters": orig_limit_m,
+        "origin_limit_source": orig_limit_src,
+        "destination_documented_draft_limit_meters": dest_limit_m,
+        "destination_limit_source": dest_limit_src,
+    }
+
+    if route_eval is not None and route_eval.get("route_navigable") is False:
+        status_str = "unavailable"
+        msg = (
+            f"Operational sea route between origin and destination is unnavigable "
+            f"({route_eval.get('error_message') or 'disconnected sea lane'}); no candidates can be approved for voyage transit."
+        )
+    else:
+        status_str = "matched" if is_monitored else "unmonitored_corridor_matched"
+        msg = (
+            f"Evaluated {total_evaluated} genuine vessel observations for {req.cargo_tonnes:,.0f} MT "
+            f"on {corridor_res.route_name or 'corridor'}. Found {potentially_suitable_count} potentially suitable candidate(s)."
+        )
 
     return VesselSuitabilityResponse(
         status=status_str,
@@ -515,11 +1196,16 @@ def match_suitable_vessels(
         loading_port_id=load_port_id,
         loading_port_name=load_port_name,
         loading_port_coordinates=load_port_coords_list,
+        destination_port_id=dest_port_id,
+        destination_port_name=dest_port_name,
+        destination_port_coordinates=dest_port_coords_list,
         cargo_tonnes=req.cargo_tonnes,
+        commodity=req.commodity,
         target_vessel_class=target_class,
         total_vessels_evaluated=total_evaluated,
         potentially_suitable_count=potentially_suitable_count,
         candidates=limited_candidates,
+        route_compatibility_summary=route_compat_summary,
         data_mode=resp_data_mode,
         data_mode_notice=data_mode_notice,
         disclaimers=list(SUITABILITY_COMMERCIAL_DISCLAIMERS),

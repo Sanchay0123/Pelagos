@@ -234,6 +234,96 @@ class SuitabilityStatus(str, Enum):
     UNSUITABLE_TYPE = "unsuitable_type"
 
 
+class ParticularsCompletenessSummary(BaseModel):
+    """Explicit accounting of verified vs. missing physical and commercial particulars."""
+
+    completeness_status: str = Field(
+        ...,
+        description="Particulars readiness: 'complete', 'partial', or 'insufficient_data'.",
+    )
+    verified_particulars: List[str] = Field(
+        default_factory=list,
+        description="Physical or identity attributes verified in telemetry or canonical registry.",
+    )
+    missing_particulars: List[str] = Field(
+        default_factory=list,
+        description="Required physical, cargo-capacity, or commercial attributes currently missing.",
+    )
+    registry_vessel_class: Optional[str] = Field(
+        default=None,
+        description="Canonical registry vessel_class if persisted on Vessel record (separate from AIS estimate).",
+    )
+    registry_commercial_status: Optional[str] = Field(
+        default=None,
+        description="Canonical Vessel.commercial_status field (registry sync indicator, NOT spot charter availability).",
+    )
+    data_sources: List[str] = Field(
+        default_factory=list,
+        description="Source datasets contributing particulars.",
+    )
+
+
+class CargoCompatibilityAssessment(BaseModel):
+    """Transparent vessel-to-cargo compatibility evaluation."""
+
+    status: str = Field(
+        ...,
+        description="'compatible', 'potentially_compatible_unverified_capacity', 'incompatible', or 'insufficient_data'.",
+    )
+    cargo_tonnes: float
+    commodity: str = Field(default="Agricultural Bulk Grain")
+    verified_dwt_tonnes: Optional[float] = None
+    capacity_check_basis: str = Field(
+        default="ais_dimensional_envelope_only",
+        description="'verified_dwt' when canonical DWT exists, otherwise 'ais_dimensional_envelope_only'.",
+    )
+    reasons: List[str] = Field(default_factory=list)
+    missing_requirements: List[str] = Field(default_factory=list)
+
+
+class PortConstraintEvaluation(BaseModel):
+    """Load or discharge port physical access compatibility check."""
+
+    port_id: Optional[str] = None
+    port_name: Optional[str] = None
+    role: str = Field(..., description="'origin_load_port' or 'destination_discharge_port'.")
+    status: str = Field(
+        ...,
+        description="'compatible', 'incompatible', or 'insufficient_data'.",
+    )
+    documented_draft_limit_meters: Optional[float] = Field(
+        default=None,
+        description="Explicit channel/project draft limit extracted strictly from verified port records (null if unverified).",
+    )
+    limit_source_note: Optional[str] = Field(
+        default=None,
+        description="Source clause in port metadata documenting any numeric limit.",
+    )
+    vessel_draft_meters: Optional[float] = None
+    access_limitations: Optional[str] = None
+    reasons: List[str] = Field(default_factory=list)
+    missing_requirements: List[str] = Field(default_factory=list)
+
+
+class RouteCompatibilityAssessment(BaseModel):
+    """Vessel-to-route navigational, canal, and port compatibility evaluation."""
+
+    status: str = Field(
+        ...,
+        description="'compatible', 'conditionally_compatible_unverified_limits', 'incompatible', or 'insufficient_data'.",
+    )
+    route_navigable: Optional[bool] = None
+    routing_status: Optional[str] = None
+    routing_mode: Optional[str] = None
+    route_distance_nm: Optional[float] = None
+    canals_transited: List[str] = Field(default_factory=list)
+    canal_compatibility_notes: List[str] = Field(default_factory=list)
+    origin_port: Optional[PortConstraintEvaluation] = None
+    destination_port: Optional[PortConstraintEvaluation] = None
+    missing_requirements: List[str] = Field(default_factory=list)
+    reasons: List[str] = Field(default_factory=list)
+
+
 class VesselCandidateMatch(BaseModel):
     """Candidate vessel evaluation record based on verified physical criteria."""
 
@@ -317,6 +407,30 @@ class VesselCandidateMatch(BaseModel):
         default="Position fixes and AIS static broadcasts do not establish open-tonnage status, spot charter availability, or charter party commitments.",
         description="Transparent notice regarding commercial availability.",
     )
+    missing_particulars: List[str] = Field(
+        default_factory=list,
+        description="Explicit list of missing physical, capacity, or commercial particulars.",
+    )
+    registry_vessel_class: Optional[str] = Field(
+        default=None,
+        description="Vessel class persisted in canonical Vessel registry (distinct from AIS estimated class).",
+    )
+    registry_commercial_status: Optional[str] = Field(
+        default=None,
+        description="Canonical Vessel.commercial_status indicator (AIS registry sync presence only, NOT charter openness).",
+    )
+    particulars_completeness: Optional[ParticularsCompletenessSummary] = Field(
+        default=None,
+        description="Structured breakdown of verified vs. missing vessel particulars.",
+    )
+    cargo_compatibility: Optional[CargoCompatibilityAssessment] = Field(
+        default=None,
+        description="Explicit vessel-to-cargo compatibility evaluation.",
+    )
+    route_compatibility: Optional[RouteCompatibilityAssessment] = Field(
+        default=None,
+        description="Explicit vessel-to-route, canal, and port compatibility evaluation.",
+    )
 
 
 class VesselSuitabilityRequest(BaseModel):
@@ -325,6 +439,10 @@ class VesselSuitabilityRequest(BaseModel):
     cargo_tonnes: float = Field(
         default=52000.0,
         description="Cargo volume in metric tonnes (MT). Must be strictly positive (> 0).",
+    )
+    commodity: str = Field(
+        default="Agricultural Bulk Grain",
+        description="Cargo commodity type being evaluated.",
     )
     origin: Optional[Union[str, List[float], Dict[str, Any]]] = Field(
         default=None,
@@ -337,6 +455,10 @@ class VesselSuitabilityRequest(BaseModel):
     route_code: Optional[str] = Field(
         default=None,
         description="Direct corridor code (e.g. 'PNW-JPN-BULK', 'USG-JPN-BULK').",
+    )
+    canal_policy: str = Field(
+        default="allow",
+        description="Chokepoint canal routing policy ('allow', 'avoid_panama', 'avoid_suez', 'avoid_all').",
     )
     max_vessels: int = Field(
         default=50,
@@ -368,7 +490,7 @@ class VesselSuitabilityResponse(BaseModel):
 
     status: str = Field(
         ...,
-        description="Response status: 'matched', 'unavailable', or 'invalid_input'.",
+        description="Response status: 'matched', 'unmonitored_corridor_matched', 'unavailable', or 'invalid_input'.",
     )
     corridor: Optional[VoyageCorridorInfo] = Field(
         default=None,
@@ -386,9 +508,25 @@ class VesselSuitabilityResponse(BaseModel):
         default=None,
         description="Coordinates of the loading port [lon, lat].",
     )
+    destination_port_id: Optional[str] = Field(
+        default=None,
+        description="Destination discharging port UN/LOCODE (e.g. 'JPYOK').",
+    )
+    destination_port_name: Optional[str] = Field(
+        default=None,
+        description="Destination discharging port name (e.g. 'Yokohama').",
+    )
+    destination_port_coordinates: Optional[List[float]] = Field(
+        default=None,
+        description="Coordinates of the destination port [lon, lat].",
+    )
     cargo_tonnes: float = Field(
         ...,
         description="Cargo tonnage evaluated.",
+    )
+    commodity: str = Field(
+        default="Agricultural Bulk Grain",
+        description="Cargo commodity evaluated.",
     )
     target_vessel_class: Optional[str] = Field(
         default=None,
@@ -406,6 +544,17 @@ class VesselSuitabilityResponse(BaseModel):
         default_factory=list,
         description="Ranked list of candidate vessels.",
     )
+    route_compatibility_summary: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Corridor routing navigability, canal transit, and port limit audit summary.",
+    )
+    ais_vs_commercial_distinction: str = Field(
+        default=(
+            "AIS position records and Vessel.commercial_status registry sync markers do NOT represent "
+            "commercial charter open-tonnage availability, laycan readiness, or broker fixture confirmation."
+        ),
+        description="Explicit distinction between AIS/registry observations and commercial charter availability.",
+    )
     data_mode: str = Field(
         default="historical",
         description="Data mode of underlying telemetry: 'historical' (archived sample) or 'live' (real-time stream).",
@@ -422,4 +571,254 @@ class VesselSuitabilityResponse(BaseModel):
         default=None,
         description="Explanatory or diagnostic message.",
     )
+
+
+# ---------------------------------------------------------------------------
+# Stage D / Milestone D10 & D10.2 Chartering Intelligence & Vessel Assessment
+# ---------------------------------------------------------------------------
+
+
+class VesselParticularsInput(BaseModel):
+    """Explicit vessel particulars input for standalone/unit-level suitability verification."""
+
+    mmsi: str = Field(..., description="Maritime Mobile Service Identity.")
+    imo: Optional[str] = Field(default=None, description="IMO vessel identifier.")
+    vessel_name: Optional[str] = Field(default=None, description="Vessel name.")
+    vessel_type: Optional[str] = Field(default=None, description="Reported vessel type.")
+    vessel_type_code: Optional[int] = Field(default=None, description="AIS vessel type code.")
+    length_meters: Optional[float] = Field(default=None, description="Verified length overall (LOA) in meters.")
+    width_meters: Optional[float] = Field(default=None, description="Verified beam in meters.")
+    draft_meters: Optional[float] = Field(default=None, description="Verified operating or max draft in meters.")
+    dwt_tonnage: Optional[float] = Field(default=None, description="Verified deadweight tonnage (DWT).")
+    hold_cleanliness_verified: Optional[bool] = Field(
+        default=None,
+        description="True only when grain-clean/hold inspection is commercially verified.",
+    )
+    latitude: Optional[float] = Field(default=None, description="Observed latitude in WGS84 degrees.")
+    longitude: Optional[float] = Field(default=None, description="Observed longitude in WGS84 degrees.")
+    speed_knots: Optional[float] = Field(default=None, description="Observed or service speed in knots.")
+    observation_time: Optional[str] = Field(default=None, description="UTC timestamp (ISO-8601) of observation.")
+
+
+class VesselCompatibilityRequest(BaseModel):
+    """Evaluate a specific vessel against cargo and route compatibility criteria."""
+
+    mmsi: Optional[str] = Field(
+        default=None,
+        description="Canonical vessel MMSI in Pelagos database to assess.",
+    )
+    vessel: Optional[VesselParticularsInput] = Field(
+        default=None,
+        description="Explicit vessel particulars (required only when assessing an unregistered candidate).",
+    )
+    cargo_tonnes: float = Field(
+        default=52000.0,
+        description="Requested cargo quantity in metric tonnes (MT). Must be > 0.",
+    )
+    commodity: str = Field(
+        default="Agricultural Bulk Grain",
+        description="Requested cargo commodity.",
+    )
+    origin: Optional[Union[str, List[float], Dict[str, Any]]] = Field(
+        default=None,
+        description="Origin port UN/LOCODE (e.g. 'USSEA') or coordinates.",
+    )
+    destination: Optional[Union[str, List[float], Dict[str, Any]]] = Field(
+        default=None,
+        description="Destination port UN/LOCODE (e.g. 'JPYOK') or coordinates.",
+    )
+    route_code: Optional[str] = Field(
+        default=None,
+        description="Standard corridor code (e.g. 'PNW-JPN-BULK', 'USG-JPN-BULK').",
+    )
+    canal_policy: str = Field(
+        default="allow",
+        description="Chokepoint canal routing policy ('allow', 'avoid_panama', 'avoid_suez', 'avoid_all').",
+    )
+
+    @model_validator(mode="after")
+    def validate_request(self) -> VesselCompatibilityRequest:
+        if self.cargo_tonnes is None or self.cargo_tonnes <= 0:
+            raise ValueError(f"cargo_tonnes must be strictly positive (> 0), got {self.cargo_tonnes}")
+        if not self.mmsi and self.vessel is None:
+            raise ValueError("Either 'mmsi' (database lookup) or 'vessel' particulars must be provided.")
+        return self
+
+
+class VesselCompatibilityResult(BaseModel):
+    """Explicit single-vessel suitability, particulars, cargo, and route compatibility assessment."""
+
+    status: str = Field(
+        ...,
+        description="Assessment status: 'assessed', 'vessel_not_found', 'unavailable', or 'invalid_input'.",
+    )
+    overall_suitability: Optional[SuitabilityStatus] = None
+    corridor: Optional[VoyageCorridorInfo] = None
+    candidate: Optional[VesselCandidateMatch] = None
+    ais_observation_status: Dict[str, Any] = Field(default_factory=dict)
+    commercial_availability_status: Dict[str, Any] = Field(default_factory=dict)
+    disclaimers: List[str] = Field(default_factory=lambda: list(SUITABILITY_COMMERCIAL_DISCLAIMERS))
+    message: Optional[str] = None
+
+
+class VerifiedVesselFixtureInput(BaseModel):
+    """Verified commercial broker open-tonnage & operational particulars (never synthesized)."""
+
+    mmsi: str
+    vessel_name: str
+    vessel_type: str = "Dry Bulk Carrier"
+    vessel_type_code: Optional[int] = 70
+    length_meters: float = Field(..., gt=0)
+    width_meters: float = Field(..., gt=0)
+    draft_meters: float = Field(..., gt=0)
+    dwt_tonnage: float = Field(..., gt=0)
+    commercial_status: str = Field(
+        ...,
+        description="Verified broker status: 'open', 'laden', 'drydock', 'fixed', or 'unavailable'.",
+    )
+    hold_cleanliness_verified: bool = Field(
+        default=False,
+        description="True when hold inspection/cleanliness is verified for cargo.",
+    )
+    current_latitude: float
+    current_longitude: float
+    service_speed_knots: float = Field(..., gt=0)
+    daily_fuel_consumption_mt: float = Field(..., gt=0)
+    spot_charter_rate_usd_per_mt: Optional[float] = Field(default=None, gt=0)
+    time_charter_daily_hire_usd: Optional[float] = Field(default=None, gt=0)
+    coa_consecutive_voyage_rate_usd_per_mt: Optional[float] = Field(default=None, gt=0)
+    observation_time: str = Field(..., description="UTC timestamp of verified position report.")
+
+
+class VerifiedCharterInputs(BaseModel):
+    """Explicit bundle of verified commercial inputs required to authorize chartering recommendations."""
+
+    source_provenance: str = Field(..., description="Source attribution for verified commercial fixture/quote inputs.")
+    bunker_price_usd_per_mt: float = Field(..., gt=0, description="Verified delivered bunker price at corridor hub.")
+    bunker_fuel_grade: str = Field(default="VLSFO")
+    port_disbursements_usd: float = Field(default=0.0, ge=0.0)
+    canal_tolls_usd: float = Field(default=0.0, ge=0.0)
+    voyage_loading_discharge_days: float = Field(..., gt=0)
+    consecutive_voyages_count: int = Field(default=2, ge=2)
+    origin_max_draft_meters: Optional[float] = Field(default=None, gt=0)
+    destination_max_draft_meters: Optional[float] = Field(default=None, gt=0)
+    origin_max_loa_meters: Optional[float] = Field(default=None, gt=0)
+    destination_max_loa_meters: Optional[float] = Field(default=None, gt=0)
+    origin_max_beam_meters: Optional[float] = Field(default=None, gt=0)
+    destination_max_beam_meters: Optional[float] = Field(default=None, gt=0)
+    verified_future_rate_usd_per_mt: Optional[float] = Field(
+        default=None,
+        gt=0,
+        description="Verified directional forward/forecast rate signal if a non-flat validated signal exists.",
+    )
+    vessel_fixtures: List[VerifiedVesselFixtureInput] = Field(default_factory=list)
+
+
+class DataGateStatus(BaseModel):
+    """Readiness audit status for a single prerequisite domain of chartering optimization."""
+
+    domain: str
+    status: str = Field(
+        ...,
+        description="'available', 'partial', 'insufficient_data', or 'unavailable'.",
+    )
+    details: str
+    missing_items: List[str] = Field(default_factory=list)
+
+
+class ContractCostComparison(BaseModel):
+    """Deterministic procurement cost comparison across charter structures (REQ-FR-CPO-002)."""
+
+    contract_structure: str
+    total_cost_usd: float
+    unit_cost_usd_per_mt: float
+    voyages_evaluated: int = 1
+    assumptions_used: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CharterRecommendRequest(BaseModel):
+    """Input request for Chartering Recommendation & Readiness Gate (REQ-FR-CPO-001/002/003, CDV-002)."""
+
+    cargo_tonnes: float = Field(
+        ...,
+        description="Requested cargo volume in metric tonnes (MT). Must be > 0.",
+    )
+    commodity: str = Field(
+        default="Agricultural Bulk Grain",
+        description="Cargo commodity specification.",
+    )
+    origin: Optional[Union[str, List[float], Dict[str, Any]]] = Field(
+        default=None,
+        description="Origin loading port UN/LOCODE or coordinates.",
+    )
+    destination: Optional[Union[str, List[float], Dict[str, Any]]] = Field(
+        default=None,
+        description="Destination discharging port UN/LOCODE or coordinates.",
+    )
+    route_code: Optional[str] = Field(
+        default=None,
+        description="Direct corridor code (e.g. 'PNW-JPN-BULK', 'USG-JPN-BULK').",
+    )
+    canal_policy: str = Field(
+        default="allow",
+        description="Chokepoint canal routing policy ('allow', 'avoid_panama', 'avoid_suez', 'avoid_all').",
+    )
+    laycan_start: Optional[date] = Field(
+        default=None,
+        description="Start of target cargo laycan window (YYYY-MM-DD).",
+    )
+    laycan_end: Optional[date] = Field(
+        default=None,
+        description="Laycan cancelling date (YYYY-MM-DD).",
+    )
+    max_vessels: int = Field(default=20, ge=1, le=200)
+    verified_commercial_inputs: Optional[VerifiedCharterInputs] = Field(
+        default=None,
+        description="Optional caller-supplied verified commercial fixtures and bunker/port inputs; strictly None when unconnected.",
+    )
+
+    @model_validator(mode="after")
+    def validate_inputs(self) -> CharterRecommendRequest:
+        if self.cargo_tonnes is None or self.cargo_tonnes <= 0:
+            raise ValueError(f"cargo_tonnes must be strictly positive (> 0), got {self.cargo_tonnes}")
+        if self.laycan_start and self.laycan_end and self.laycan_end < self.laycan_start:
+            raise ValueError("laycan_end must not precede laycan_start")
+        return self
+
+
+class CharterRecommendationResponse(BaseModel):
+    """Deterministic chartering decision gate & recommendation output (ARCH-001 / REQ-FR-CPO-001)."""
+
+    status: str = Field(
+        ...,
+        description="Outcome: 'recommended', 'insufficient_data', 'unavailable', or 'invalid_input'.",
+    )
+    recommendation_issued: bool = Field(
+        default=False,
+        description="True ONLY when all required authentic data gates pass and a valid procurement action is supported.",
+    )
+    recommended_action: Optional[str] = Field(
+        default=None,
+        description="Action Type ('Fix Now', 'Wait', 'Hedge') when issued; strictly null when insufficient_data/unavailable.",
+    )
+    recommended_contract_structure: Optional[str] = Field(
+        default=None,
+        description="Contract structure ('Spot Single Voyage', 'Consecutive Voyage Charter (COA)', 'Time Charter (TC)') when issued.",
+    )
+    corridor: Optional[VoyageCorridorInfo] = None
+    cargo_tonnes: Optional[float] = None
+    commodity: str = "Agricultural Bulk Grain"
+    data_readiness_gates: Dict[str, DataGateStatus] = Field(default_factory=dict)
+    missing_decision_inputs: List[str] = Field(default_factory=list)
+    verified_supporting_analytics: Dict[str, Any] = Field(default_factory=dict)
+    contract_comparisons: List[ContractCostComparison] = Field(default_factory=list)
+    ranked_vessel_candidates: List[VesselCandidateMatch] = Field(default_factory=list)
+    ais_vs_commercial_summary: str = Field(
+        default=(
+            "Historical AIS observations in Pelagos demonstrate dimensional screening only and do NOT "
+            "establish open-tonnage availability, laycan readiness, or commercial fixture status."
+        )
+    )
+    disclaimers: List[str] = Field(default_factory=lambda: list(SUITABILITY_COMMERCIAL_DISCLAIMERS))
+    message: str = ""
 

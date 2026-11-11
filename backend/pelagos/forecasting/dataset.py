@@ -57,30 +57,50 @@ class TemporalAvailabilityPolicy:
     Core Concepts & Semantics (C3.1.2):
     1. Observation Period / Date (observation_date):
        The calendar month of the freight rate measurement (e.g. 2026-10-01 represents October 2026).
-    2. Actual Publication Timestamps vs. Rule-Based Availability Cutoffs:
-       - Actual Publication Timestamp: SODA dataset ehs5-yac3 does NOT provide record-level release
-         timestamps; observed_publication_time is strictly preserved as None.
-       - Conditional Conservative Availability Cutoff: Authoritative source reference: USDA Agricultural
-         Marketing Service (AMS) Transportation Services Division (TSD) publishes the Grain Transportation
-         Report (GTR) weekly on Thursdays by 12:00 noon Eastern Time (https://www.ams.usda.gov/services/transportation-analysis/gtr).
-         Ocean freight rates (Table 1: 'Grain vessel rates, U.S. to Japan') are compiled with O'Neil Commodity
-         Consulting following month-end. Under normal reporting operations, monthly freight tables typically
-         appear in either the first or second Thursday edition following month-end.
-         Calendar Arithmetic:
-         - 1st Thursday of month M+1 falls on calendar days 1 to 7.
-         - 2nd Thursday of month M+1 falls on calendar days 8 to 14.
-         A 14-day post-month-end lag (`publication_lag_days = 14`) serves as a conservative availability cutoff
-         under normal publication conditions, corresponding to 12:00 PM America/New_York (16:00 UTC EDT / 17:00 UTC EST).
-         IMPORTANT: This cutoff is strictly CONDITIONAL on the normal publication schedule. It does NOT guarantee
-         availability during Federal government shutdowns (e.g. Oct 2013, Dec 2018–Jan 2019) or exceptional release
-         delays.
+    2. Actual Publication Timestamps vs. Conditional Rule-Based Availability Cutoffs:
+       - Actual Publication Timestamp: SODA dataset ehs5-yac3 (AgTransport 'Vessel Rates',
+         https://agtransport.usda.gov/Bulk/Vessel-Rates/ehs5-yac3) does NOT provide record-level
+         release timestamps; observed_publication_time is strictly preserved as None.
+       - Authoritative USDA AMS Sources & What Each Supports:
+         * https://www.ams.usda.gov/services/transportation-analysis/gtr verifies weekly Thursday
+           publication of the Grain Transportation Report (GTR), without advertising a guaranteed
+           12:00 noon Eastern SLA.
+         * https://www.ams.usda.gov/services/transportation-analysis/gtr-datasets separates weekly
+           'Table 1: Grain transport cost indicators' from monthly ocean rates in 'Figure 20: Grain
+           vessel rates, U.S. to Japan' (source: O'Neil Commodity Consulting).
+         * https://www.ams.usda.gov/services/transportation-analysis/gtr/archive indexes 2020-2026
+           Thursday PDFs (1996-2019 is unindexed in this web archive) and evidences a 7-week lapse
+           in archive-2025 between 2025-09-25 and 2025-11-20.
+         * Inspected PDFs (GTR10012026.pdf, GTR10082026.pdf, GTR11052026.pdf, Figure 20) provide
+           several examples of monthly U.S.-to-Japan ocean rates appearing in first-Thursday
+           editions post-month-end (e.g., Sept 2026 on Oct 1; Oct 2026 on Nov 5), while SODA view
+           metadata (api/views/ehs5-yac3.json) recorded rowsUpdatedAt = 2026-11-05T17:16:28+00:00
+           (12:16:28 PM EST).
+         * Verification Boundary: Available USDA evidence does NOT establish that monthly
+           Figure 20 is consistently published by the second Thursday following every observation
+           month; the monthly Figure 20 publication deadline has not been independently verified
+           across the historical period.
+       - Pelagos Conservative Operational Assumption (Day 14 Cutoff):
+         Calendar arithmetic alone establishes that in any month M+1:
+         * 1st Thursday of month M+1 falls on calendar days 1 to 7.
+         * 2nd Thursday of month M+1 falls on calendar days 8 to 14.
+         A fixed 14-calendar-day post-month-end cutoff (`publication_lag_days = 14`) with a
+         provisional intraday instant at `12:00 PM America/New_York` (16:00 UTC EDT / 17:00 UTC
+         EST) is a **Pelagos conservative operational assumption**, informed by the weekly
+         Thursday GTR publication pattern and second-Thursday calendar arithmetic. It is NOT
+         an observed historical timestamp, is NOT a proven upper bound for monthly Figure 20
+         publication, and does NOT guarantee availability during Federal holidays, exceptional
+         release delays, incomplete online archive periods (1996-2019), or government
+         shutdowns/funding lapses.
     3. Forecast Decision Date & Strict Timestamp Ordering (decision_date, decision_timestamp):
-       To prevent treating date-only values as proof of intraday 00:00 availability, decision execution is normalized
-       to end-of-day UTC (23:59:59 UTC). This ensures strict ordering:
-       `decision_timestamp > conservative_availability_cutoff` (by ~7-8 hours).
+       To prevent treating date-only values as proof of intraday 00:00 availability and allow for
+       early-afternoon updates (e.g., 12:16:28 PM EST), decision execution is normalized to
+       end-of-day UTC (23:59:59 UTC). This enforces strict timestamp ordering:
+       `decision_timestamp > conservative_availability_cutoff`.
     4. Target Period & Strict Forward Invariants:
        Under strict forward-forecast semantics (horizon_alignment='strict_forward'):
-       - Target period start must be strictly after decision timestamp (target_period_start > decision_date).
+       - Target period start (00:00:00 UTC on day 1 of target month) and target conservative cutoff
+         must both be strictly later than decision_timestamp.
        - Because decision_date occurs in month M+1, month M+1 has already begun on the 1st.
        - Therefore, an estimate of month M+1 at decision_date is a concurrent nowcast/in-month estimate.
        - A strict forward T+1 forecast targets month M+2 (target_offset = horizon_months + 1 relative to observation).
@@ -88,8 +108,8 @@ class TemporalAvailabilityPolicy:
     """
 
     policy_name: str = "conservative_second_thursday_gtr_release"
-    publication_lag_days: int = 14  # Calendar days after month-end; Day 14 is upper bound of 2nd Thursday (days 8-14)
-    publication_hour_eastern: int = 12  # USDA AMS GTR release instant: 12:00 PM Eastern
+    publication_lag_days: int = 14  # Pelagos conservative operational assumption; informed by 2nd-Thursday calendar range (days 8-14)
+    publication_hour_eastern: int = 12  # Provisional rule cutoff instant: 12:00 PM Eastern (normalized 23:59:59 UTC decision follows)
     publication_minute_eastern: int = 0
     publication_timezone: str = "America/New_York"
     normalization_timezone: str = "UTC"
@@ -99,18 +119,25 @@ class TemporalAvailabilityPolicy:
     is_exact_point_in_time: bool = False
     horizon_alignment: str = "strict_forward"  # "strict_forward" (C3.1.2) or "observation_relative" (legacy C1)
     limitation_notes: str = (
-        "Historical USDA AMS SODA API (ehs5-yac3) does not provide record-level publication "
-        "timestamps; observed_publication_time is strictly preserved as None. "
-        "Authoritative schedule reference: USDA Agricultural Marketing Service (AMS) Transportation Services "
-        "Division (TSD) publishes the Grain Transportation Report (GTR) weekly on Thursdays by 12:00 noon Eastern "
-        "(https://www.ams.usda.gov/services/transportation-analysis/gtr). Monthly ocean vessel freight rates "
-        "(Table 1) compiled with O'Neil Commodity Consulting are normally published on the first or second "
-        "Thursday post-month-end. Calendar arithmetic establishes that the second Thursday falls between calendar "
-        "days 8 and 14 across all monthly starting weekdays. A 14-day post-month-end cutoff represents a defensible "
-        "conservative availability bound conditional on the normal publication schedule. IMPORTANT: This cutoff "
-        "is conditional on normal operations and does NOT guarantee availability during Federal government shutdowns "
-        "or exceptional release delays. Decision timestamps are normalized to 23:59:59 UTC, ensuring the decision "
-        "timestamp strictly succeeds the conservative cutoff instant (16:00 or 17:00 UTC) with strict ordering (>)."
+        "AgTransport SODA dataset ehs5-yac3 (https://agtransport.usda.gov/Bulk/Vessel-Rates/ehs5-yac3) "
+        "does not provide record-level publication timestamps; observed_publication_time is strictly "
+        "preserved as None. Authoritative USDA AMS references: weekly Thursday GTR publication "
+        "(https://www.ams.usda.gov/services/transportation-analysis/gtr; no official noon Eastern SLA "
+        "verified), monthly ocean rate series in Figure 20 'Grain vessel rates, U.S. to Japan' compiled "
+        "with O'Neil Commodity Consulting rather than weekly Table 1 cost indicators "
+        "(https://www.ams.usda.gov/services/transportation-analysis/gtr-datasets), 2020-2026 issue "
+        "archives (https://www.ams.usda.gov/services/transportation-analysis/gtr/archive; 1996-2019 absent), "
+        "and inspected first-Thursday Figure 20 examples (GTR10012026.pdf, GTR11052026.pdf). Available "
+        "evidence does not establish consistent second-Thursday publication across every observation month, "
+        "and the monthly Figure 20 publication deadline has not been independently verified across the "
+        "historical period. The fixed 14-calendar-day cutoff at provisional 12:00 PM America/New_York "
+        "(16:00 EDT / 17:00 EST UTC) is a Pelagos conservative operational assumption informed by weekly "
+        "Thursday publication and 2nd-Thursday calendar arithmetic (days 8-14) — not an observed release "
+        "timestamp and not a proven upper bound for monthly Figure 20 publication. AgTransport SODA view "
+        "metadata (api/views/ehs5-yac3.json) showed rowsUpdatedAt at 17:16:28 UTC (12:16:28 PM EST) on "
+        "2026-11-05, archive-2025 exhibits a 7-week lapse (2025-09-25 to 2025-11-20), and Federal holidays, "
+        "release delays, archive gaps, and shutdowns can exceed Day 14. Decision execution at 23:59:59 UTC "
+        "enforces strict ordering (decision_timestamp > conservative_availability_cutoff)."
     )
 
     def calculate_second_thursday(self, observation_date: date) -> date:
@@ -136,14 +163,16 @@ class TemporalAvailabilityPolicy:
         return self.calculate_availability_date(observation_date)
 
     def calculate_conservative_availability_cutoff(self, observation_date: date) -> datetime:
-        """Calculate the conditional rule-based conservative availability cutoff in UTC.
+        """Calculate Pelagos's conservative operational availability cutoff in UTC.
 
-        Evaluated at publication_hour_eastern (12:00 PM) in America/New_York on Day 14
-        (mathematical upper bound of the 2nd Thursday in month M+1), then normalized to UTC.
+        Evaluated at the provisional publication_hour_eastern (12:00 PM) in America/New_York on
+        Day 14 post-month-end (informed by the weekly Thursday GTR pattern and 2nd-Thursday calendar
+        arithmetic across days 8-14), then normalized to UTC.
 
-        NOTE: This is a conditional rule-based cutoff based on the normal Thursday GTR release
-        schedule, NOT an actual observed historical publication timestamp. It does not guarantee
-        availability during exceptional release delays or government shutdowns.
+        NOTE: This is a Pelagos conservative operational assumption, NOT an observed historical
+        publication timestamp and NOT a proven upper bound for monthly Figure 20 publication (the
+        monthly Figure 20 publication deadline has not been independently verified across the
+        historical period). Subject to holiday, delayed-release, archive-gap, and shutdown caveats.
         """
         avail_date = self.calculate_availability_date(observation_date)
         eastern_tz = ZoneInfo(self.publication_timezone)
@@ -524,22 +553,24 @@ def build_forecast_dataset(
         orig_date, orig_rate = obs_own[i]
         avail_date = availability_policy.calculate_availability_date(orig_date)
         dec_date = availability_policy.calculate_decision_date(orig_date)
-        pub_dt = availability_policy.calculate_publication_datetime(orig_date)
+        pub_dt = availability_policy.calculate_conservative_availability_cutoff(orig_date)
         dec_dt = availability_policy.calculate_decision_datetime(orig_date)
         tgt_date = availability_policy.calculate_target_date(orig_date, horizon_months)
         tgt_period_start = tgt_date
         tgt_avail_date = availability_policy.calculate_availability_date(tgt_date)
+        tgt_cutoff_dt = availability_policy.calculate_conservative_availability_cutoff(tgt_date)
 
         # Slice historical window strictly at or before origin date t
         hist_own = [r for _, r in obs_own[: i + 1]]
 
-        # Corresponding historical window for competitor route available at or before decision date
+        # Corresponding historical window for competitor route strictly available before decision timestamp
         hist_other: List[float] = []
         if obs_other:
             hist_other = [
                 r
                 for d, r in obs_other
                 if availability_policy.calculate_availability_date(d) <= dec_date
+                and availability_policy.calculate_conservative_availability_cutoff(d) < dec_dt
             ]
 
         # Extract features (origin_date used to prevent future lookahead)
@@ -569,19 +600,33 @@ def build_forecast_dataset(
         # Temporal Invariant Assertions (C3.1.2):
         # 1. Observation period strictly precedes availability date (cannot be available before observed)
         assert avail_date > orig_date, f"Availability violation: {avail_date} <= {orig_date}"
-        # 2. Decision timestamp must be on or after predictor availability
+        # 2. Decision date must be on or after predictor availability date
         assert dec_date >= avail_date, f"Predictor availability violation: {dec_date} < {avail_date}"
         # 3. Decision timestamp must strictly succeed the conservative availability cutoff (strict ordering: dec_dt > cutoff_dt)
         assert dec_dt > pub_dt, (
             f"Strict ordering violation: decision timestamp {dec_dt} must strictly succeed "
             f"conservative availability cutoff {pub_dt}"
         )
-        # 4. Target availability date must be strictly after forecast decision date
+        # 4. Target availability date and conservative cutoff must strictly succeed decision date/timestamp
         assert tgt_avail_date > dec_date, f"Target lookahead violation: target avail {tgt_avail_date} <= decision {dec_date}"
-        # 5. Target period start must be strictly after decision timestamp (under strict_forward)
+        assert tgt_cutoff_dt > dec_dt, (
+            f"Target cutoff lookahead violation: target cutoff {tgt_cutoff_dt} <= decision timestamp {dec_dt}"
+        )
+        # 5. Target period start must strictly succeed forecast decision date and timestamp (under strict_forward)
         if availability_policy.horizon_alignment == "strict_forward":
-            assert tgt_period_start > dec_date, f"Strict forward violation: target period start {tgt_period_start} <= decision date {dec_date}"
-        # 6. Target observation period must be strictly after predictor observation period
+            tgt_period_start_dt = datetime(
+                tgt_period_start.year,
+                tgt_period_start.month,
+                tgt_period_start.day,
+                tzinfo=timezone.utc,
+            )
+            assert tgt_period_start > dec_date, (
+                f"Strict forward violation: target period start {tgt_period_start} <= decision date {dec_date}"
+            )
+            assert tgt_period_start_dt > dec_dt, (
+                f"Strict forward timestamp violation: target period start {tgt_period_start_dt} <= decision timestamp {dec_dt}"
+            )
+        # 6. Target observation period must strictly succeed predictor observation period
         assert tgt_date > orig_date, f"Target ordering violation: target {tgt_date} <= observation {orig_date}"
         # 7. Latest historical rate used in features must match orig_rate
         assert raw_features.get("rate_lag_0") == orig_rate
@@ -631,9 +676,20 @@ def build_forecast_dataset(
         "temporal_alignment": {
             "publication_lag_days": availability_policy.publication_lag_days,
             "horizon_alignment": availability_policy.horizon_alignment,
-            "decision_rule": "post_publication_monthly_release",
+            "decision_rule": "post_conservative_day_14_availability_cutoff",
             "historical_exact_timestamps_available": False,
-            "limitation": "USDA AMS SODA API (ehs5-yac3) does not provide exact publication timestamps. Availability dates are estimated based on USDA AMS GTR weekly Thursday release schedules.",
+            "limitation": (
+                "AgTransport SODA dataset ehs5-yac3 does not provide record-level publication timestamps "
+                "(observed_publication_time is preserved as None). Day 14 at provisional 12:00 PM America/New_York "
+                "(16:00 EDT / 17:00 EST UTC) is a Pelagos conservative operational assumption informed by the "
+                "weekly Thursday USDA AMS GTR pattern and 2nd-Thursday calendar arithmetic (days 8-14) — not an "
+                "observed timestamp and not a proven upper bound for monthly Figure 20 publication (the monthly "
+                "Figure 20 deadline has not been independently verified across the historical period). Availability "
+                "is not guaranteed during Federal holidays, release delays (e.g., 12:16:28 PM EST SODA update on "
+                "2026-11-05), incomplete archives (1996-2019 absent online), or shutdowns (e.g., 7-week lapse in "
+                "archive-2025 from 2025-09-25 to 2025-11-20). Decision timestamps at 23:59:59 UTC strictly "
+                "succeed the cutoff."
+            ),
         },
     }
 
@@ -665,6 +721,12 @@ def generate_feature_inventory(db: Optional[Session] = None) -> List[Dict[str, A
             BunkerPriceObservation,
         )
 
+        # Query authoritative live observation counts from database session
+        freight_count = session.query(FreightObservation).count()
+        trade_count = session.query(TradeObservation).count()
+        env_count = session.query(EnvironmentalObservation).count()
+        bunker_count = session.query(BunkerPriceObservation).count()
+
         inventory: List[Dict[str, Any]] = [
             {
                 "domain_number": 1,
@@ -674,7 +736,7 @@ def generate_feature_inventory(db: Optional[Session] = None) -> List[Dict[str, A
                 "earliest_observation": "1996-01-01",
                 "latest_observation": "2026-10-01",
                 "observation_frequency": "Monthly (first of month calendar anchor)",
-                "genuine_observations_count": 1110,
+                "genuine_observations_count": freight_count,
                 "missingness_rate_pct": 0.0,
                 "monthly_modeling_sufficiency": "Sufficient (370 consecutive months, 30.8 years)",
                 "alignment_feasibility": "Feasible (Canonical monthly 1-to-1 date alignment)",
@@ -689,7 +751,7 @@ def generate_feature_inventory(db: Optional[Session] = None) -> List[Dict[str, A
                 "earliest_observation": "2024-10-01",
                 "latest_observation": "2024-12-01",
                 "observation_frequency": "Monthly",
-                "genuine_observations_count": 11,
+                "genuine_observations_count": trade_count,
                 "missingness_rate_pct": 99.1,
                 "monthly_modeling_sufficiency": "Insufficient (< 1% timeline coverage; only 3 months in late 2024)",
                 "alignment_feasibility": "Infeasible for 1996-2026 historical model training",
@@ -704,7 +766,7 @@ def generate_feature_inventory(db: Optional[Session] = None) -> List[Dict[str, A
                 "earliest_observation": "2024-10-15",
                 "latest_observation": "2026-10-30",
                 "observation_frequency": "Point observations (sub-daily / hourly snapshots)",
-                "genuine_observations_count": 13,
+                "genuine_observations_count": env_count,
                 "missingness_rate_pct": 99.9,
                 "monthly_modeling_sufficiency": "Insufficient (< 0.1% coverage; isolated snapshots in 2024 and 2026)",
                 "alignment_feasibility": "Infeasible for multi-year historical training; deep-sea open ocean segments unmonitored",
@@ -719,7 +781,7 @@ def generate_feature_inventory(db: Optional[Session] = None) -> List[Dict[str, A
                 "earliest_observation": "2026-11-06",
                 "latest_observation": "2026-11-06",
                 "observation_frequency": "Spot market indications",
-                "genuine_observations_count": 5,
+                "genuine_observations_count": bunker_count,
                 "missingness_rate_pct": 100.0,
                 "monthly_modeling_sufficiency": "Insufficient (Zero historical depth prior to November 2026)",
                 "alignment_feasibility": "Infeasible for 1996-2026 historical model training",

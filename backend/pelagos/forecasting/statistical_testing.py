@@ -404,11 +404,11 @@ def compare_candidate_to_baseline(
         n_boot=n_boot,
         seed=seed,
     )
-    ci_spans_zero = (ci_low <= 0.0 <= ci_high)
+    ci_spans_zero = bool(ci_low <= 0.0 <= ci_high)
 
-    sig = p_val < SIGNIFICANCE_ALPHA
-    fav_cand = mean_diff > 0.0 and sig
-    fav_base = mean_diff < 0.0 and sig
+    sig = bool(p_val < SIGNIFICANCE_ALPHA)
+    fav_cand = bool(mean_diff > 0.0 and sig)
+    fav_base = bool(mean_diff < 0.0 and sig)
 
     classification = classify_candidate_performance(
         percent_improvement=pct_imp,

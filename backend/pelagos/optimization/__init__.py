@@ -12,9 +12,22 @@ from pelagos.optimization.schemas import (
     RouteDistanceInfo,
     VoyageCorridorInfo,
     SuitabilityStatus,
+    ParticularsCompletenessSummary,
+    CargoCompatibilityAssessment,
+    PortConstraintEvaluation,
+    RouteCompatibilityAssessment,
     VesselCandidateMatch,
     VesselSuitabilityRequest,
     VesselSuitabilityResponse,
+    VesselParticularsInput,
+    VesselCompatibilityRequest,
+    VesselCompatibilityResult,
+    VerifiedVesselFixtureInput,
+    VerifiedCharterInputs,
+    DataGateStatus,
+    ContractCostComparison,
+    CharterRecommendRequest,
+    CharterRecommendationResponse,
     SUITABILITY_COMMERCIAL_DISCLAIMERS,
 )
 from pelagos.optimization.calculator import calculate_voyage_freight
@@ -23,6 +36,10 @@ from pelagos.optimization.matcher import (
     infer_dimensional_class,
     evaluate_vessel_suitability,
     match_suitable_vessels,
+)
+from pelagos.optimization.chartering import (
+    assess_vessel_for_voyage,
+    recommend_charter_strategy,
 )
 
 __all__ = [
@@ -34,13 +51,28 @@ __all__ = [
     "VoyageCorridorInfo",
     "calculate_voyage_freight",
     "SuitabilityStatus",
+    "ParticularsCompletenessSummary",
+    "CargoCompatibilityAssessment",
+    "PortConstraintEvaluation",
+    "RouteCompatibilityAssessment",
     "VesselCandidateMatch",
     "VesselSuitabilityRequest",
     "VesselSuitabilityResponse",
+    "VesselParticularsInput",
+    "VesselCompatibilityRequest",
+    "VesselCompatibilityResult",
+    "VerifiedVesselFixtureInput",
+    "VerifiedCharterInputs",
+    "DataGateStatus",
+    "ContractCostComparison",
+    "CharterRecommendRequest",
+    "CharterRecommendationResponse",
     "SUITABILITY_COMMERCIAL_DISCLAIMERS",
     "haversine_distance_nm",
     "infer_dimensional_class",
     "evaluate_vessel_suitability",
     "match_suitable_vessels",
+    "assess_vessel_for_voyage",
+    "recommend_charter_strategy",
 ]
 
