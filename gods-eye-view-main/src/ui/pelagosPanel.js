@@ -26,6 +26,7 @@ import {
   formatVesselCoords,
   formatRelativeAge,
 } from './pelagosVessels.js';
+import { PelagosOverviewController } from './pelagosOverview.js';
 
 /** Verified hydrographic ports fallback dataset from backend/pelagos/routing/fixtures/ports.json */
 export const VERIFIED_HYDROGRAPHIC_PORTS = Object.freeze([
@@ -136,6 +137,12 @@ export class PelagosPanelController {
     this.vesselFilterTab = 'all'; // 'all' | 'corridor'
     this.vesselSearchQuery = '';
     this._windowListeners = [];
+
+    this.overview = new PelagosOverviewController({
+      document: this.doc,
+      onNavigateExplorer: (domain) =>
+        this.actions?.navigateToExplorer?.(domain),
+    });
 
     this._resolveElements();
   }
@@ -272,14 +279,16 @@ export class PelagosPanelController {
     };
   }
 
-  /** Initialize event listeners and fetch port definitions. */
+  /** Initialize event listeners, live data overview, and port definitions. */
   async init() {
     this._resolveElements();
     if (!this.elements.panel) return;
 
     this._bindEvents();
     this._initGlobeEventListeners();
+    const overviewPromise = this.overview?.init?.();
     await this.loadPorts();
+    if (overviewPromise) await overviewPromise;
   }
 
   _bind(element, event, handler) {
@@ -1055,7 +1064,7 @@ export class PelagosPanelController {
         el.forecastVal.textContent = Number(fc.predicted_value).toFixed(2);
       if (el.forecastUnit) el.forecastUnit.textContent = fc.unit || 'USD/MT';
       if (el.forecastPeriod)
-        el.forecastPeriod.textContent = fc.target_date || 'October 2026';
+        el.forecastPeriod.textContent = fc.target_date || 'Unavailable';
       const modelName = fc.model_type
         ? fc.model_type.charAt(0).toUpperCase() + fc.model_type.slice(1)
         : 'Persistence';
@@ -1131,7 +1140,7 @@ export class PelagosPanelController {
             if (el.fleetDot)
               el.fleetDot.className = 'status-indicator-dot dot-warning';
             if (el.fleetText) {
-              el.fleetText.textContent = `Historical Sample — 120 Coastal Vessel Tracks (${count} loaded)`;
+              el.fleetText.textContent = `Historical Sample — ${totalLive.toLocaleString()} Coastal Vessel Tracks (${count} loaded)`;
             }
             if (el.fleetDesc) {
               el.fleetDesc.textContent =
@@ -2194,6 +2203,7 @@ export class PelagosPanelController {
 
   /** Teardown all event listeners, graphics, and abort pending requests. */
   destroy() {
+    this.overview?.destroy();
     this._abortController?.abort();
     this._costAbortController?.abort();
     this._suitabilityAbortController?.abort();

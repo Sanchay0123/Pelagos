@@ -3,9 +3,9 @@ title: Pelagos Documentation Index
 document_id: DOC-003
 type: documentation_index
 status: approved
-version: 1.0.25
+version: 1.0.27
 created: 2026-10-10
-updated: 2026-11-11
+updated: 2026-11-12
 tags:
   - index
   - navigation
@@ -29,11 +29,11 @@ N/A
 
 ### Core Foundations
 * [Documentation Standard](./DOCUMENTATION_STANDARD.md) (v1.1.1, Status: Approved)
-* [Project Overview](./PROJECT_OVERVIEW.md) (v1.0.4, Status: Approved)
-* [Documentation Index](./INDEX.md) (v1.0.25, Status: Approved)
+* [Project Overview](./PROJECT_OVERVIEW.md) (v1.0.5, Status: Approved)
+* [Documentation Index](./INDEX.md) (v1.0.27, Status: Approved)
 
 ### Architecture and Decisions
-* [System Architecture Specification](./architecture/system-architecture.md) (v1.0.2, Status: Drafting)
+* [System Architecture Specification](./architecture/system-architecture.md) (v1.0.3, Status: Drafting)
 * Architecture Decision Records (ADRs):
   * [ADR-0001: Modular Monolith Backend Architecture](./architecture/adr/adr-0001-modular-monolith-architecture.md) (v1.0.0, Status: Drafting)
   * [ADR-0002: Dual-Tier Storage Strategy](./architecture/adr/adr-0002-dual-tier-storage-strategy.md) (v1.0.0, Status: Drafting)
@@ -62,7 +62,7 @@ N/A
 * [Forecast Cadence Reconciliation Decision Record (OD-ROUT-06-01)](./routing/od-rout-06-01-forecasting-horizons-amendment-proposal.md) (v1.0.0, Status: Approved)
 
 ### Engineering and Operations
-* API Specifications (Planned)
+* [Stage E1 Platform Data Overview & Detailed Data Explorer Specification (API-001)](./architecture/platform-data-explorer.md) (v1.0.1, Status: Under Review)
 * Security Specifications (Planned)
 * Testing Specifications (Planned)
 * Runbooks (Planned)
@@ -130,3 +130,5 @@ Links to established, governed documentation within the repository, and maps pla
 | 1.0.23 | 2026-10-21 | Implementation Agent | Synchronized ROUT-006 status reference to Accepted following independent final review and Project Owner formal specification acceptance. Synchronized index version reference. Kept status approved. |
 | 1.0.24 | 2026-10-24 | Implementation Agent | Registered OD-ROUT-06-01 decision record; synchronized Functional Requirements (v1.0.6), System Architecture (v1.0.1), and ROUT-006 (v1.0.1) following formal forecast cadence reconciliation. Status: approved. |
 | 1.0.25 | 2026-11-11 | Implementation Agent | Registered promoted Stage C3 research documentation (`RES-C31-001`, `REPORT-C32-ML-BENCHMARK-001`, `SPEC-C33-REGIME-001`, `REPORT-C33-REGIME-001` plus JSON artifacts) and Stage D specification (`OPT-001`); synchronized Project Overview (v1.0.4), System Architecture (v1.0.2), and Functional Requirements (v1.0.7). Status: approved. |
+| 1.0.26 | 2026-11-11 | Implementation Agent | Registered Stage E1 Platform Data Overview & Detailed Data Explorer Specification (`API-001`, v1.0.0); synchronized Project Overview (v1.0.5) and System Architecture Specification (v1.0.3). Status: approved. |
+| 1.0.27 | 2026-11-12 | Implementation Agent | Synchronized `API-001` reference (`v1.0.1`, updated `2026-11-12`) after Stage E1 documentation-code alignment pass. Status: approved. |

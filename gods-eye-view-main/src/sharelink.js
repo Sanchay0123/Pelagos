@@ -136,6 +136,7 @@ export class ShareLinkManager {
       panels: new Map(),
     };
     this._destroyed = false;
+    this._hashSyncPaused = false;
     this._restoreGeneration = 0;
     this._activeCameraFlight = null;
     this._isNavigationCurrent =
@@ -526,14 +527,25 @@ export class ShareLinkManager {
     }
   }
 
+  /** Pause or resume debounced URL hash synchronization (e.g. while #/explorer route is active). */
+  setHashSyncPaused(paused) {
+    this._hashSyncPaused = Boolean(paused);
+    if (this._hashSyncPaused) {
+      clearTimeout(this._debounceTimer);
+      this._debounceTimer = null;
+    }
+  }
+
   _scheduleUpdate() {
-    if (this._destroyed || this._initialRestorePending) return;
+    if (this._destroyed || this._initialRestorePending || this._hashSyncPaused)
+      return;
     clearTimeout(this._debounceTimer);
     this._debounceTimer = setTimeout(() => this._updateHash(), DEBOUNCE_MS);
   }
 
   _updateHash() {
-    if (this._destroyed || this._initialRestorePending) return;
+    if (this._destroyed || this._initialRestorePending || this._hashSyncPaused)
+      return;
     const params = this._buildHashParams();
     if (!params) return;
     history.replaceState(null, '', `#${params.toString()}`);

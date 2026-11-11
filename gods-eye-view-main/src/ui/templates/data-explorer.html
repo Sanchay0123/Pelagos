@@ -1,0 +1,247 @@
+<!-- Full-View SPA Detailed Data Explorer (#/explorer) -->
+<section
+  id="pelagos-explorer-view"
+  class="pelagos-explorer-view"
+  aria-label="Pelagos Detailed Data Explorer"
+  hidden
+>
+  <div class="explorer-shell">
+    <header class="explorer-topbar">
+      <div class="explorer-brand">
+        <div id="pelagos-explorer-kicker" class="explorer-kicker">
+          PELAGOS MARITIME INTELLIGENCE · AUDIT &amp; PROVENANCE
+        </div>
+        <h1 id="pelagos-explorer-title" class="explorer-title">
+          DETAILED DATA EXPLORER
+        </h1>
+      </div>
+      <div class="explorer-topbar-actions">
+        <span
+          id="pelagos-explorer-summary-badge"
+          class="explorer-summary-badge"
+          title="Genuine records and physical entities across catalogued domains"
+          >LIVE DATABASE INVENTORY</span
+        >
+        <button
+          type="button"
+          id="pelagos-explorer-return-btn"
+          class="pelagos-btn-secondary explorer-return-btn"
+        >
+          ← RETURN TO COMMAND GLOBE
+        </button>
+      </div>
+    </header>
+
+    <nav
+      id="explorer-domain-tabs"
+      class="explorer-domain-tabs"
+      role="tablist"
+      aria-label="Data Explorer Domains"
+    >
+      <button
+        type="button"
+        class="domain-tab active"
+        data-domain="freight"
+        role="tab"
+        aria-selected="true"
+      >
+        <span class="tab-label">1. Freight Market</span>
+        <span class="tab-pill">—</span>
+      </button>
+      <button
+        type="button"
+        class="domain-tab"
+        data-domain="trade"
+        role="tab"
+        aria-selected="false"
+      >
+        <span class="tab-label">2. Trade Data</span>
+        <span class="tab-pill">—</span>
+      </button>
+      <button
+        type="button"
+        class="domain-tab"
+        data-domain="environmental"
+        role="tab"
+        aria-selected="false"
+      >
+        <span class="tab-label">3. Environmental</span>
+        <span class="tab-pill">—</span>
+      </button>
+      <button
+        type="button"
+        class="domain-tab"
+        data-domain="bunker"
+        role="tab"
+        aria-selected="false"
+      >
+        <span class="tab-label">4. Bunker Fuel</span>
+        <span class="tab-pill">—</span>
+      </button>
+      <button
+        type="button"
+        class="domain-tab"
+        data-domain="vessels"
+        role="tab"
+        aria-selected="false"
+      >
+        <span class="tab-label">5. Vessel &amp; AIS</span>
+        <span class="tab-pill">—</span>
+      </button>
+      <button
+        type="button"
+        class="domain-tab"
+        data-domain="ports"
+        role="tab"
+        aria-selected="false"
+      >
+        <span class="tab-label">6. Ports &amp; Routes</span>
+        <span class="tab-pill">—</span>
+      </button>
+      <button
+        type="button"
+        class="domain-tab"
+        data-domain="datasets"
+        role="tab"
+        aria-selected="false"
+      >
+        <span class="tab-label">7. Forecasting Datasets</span>
+        <span class="tab-pill">—</span>
+      </button>
+      <button
+        type="button"
+        class="domain-tab"
+        data-domain="sources"
+        role="tab"
+        aria-selected="false"
+      >
+        <span class="tab-label">8. Source Operations</span>
+        <span class="tab-pill">—</span>
+      </button>
+    </nav>
+
+    <div
+      id="explorer-kpi-bar"
+      class="explorer-kpi-bar"
+      aria-live="polite"
+    ></div>
+
+    <div
+      id="explorer-status-banner"
+      class="explorer-banner"
+      role="status"
+      aria-live="polite"
+      style="display: none"
+    ></div>
+
+    <div class="explorer-workspace">
+      <div class="explorer-table-pane">
+        <div class="explorer-toolbar">
+          <div class="toolbar-search">
+            <input
+              type="text"
+              id="explorer-search-input"
+              class="pelagos-filter-input"
+              placeholder="Search current domain…"
+              autocomplete="off"
+              aria-label="Search explorer records"
+            />
+          </div>
+          <div id="explorer-dynamic-filters" class="toolbar-filters"></div>
+          <div class="toolbar-actions">
+            <button
+              type="button"
+              id="explorer-reset-filters-btn"
+              class="pelagos-btn-secondary"
+            >
+              RESET
+            </button>
+            <button
+              type="button"
+              id="explorer-export-csv-btn"
+              class="pelagos-btn-secondary"
+            >
+              EXPORT PAGE CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="explorer-table-wrap">
+          <table id="explorer-data-table" class="explorer-data-table">
+            <thead id="explorer-table-head"></thead>
+            <tbody id="explorer-table-body"></tbody>
+          </table>
+          <div
+            id="explorer-loading-spinner"
+            class="explorer-loading-overlay"
+            style="display: none"
+          >
+            <span
+              class="btn-spinner explorer-spinner-visible"
+              aria-hidden="true"
+            ></span>
+            <span>Loading backend records…</span>
+          </div>
+          <div
+            id="explorer-empty-state"
+            class="explorer-empty-state"
+            style="display: none"
+          >
+            No matching records found.
+          </div>
+        </div>
+
+        <div class="explorer-pagination-bar">
+          <div class="pagination-info">
+            Showing <span id="explorer-page-start">0</span>–<span
+              id="explorer-page-end"
+              >0</span
+            >
+            of <span id="explorer-total-count">0</span> records
+          </div>
+          <div class="pagination-controls">
+            <button
+              type="button"
+              id="explorer-prev-page-btn"
+              class="pelagos-btn-secondary"
+              disabled
+            >
+              ◀ PREV
+            </button>
+            <span class="pagination-page-label"
+              >Page <span id="explorer-current-page">0</span> of
+              <span id="explorer-total-pages">0</span></span
+            >
+            <button
+              type="button"
+              id="explorer-next-page-btn"
+              class="pelagos-btn-secondary"
+              disabled
+            >
+              NEXT ▶
+            </button>
+            <select
+              id="explorer-page-size-select"
+              class="pelagos-select select-compact"
+              aria-label="Rows per page"
+            >
+              <option value="10">10 / page</option>
+              <option value="25" selected>25 / page</option>
+              <option value="50">50 / page</option>
+              <option value="100">100 / page</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <aside
+        id="explorer-provenance-drawer"
+        class="explorer-provenance-drawer"
+        aria-label="Provenance and Audit Inspector"
+      >
+        <div class="drawer-header">PROVENANCE &amp; INTEGRITY AUDIT</div>
+        <div id="explorer-provenance-content" class="drawer-body"></div>
+      </aside>
+    </div>
+  </div>
+</section>

@@ -45,6 +45,9 @@ import {
   holdContinuousRender,
   releaseContinuousRender,
   governorRequestRender,
+  suspendRendering,
+  resumeRendering,
+  isRenderingSuspended,
 } from '../renderGovernor.js';
 import {
   setScopeMaskEnabled,
@@ -100,6 +103,9 @@ export class StyleManager extends ApplicationShell {
         holdContinuousRender,
         releaseContinuousRender,
         governorRequestRender,
+        suspendRendering,
+        resumeRendering,
+        isRenderingSuspended,
         setScopeMaskEnabled,
         isScopeMaskEnabled,
         setScopeMaskFeather,

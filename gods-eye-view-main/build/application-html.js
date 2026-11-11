@@ -10,6 +10,7 @@ export const APPLICATION_TEMPLATES = Object.freeze([
   'welcome',
   'provider-settings',
   'hud-loading',
+  'data-explorer',
 ]);
 const allowed = new Set(APPLICATION_TEMPLATES);
 

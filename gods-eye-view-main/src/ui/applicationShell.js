@@ -16,6 +16,8 @@ import { ContextControls } from './context.js';
 import { CctvControls } from './cctv.js';
 import { RadioControls } from './radio.js';
 import { PelagosPanelController } from './pelagosPanel.js';
+import { PelagosExplorerController } from './pelagosExplorer.js';
+import { buildExplorerHash, parseExplorerHash } from './explorerRouter.js';
 import { LocationNavigation } from './locationNavigation.js';
 import { bindClearLayersControl } from './layers.js';
 import { bindCameraOrientationControls } from './cameraOrientationControls.js';
@@ -922,14 +924,27 @@ export class StyleManager extends ShellFacade {
     });
   }
 
-  /** Initialize the Pelagos dedicated maritime intelligence workspace. */
+  /** Initialize the Pelagos dedicated maritime intelligence workspace and Detailed Data Explorer. */
   _initPelagosPanel() {
     this._pelagosControls?.destroy();
+    this._pelagosExplorer?.destroy();
+    if (this._explorerHashHandler && typeof window !== 'undefined') {
+      window.removeEventListener('hashchange', this._explorerHashHandler);
+      this._explorerHashHandler = null;
+    }
+
+    this._pelagosExplorer = new PelagosExplorerController({
+      onDomainChange: (domain) => this._navigateToExplorer(domain),
+      onReturnToGlobe: () => this._returnFromExplorer(),
+    });
+    this._pelagosExplorer.init();
+
     this._pelagosControls = new PelagosPanelController({
       viewer: this.viewer,
       services: this.services,
       actions: {
         showToast: (message) => this._showToast(message),
+        navigateToExplorer: (domain) => this._navigateToExplorer(domain),
         holdContinuousRender: (id) =>
           this.services.holdContinuousRender?.(id) ||
           this.services.render?.holdContinuousRender?.(id),
@@ -941,7 +956,74 @@ export class StyleManager extends ShellFacade {
           this.services.render?.governorRequestRender?.(id),
       },
     });
-    void this._pelagosControls.init();
+
+    void this._pelagosControls.init().then(() => {
+      if (!this._disposed && this._pelagosControls?.overview?.overviewData) {
+        this._pelagosExplorer?.updateOverviewCounts(
+          this._pelagosControls.overview.overviewData,
+        );
+      }
+    });
+
+    if (typeof window !== 'undefined') {
+      this._explorerHashHandler = () => this._syncExplorerRoute();
+      window.addEventListener('hashchange', this._explorerHashHandler);
+      this._syncExplorerRoute();
+    }
+  }
+
+  _navigateToExplorer(domain = 'freight') {
+    if (this._disposed) return;
+    const nextHash = buildExplorerHash(domain);
+    if (typeof window !== 'undefined' && window.location) {
+      if (window.location.hash !== nextHash) {
+        window.location.hash = nextHash;
+      } else {
+        this._syncExplorerRoute();
+      }
+    } else {
+      this._syncExplorerRoute(nextHash);
+    }
+  }
+
+  _returnFromExplorer() {
+    if (this._disposed) return;
+    if (typeof window !== 'undefined' && window.location) {
+      if (typeof history !== 'undefined' && history.replaceState) {
+        history.replaceState(
+          null,
+          '',
+          `${window.location.pathname || '/'}${window.location.search || ''}`,
+        );
+      } else {
+        window.location.hash = '';
+      }
+    }
+    this._syncExplorerRoute('');
+    this._syncShareState();
+  }
+
+  _syncExplorerRoute(hashOverride) {
+    if (this._disposed || !this._pelagosExplorer) return;
+    const hash =
+      typeof hashOverride === 'string'
+        ? hashOverride
+        : typeof window !== 'undefined'
+          ? window.location.hash
+          : '';
+    const parsed = parseExplorerHash(hash);
+    if (parsed.active) {
+      this.shareLinkManager?.setHashSyncPaused?.(true);
+      this.services.suspendRendering?.('explorer');
+      this._pelagosExplorer.updateOverviewCounts(
+        this._pelagosControls?.overview?.overviewData,
+      );
+      this._pelagosExplorer.syncFromHash(hash);
+    } else {
+      this._pelagosExplorer.close();
+      this.services.resumeRendering?.('explorer');
+      this.shareLinkManager?.setHashSyncPaused?.(false);
+    }
   }
 
   /**
@@ -1495,6 +1577,13 @@ export class StyleManager extends ShellFacade {
     this._cameraOrientationControls?.destroy();
     this._clearLayersControl?.destroy();
     this._cctvControls?.destroy();
+    if (this._explorerHashHandler && typeof window !== 'undefined') {
+      window.removeEventListener('hashchange', this._explorerHashHandler);
+      this._explorerHashHandler = null;
+    }
+    this._pelagosExplorer?.destroy();
+    this.services.resumeRendering?.('explorer');
+    this.shareLinkManager?.setHashSyncPaused?.(false);
     this._pelagosControls?.destroy();
     this._radioControls?.destroy();
     this._cockpitCoordinator.stop();

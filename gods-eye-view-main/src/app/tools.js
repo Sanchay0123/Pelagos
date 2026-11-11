@@ -8,7 +8,10 @@ import {
   getRenderGovernorDiagnostics,
   governorRequestRender,
   holdContinuousRender,
+  isRenderingSuspended,
   releaseContinuousRender,
+  resumeRendering,
+  suspendRendering,
 } from '../renderGovernor.js';
 
 /** Attach scene tools, rendering listeners and the application debug handle. */
@@ -80,17 +83,22 @@ export function createApplicationTools({
   // the loop, refresh the one DOM surface we gated, render a frame.
   const syncVisibilitySuspension = () => {
     const hidden = document.hidden;
-    viewer.useDefaultRenderLoop = !hidden;
-    cockpitCloudEffects?.setSuspended?.(hidden);
-    if (!hidden) {
+    if (hidden) {
+      suspendRendering('document-hidden');
+    } else {
+      resumeRendering('document-hidden');
+    }
+    cockpitCloudEffects?.setSuspended?.(hidden || isRenderingSuspended());
+    if (!hidden && !isRenderingSuspended()) {
       data.presentation.flushVisible();
       governorRequestRender('visibility-restore');
     }
   };
   document.addEventListener('visibilitychange', syncVisibilitySuspension);
-  defer(() =>
-    document.removeEventListener('visibilitychange', syncVisibilitySuspension),
-  );
+  defer(() => {
+    document.removeEventListener('visibilitychange', syncVisibilitySuspension);
+    resumeRendering('document-hidden');
+  });
   defer(() => {
     removeTrackingListener();
     releaseContinuousRender('tracked-entity');

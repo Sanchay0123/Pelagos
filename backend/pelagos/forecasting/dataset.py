@@ -471,6 +471,7 @@ def build_forecast_dataset(
     exclude_reconstructed: bool = False,
     feature_set: Union[str, List[str]] = "all",
     availability_policy: Optional[TemporalAvailabilityPolicy] = None,
+    preloaded_series: Optional[Dict[str, Tuple[List[Tuple[date, float]], str]]] = None,
 ) -> ForecastDataset:
     """Build a leakage-safe, chronologically aligned multivariate forecasting dataset.
 
@@ -516,12 +517,15 @@ def build_forecast_dataset(
         )
 
     # 1. Retrieve own-route chronological rate observations
-    obs_own, source_own = get_route_rate_observations(
-        db=db,
-        route_code=route_code,
-        storage_dir=storage_dir,
-        exclude_reconstructed=exclude_reconstructed,
-    )
+    if preloaded_series is not None and route_code in preloaded_series:
+        obs_own, source_own = preloaded_series[route_code]
+    else:
+        obs_own, source_own = get_route_rate_observations(
+            db=db,
+            route_code=route_code,
+            storage_dir=storage_dir,
+            exclude_reconstructed=exclude_reconstructed,
+        )
 
     if len(obs_own) <= burn_in_months:
         raise ValueError(
@@ -532,18 +536,29 @@ def build_forecast_dataset(
     competitor_code = ROUTE_METADATA.get(route_code, {}).get("competitor_route")
     obs_other: List[Tuple[date, float]] = []
     if competitor_code:
-        try:
-            obs_other, _ = get_route_rate_observations(
-                db=db,
-                route_code=competitor_code,
-                storage_dir=storage_dir,
-                exclude_reconstructed=exclude_reconstructed,
-            )
-        except Exception as exc:
-            logger.warning("Could not load competitor route '%s': %s", competitor_code, exc)
+        if preloaded_series is not None and competitor_code in preloaded_series:
+            obs_other, _ = preloaded_series[competitor_code]
+        else:
+            try:
+                obs_other, _ = get_route_rate_observations(
+                    db=db,
+                    route_code=competitor_code,
+                    storage_dir=storage_dir,
+                    exclude_reconstructed=exclude_reconstructed,
+                )
+            except Exception as exc:
+                logger.warning("Could not load competitor route '%s': %s", competitor_code, exc)
 
     # Map dates to rates for fast lookup
     own_date_map: Dict[date, float] = {d: r for d, r in obs_own}
+    other_with_avail: List[Tuple[float, date, datetime]] = [
+        (
+            r,
+            availability_policy.calculate_availability_date(d),
+            availability_policy.calculate_conservative_availability_cutoff(d),
+        )
+        for d, r in obs_other
+    ]
 
     rows: List[ForecastDatasetRow] = []
     all_feature_names: Set[str] = set()
@@ -565,12 +580,11 @@ def build_forecast_dataset(
 
         # Corresponding historical window for competitor route strictly available before decision timestamp
         hist_other: List[float] = []
-        if obs_other:
+        if other_with_avail:
             hist_other = [
                 r
-                for d, r in obs_other
-                if availability_policy.calculate_availability_date(d) <= dec_date
-                and availability_policy.calculate_conservative_availability_cutoff(d) < dec_dt
+                for r, av_d, cut_dt in other_with_avail
+                if av_d <= dec_date and cut_dt < dec_dt
             ]
 
         # Extract features (origin_date used to prevent future lookahead)

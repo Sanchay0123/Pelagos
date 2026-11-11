@@ -580,7 +580,17 @@
       "src/ui/aircraftDisplay.js",
       "src/ui/layerBindings.js",
       "src/ui/displayBindings.js",
-      "src/ui/shellFacade.js"
+      "src/ui/shellFacade.js",
+      "src/ui/explorerRouter.js",
+      "src/ui/pelagosApi.js",
+      "src/ui/pelagosOverview.js",
+      "src/ui/pelagosExplorerDomains.js",
+      "src/ui/pelagosExplorer.js",
+      "src/ui/pelagosPanel.js",
+      "src/ui/pelagosVessels.js",
+      "src/annotations/worldAnnotationRenderer.js",
+      "src/layers/directions/index.js",
+      "src/data/routeSteps.js"
     ],
     "external": ["cesium"]
   },
@@ -599,6 +609,8 @@
       "src/ui/styles/radio.css",
       "src/ui/styles/cctv.css",
       "src/ui/styles/scenes.css",
+      "src/ui/styles/pelagos.css",
+      "src/ui/styles/pelagos-explorer.css",
       "src/ui/styles/bhote-koshi.css",
       "src/ui/styles/recording.css",
       "src/ui/styles/responsive.css",
@@ -1809,7 +1821,14 @@
       "src/director/sharing/lifetime.js",
       "src/director/authoring.js",
       "src/scenes/sharing.js",
-      "src/ui/sceneSharing.js"
+      "src/ui/sceneSharing.js",
+      "src/ui/explorerRouter.js",
+      "src/ui/pelagosApi.js",
+      "src/ui/pelagosOverview.js",
+      "src/ui/pelagosExplorerDomains.js",
+      "src/ui/pelagosExplorer.js",
+      "src/ui/pelagosPanel.js",
+      "src/ui/pelagosVessels.js"
     ],
     "external": [
       "@mapbox/vector-tile",

@@ -34,6 +34,7 @@
 let _viewer = null;
 let _installed = false;
 const _holds = new Set();
+const _suspends = new Set();
 
 /** Debug trail of the most recent one-shot render requests (idle mode only). */
 const _recentRequests = [];
@@ -41,8 +42,24 @@ const RECENT_REQUEST_CAP = 16;
 
 function applyMode() {
   if (!_installed || !_viewer?.scene) return;
-  const continuous = _holds.size > 0;
   const scene = _viewer.scene;
+  if (_suspends.size > 0) {
+    if (
+      'useDefaultRenderLoop' in _viewer ||
+      _viewer.useDefaultRenderLoop !== undefined
+    ) {
+      _viewer.useDefaultRenderLoop = false;
+    }
+    scene.requestRenderMode = true;
+    return;
+  }
+  if (
+    'useDefaultRenderLoop' in _viewer &&
+    _viewer.useDefaultRenderLoop === false
+  ) {
+    _viewer.useDefaultRenderLoop = true;
+  }
+  const continuous = _holds.size > 0;
   if (scene.requestRenderMode === !continuous) return;
   scene.requestRenderMode = !continuous;
   if (!continuous) {
@@ -108,7 +125,7 @@ export function releaseContinuousRender(ownerId) {
  * @returns {void}
  */
 export function governorRequestRender(reason = 'unspecified') {
-  if (!_installed || !_viewer?.scene) return;
+  if (!_installed || !_viewer?.scene || _suspends.size > 0) return;
   if (_holds.size === 0) {
     _recentRequests.push({ reason, at: Date.now() });
     if (_recentRequests.length > RECENT_REQUEST_CAP) _recentRequests.shift();
@@ -117,13 +134,49 @@ export function governorRequestRender(reason = 'unspecified') {
 }
 
 /**
- * @returns {{installed: boolean, mode: 'continuous'|'idle', holds: string[],
+ * Pause Cesium rendering for an owner (e.g., 'explorer' route or 'document-hidden')
+ * without releasing existing animation/layer holds or mutating scene state.
+ * @param {string} ownerId
+ * @returns {void}
+ */
+export function suspendRendering(ownerId) {
+  if (!ownerId) return;
+  _suspends.add(ownerId);
+  applyMode();
+}
+
+/**
+ * Resume Cesium rendering once all suspension owners have released.
+ * Triggers one settling render frame on resume when idle or continuous holds resume.
+ * @param {string} ownerId
+ * @returns {void}
+ */
+export function resumeRendering(ownerId) {
+  if (!ownerId) return;
+  const wasSuspended = _suspends.size > 0;
+  _suspends.delete(ownerId);
+  applyMode();
+  if (wasSuspended && _suspends.size === 0 && _installed && _viewer?.scene) {
+    _viewer.scene.requestRender?.();
+  }
+}
+
+/** @returns {boolean} True when any rendering suspension owner is active. */
+export function isRenderingSuspended() {
+  return _suspends.size > 0;
+}
+
+/**
+ * @returns {{installed: boolean, mode: 'continuous'|'idle'|'suspended', suspended: boolean, suspendOwners: string[], holds: string[],
  *   recentRequests: Array<{reason: string, at: number}>}}
  */
 export function getRenderGovernorDiagnostics() {
+  const suspended = _suspends.size > 0;
   return {
     installed: _installed,
-    mode: _holds.size > 0 ? 'continuous' : 'idle',
+    mode: suspended ? 'suspended' : _holds.size > 0 ? 'continuous' : 'idle',
+    suspended,
+    suspendOwners: [..._suspends].sort(),
     holds: [..._holds].sort(),
     recentRequests: [..._recentRequests],
   };
@@ -135,6 +188,7 @@ export function uninstallRenderGovernor(viewer) {
   _viewer = null;
   _installed = false;
   _holds.clear();
+  _suspends.clear();
   _recentRequests.length = 0;
 }
 
@@ -143,5 +197,6 @@ export function _resetRenderGovernorForTest() {
   _viewer = null;
   _installed = false;
   _holds.clear();
+  _suspends.clear();
   _recentRequests.length = 0;
 }

@@ -3,7 +3,7 @@ title: Pelagos Project Overview
 document_id: DOC-002
 type: project_overview
 status: approved
-version: 1.0.4
+version: 1.0.5
 created: 2026-10-10
 updated: 2026-11-11
 tags:
@@ -30,6 +30,7 @@ Pelagos builds upon the open-source God's Eye View repository as its interactive
   * Operational maritime routing across both prototype corridor graphs and compiled Eurostat MARNET 50 km graphs with dynamic canal bypass rules, antimeridian segmentation, and explicit `unsupported_route` fail-closed handling (`pelagos.routing`, `ROUT-004`, `ROUT-006`).
   * Freight index (`PEGI-USJPN`) and multi-horizon (`T+1`, `T+3`, `T+6`) forecasting baseline engine on genuine monthly U.S.–Japan grain rates (`PNW-JPN-BULK`, `USG-JPN-BULK`), with `persistence` confirmed as the active production baseline after Stage C3.1–C3.3 empirical benchmarking against ML and regime-aware candidates (`pelagos.forecasting`).
   * Stage D / Milestone D10 & D10.2 optimization foundations (`pelagos.optimization`): deterministic gross freight-cost calculation (`/api/v1/calculator/voyage-freight`), canonical `Vessel` + `VesselPosition` suitability matching with explicit missing particulars and cargo/port/canal/route compatibility (`/api/v1/calculator/vessel-suitability`, `/api/v1/charter/assess`), and the six-gate fail-closed chartering readiness engine (`/api/v1/charter/recommend`).
+  * Stage E1 Platform Data Overview & Detailed Data Explorer (`pelagos.storage.platform_data`, `gods-eye-view-main`): read-only multi-domain overview (`/api/v1/platform-data/overview`) and server-paginated/filtered/sorted 8-domain explorer (`/api/v1/platform-data/explorer/{domain}`) embedded in `#pelagos-panel` and hash-routed `#/explorer` without destroying initialized Cesium globe state ([`API-001`](./architecture/platform-data-explorer.md)).
 * **Partially Implemented Capabilities:**
   * Multi-contract charter comparison (`Spot`, `COA`, `TC`) and laycan matching logic are implemented and verified against explicit `VerifiedCharterInputs`, but production queries on monitored routes deterministically return `insufficient_data` because live commercial inputs are absent.
   * Oceanographic buoy and bunker price integrations are operational for available stations/quotes while explicitly flagging missing corridor hub quotes (`unavailable`) without proxy substitution.
@@ -89,3 +90,4 @@ N/A - To be defined in the future Testing Specification.
 | 1.0.2 | 2026-10-10 | Agent | D1-R2 corrections: reframed SIH 26006 alignment from established conformity claim to project intent. |
 | 1.0.3 | 2026-10-12 | Project Overseer / Agent | Formal approval following D0/D1 review. Status updated to approved. |
 | 1.0.4 | 2026-11-11 | Implementation Agent | Reconciled Section 3 capability maturity and Section 5 forecasting/chartering principles to reflect implemented Stage A–C3 & Stage D capabilities vs. blocked/unimplemented external feeds. |
+| 1.0.5 | 2026-11-11 | Implementation Agent | Added implemented Stage E1 Live Data Overview and Detailed Data Explorer (`#/explorer`, `/api/v1/platform-data/*`, `API-001`) to Section 3 Implemented & Verified Capabilities. |

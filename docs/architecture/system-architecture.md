@@ -3,7 +3,7 @@ title: Pelagos System Architecture Specification
 document_id: ARCH-001
 type: architecture_spec
 status: drafting
-version: 1.0.2
+version: 1.0.3
 created: 2026-10-14
 updated: 2026-11-11
 tags:
@@ -140,6 +140,7 @@ graph TB
   * `POST /api/v1/routing/calculate` (implemented MARNET & prototype routing; originally scoped as `/api/v1/routes/evaluate`) and `GET`/`POST /api/v1/freight/route-intelligence`: Voyage corridor trajectories, rates, forecasts, buoy conditions, and bunker availability.
   * `GET`/`POST /api/v1/calculator/voyage-freight` (`D10` / `OPT-001`) and `GET`/`POST /api/v1/calculator/vessel-suitability` (`D10.2` / `OPT-002`).
   * `GET`/`POST /api/v1/charter/assess` and `GET`/`POST /api/v1/charter/recommend`: Vessel-to-cargo/route assessment and six-gate fail-closed chartering readiness recommendation endpoint ([OPT-001](../optimization/stage-d-vessel-suitability-and-chartering.md)).
+  * `GET /api/v1/platform-data/overview` and `GET /api/v1/platform-data/explorer/{domain}` (`Stage E1` / [`API-001`](./platform-data-explorer.md)): Read-only database-wide counting overview for `#pelagos-panel` and 8-domain server-paginated Detailed Data Explorer (`#/explorer`) with Cesium render suspension while active.
 
 #### 2. Data Ingestion Subsystem (`pelagos.ingestion`)
 * **Responsibilities:**
@@ -401,6 +402,7 @@ graph TB
 * `pelagos.routing.service` (`MaritimeRoutingEngine`): Deterministic route service returning `RoutingResult` models with GeoJSON polyline geometries, antimeridian segments, canal transits, and documented limitations.
 * `pelagos.forecasting.service` / `dataset` / `ml_benchmarks` / `regime_experiments`: Multi-horizon forecasting baselines (active production `persistence`), strict-forward `ForecastDataset`, and empirical ML/regime benchmarking modules ([`ML-001`](../forecasting/freight-index-and-forecasting-specification.md), [`REPORT-C33-REGIME-001`](../forecasting/c3-3-regime-aware-forecasting-report.md)).
 * `pelagos.optimization` (`calculator`, `matcher`, `chartering`): Stage D optimization boundary providing `calculate_voyage_freight`, `match_suitable_vessels`, `assess_vessel_for_voyage`, and `recommend_charter_strategy` ([`OPT-001`](../optimization/stage-d-vessel-suitability-and-chartering.md)).
+* `pelagos.storage.platform_data`: Read-only Stage E1 platform overview and 8-domain server-paginated explorer query service with secret redaction and 60-second fingerprint caching ([`API-001`](./platform-data-explorer.md)).
 
 ### 6.2 External System Interfaces
 * **AISStream WebSocket (`wss://stream.aisstream.io/v0/stream`):** Live AIS feed.
@@ -464,3 +466,4 @@ graph TB
 | 1.0.0 | 2026-10-14 | Project Agent | Initial draft of Pelagos System Architecture Specification (ARCH-001) under Milestone D3. Defines modular monolith decomposition, GEV frontend integration, dual-tier storage, failure isolation, and container boundaries. Status: drafting. |
 | 1.0.1 | 2026-10-24 | Project Agent | Reconciled freight forecasting engine horizons to candidate monthly horizons (T+1, T+3, T+6) per OD-ROUT-06-01 resolution and REQ-FR-FRF-001. Kept status drafting. |
 | 1.0.2 | 2026-11-11 | Implementation Agent | Reconciled Section 5.2 and Section 6.1 module contracts and REST interfaces with completed Stage C3 forecasting benchmarks and Stage D (`D10`/`D10.2`) optimization/chartering endpoints (`OPT-001`). Kept status drafting. |
+| 1.0.3 | 2026-11-11 | Implementation Agent | Added Stage E1 read-only platform overview and `#/explorer` SPA data explorer endpoints and module boundaries (`API-001`). Kept status drafting. |

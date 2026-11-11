@@ -24,6 +24,9 @@ export function bindApplicationShortcuts({
   actions,
 }) {
   const onKeyDown = (event) => {
+    if (documentRef?.body?.classList?.contains?.('pelagos-explorer-active')) {
+      return;
+    }
     const isFormControl =
       event.target?.matches?.('select, input, textarea') ||
       event.target === searchInput;
