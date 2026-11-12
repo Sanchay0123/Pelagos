@@ -18,9 +18,10 @@ from __future__ import annotations
 import logging
 from datetime import datetime, time, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from pelagos.models import FreightRoute, Vessel, VesselPosition
+from pelagos.models import FreightRoute, Vessel, VesselPosition, validate_imo
 from pelagos.optimization.calculator import calculate_voyage_freight
 from pelagos.optimization.matcher import (
     evaluate_vessel_suitability,
@@ -173,7 +174,13 @@ def assess_vessel_for_voyage(
             .order_by(VesselPosition.observation_time.desc(), VesselPosition.id.desc())
             .first()
         )
-        reg_row = db.query(Vessel).filter(Vessel.mmsi == clean_mmsi).first()
+        from pelagos.registry.vessel_registry import VesselRegistry
+        reg_service = VesselRegistry(db)
+        is_imo, c_imo, _ = validate_imo(clean_mmsi)
+        if is_imo and c_imo:
+            reg_row = reg_service.resolve_canonical_vessel(imo=c_imo)
+        else:
+            reg_row = reg_service.resolve_canonical_vessel(mmsi=clean_mmsi)
 
         if pos_row is None and reg_row is None:
             return VesselCompatibilityResult(
@@ -237,7 +244,7 @@ def assess_vessel_for_voyage(
 
     return VesselCompatibilityResult(
         status="assessed",
-        overall_suitability=cand.suitability_status,
+        overall_suitability=cand.overall_suitability,
         corridor=corridor_info,
         candidate=cand,
         ais_observation_status=ais_status,
@@ -321,7 +328,12 @@ def _evaluate_verified_charter_fixtures(
         )
 
         # Strict physical, cargo, port, and canal compatibility pruning (REQ-FR-CPO-003)
-        if cand.suitability_status != SuitabilityStatus.POTENTIALLY_SUITABLE:
+        if (
+            cand.suitability_status != SuitabilityStatus.POTENTIALLY_SUITABLE
+            or not cand.overall_suitability_passed
+            or not cand.is_physically_compatible
+            or cand.cargo_capacity_passed is not True
+        ):
             continue
         if cand.route_compatibility and cand.route_compatibility.status == "incompatible":
             continue
@@ -662,7 +674,7 @@ def recommend_charter_strategy(
     )
 
     dwt_verified_candidates = [
-        c for c in suitability_res.candidates if c.verified_cargo_capacity_dwt is not None
+        c for c in suitability_res.candidates if c.cargo_capacity_passed is True
     ]
     if req.verified_commercial_inputs and req.verified_commercial_inputs.vessel_fixtures:
         vessel_phys_gate = DataGateStatus(
@@ -678,13 +690,20 @@ def recommend_charter_strategy(
         missing_phys.extend(["verified_hold_cleanliness", "verified_grain_cubic_capacity"])
         if any(c.draft_meters is None for c in suitability_res.candidates if c.vessel_type_code and 70 <= c.vessel_type_code <= 79):
             missing_phys.append("complete_cargo_vessel_draft_particulars")
-        vessel_phys_gate = DataGateStatus(
-            domain="vessel_physical_particulars",
-            status="insufficient_data",
-            details=(
+        dwt_count = len(dwt_verified_candidates)
+        dwt_detail = (
+            f"Evaluated {suitability_res.total_vessels_evaluated} genuine AIS vessel record(s); "
+            f"{dwt_count} verified DWT value(s), {suitability_res.potentially_suitable_count} potentially suitable candidates."
+            if dwt_count > 0
+            else (
                 f"Evaluated {suitability_res.total_vessels_evaluated} genuine AIS vessel record(s); "
                 f"0 verified DWT values, {suitability_res.potentially_suitable_count} dimensionally screened only."
-            ),
+            )
+        )
+        vessel_phys_gate = DataGateStatus(
+            domain="vessel_physical_particulars",
+            status="insufficient_data" if missing_phys else "available",
+            details=dwt_detail,
             missing_items=missing_phys,
         )
 

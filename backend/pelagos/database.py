@@ -120,6 +120,33 @@ def ensure_schema_compatibility(target_engine=None):
         if "vessels" not in table_names:
             import pelagos.models
             pelagos.models.Vessel.__table__.create(conn)
+        else:
+            cols = {c["name"] for c in inspector.get_columns("vessels")}
+            for col_name, col_type in [
+                ("net_tonnage", "FLOAT"),
+                ("air_draft_meters", "FLOAT"),
+                ("grain_cubic_meters", "FLOAT"),
+                ("holds_count", "INTEGER"),
+                ("hatches_count", "INTEGER"),
+            ]:
+                if col_name not in cols:
+                    conn.execute(text(f"ALTER TABLE vessels ADD COLUMN {col_name} {col_type}"))
+            try:
+                conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS idx_vessels_imo_unique ON vessels (imo) WHERE imo IS NOT NULL"))
+            except Exception:
+                pass
+
+        if "vessel_mmsi_history" not in table_names:
+            import pelagos.models
+            pelagos.models.VesselMmsiHistory.__table__.create(conn)
+
+        if "vessel_attribute_provenance" not in table_names:
+            import pelagos.models
+            pelagos.models.VesselAttributeProvenance.__table__.create(conn)
+
+        if "vessel_operational_estimates" not in table_names:
+            import pelagos.models
+            pelagos.models.VesselOperationalEstimates.__table__.create(conn)
 
         if "trade_observations" not in table_names:
             import pelagos.models

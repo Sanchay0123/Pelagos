@@ -1,8 +1,64 @@
 """SQLAlchemy ORM models for operational vessel telemetry and quarantine isolation."""
 
 import datetime
-from sqlalchemy import Column, Integer, BigInteger, Float, String, DateTime, Text, Index, UniqueConstraint, Boolean, Date, ForeignKey
+from typing import Any, Dict, List, Optional, Tuple, Union
+from sqlalchemy import (
+    Column,
+    Integer,
+    BigInteger,
+    Float,
+    String,
+    DateTime,
+    Text,
+    Index,
+    UniqueConstraint,
+    Boolean,
+    Date,
+    ForeignKey,
+)
+from sqlalchemy.orm import relationship, synonym
 from pelagos.database import Base
+
+
+class VerificationStatus:
+    """Standardized verification status for maritime entity particulars (Stage F1.2)."""
+    DIRECTLY_VERIFIED = "DIRECTLY_VERIFIED"
+    SOURCE_REPORTED = "SOURCE_REPORTED"
+    INFERRED = "INFERRED"
+    UNVERIFIED = "UNVERIFIED"
+    CONFLICTING = "CONFLICTING"
+    UNAVAILABLE = "UNAVAILABLE"
+
+    ALL = {
+        DIRECTLY_VERIFIED,
+        SOURCE_REPORTED,
+        INFERRED,
+        UNVERIFIED,
+        CONFLICTING,
+        UNAVAILABLE,
+    }
+
+
+def validate_imo(imo: Optional[Union[str, int]]) -> Tuple[bool, Optional[str], Optional[str]]:
+    """Validate a 7-digit maritime IMO ship identification number against the modulo-10 algorithm.
+
+    Returns:
+        Tuple[bool, Optional[str], Optional[str]]: (is_valid, cleaned_7_digit_str, error_message)
+    """
+    if imo is None:
+        return True, None, None
+    s = str(imo).strip().upper()
+    if not s:
+        return True, None, None
+    if s.startswith("IMO"):
+        s = s[3:].strip()
+    if len(s) != 7 or not s.isdigit():
+        return False, None, f"IMO number must be exactly 7 decimal digits, got '{imo}'"
+    digits = [int(c) for c in s]
+    chk = sum(d * (8 - i) for i, d in enumerate(digits[:6], 1)) % 10
+    if chk != digits[6]:
+        return False, None, f"Invalid IMO check digit: expected {chk}, got {digits[6]} in '{imo}'"
+    return True, s, None
 
 
 class VesselPosition(Base):
@@ -285,22 +341,33 @@ class PortAlias(Base):
 class Vessel(Base):
     """
     Canonical maritime vessel registry and static characteristics entity.
-    Traces to REQ-FR-DII-002 and REQ-FR-OMR-002.
+    Traces to REQ-FR-DII-002, REQ-FR-OMR-002, and Pelagos Stage F1.2.
     """
     __tablename__ = "vessels"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    vessel_id = synonym("id")  # Stable internal surrogate key alias
+
+    # Secondary tracking identifier (temporally mutable on re-flagging)
     mmsi = Column(String(32), unique=True, index=True, nullable=False)
+
+    # Canonical lifetime identifier (immutable under IMO Assembly Resolution A.1078(28))
     imo = Column(String(32), index=True, nullable=True)
+
     vessel_name = Column(String(128), index=True, nullable=False)
     vessel_type = Column(String(64), nullable=False)
     vessel_type_code = Column(Integer, nullable=True)
     vessel_class = Column(String(64), nullable=True)  # Panamax | Supramax | Handymax | Capesize
     dwt_tonnage = Column(Float, nullable=True)
     gross_tonnage = Column(Float, nullable=True)
+    net_tonnage = Column(Float, nullable=True)
     length_meters = Column(Float, nullable=True)
     width_meters = Column(Float, nullable=True)
     draft_max_meters = Column(Float, nullable=True)
+    air_draft_meters = Column(Float, nullable=True)
+    grain_cubic_meters = Column(Float, nullable=True)
+    holds_count = Column(Integer, nullable=True)
+    hatches_count = Column(Integer, nullable=True)
     built_year = Column(Integer, nullable=True)
     flag_country = Column(String(64), nullable=True)
     flag_code = Column(String(8), nullable=True)
@@ -308,6 +375,97 @@ class Vessel(Base):
     commercial_status = Column(String(32), nullable=False, default="unknown")  # active | laid_up | unknown
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    # Relationships to temporal identity, provenance, and operational models
+    mmsi_history = relationship("VesselMmsiHistory", back_populates="vessel", cascade="all, delete-orphan", order_by="desc(VesselMmsiHistory.valid_from)")
+    provenance_records = relationship("VesselAttributeProvenance", back_populates="vessel", cascade="all, delete-orphan", order_by="desc(VesselAttributeProvenance.retrieved_at)")
+    operational_estimates = relationship("VesselOperationalEstimates", back_populates="vessel", cascade="all, delete-orphan", order_by="desc(VesselOperationalEstimates.computed_at)")
+
+    __table_args__ = (
+        Index("idx_vessels_imo_unique", "imo", unique=True),
+        Index("idx_vessels_name", "vessel_name"),
+        Index("idx_vessels_class", "vessel_class"),
+    )
+
+
+class VesselMmsiHistory(Base):
+    """
+    Historical and temporal MMSI associations for maritime vessels.
+    Traces to Pelagos Stage F1.2 (REQ-FR-DII-002, REQ-FR-OMR-002).
+    """
+    __tablename__ = "vessel_mmsi_history"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    vessel_id = Column(Integer, ForeignKey("vessels.id", ondelete="CASCADE"), index=True, nullable=False)
+    mmsi = Column(String(32), index=True, nullable=False)
+    flag_country = Column(String(64), nullable=True)
+    valid_from = Column(DateTime(timezone=True), nullable=True)
+    valid_to = Column(DateTime(timezone=True), nullable=True)
+    source_name = Column(String(128), nullable=False)
+    source_record_id = Column(String(128), nullable=True)
+    retrieved_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    vessel = relationship("Vessel", back_populates="mmsi_history")
+
+    __table_args__ = (
+        Index("idx_vessel_mmsi_hist", "vessel_id", "mmsi"),
+    )
+
+
+class VesselAttributeProvenance(Base):
+    """
+    Field-level provenance and verification tracking for vessel particulars.
+    Traces to Pelagos Stage F1.2 and REQ-NFR-DIP-001.
+    """
+    __tablename__ = "vessel_attribute_provenance"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    vessel_id = Column(Integer, ForeignKey("vessels.id", ondelete="CASCADE"), index=True, nullable=False)
+    attribute_name = Column(String(64), index=True, nullable=False)
+    raw_value = Column(Text, nullable=True)
+    normalized_value = Column(Text, nullable=True)
+    source_name = Column(String(128), nullable=False)
+    source_record_id = Column(String(128), nullable=True)
+    source_url = Column(String(512), nullable=True)
+    verification_status = Column(String(32), nullable=False, default=VerificationStatus.UNVERIFIED)
+    observation_date = Column(DateTime(timezone=True), nullable=True)
+    retrieved_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    is_conflicting = Column(Boolean, nullable=False, default=False)
+    normalization_method = Column(String(128), nullable=True)
+
+    vessel = relationship("Vessel", back_populates="provenance_records")
+
+    __table_args__ = (
+        UniqueConstraint("vessel_id", "attribute_name", "source_name", "source_record_id", name="uq_vessel_attr_prov_source"),
+        Index("idx_vessel_attr_prov", "vessel_id", "attribute_name"),
+    )
+
+
+class VesselOperationalEstimates(Base):
+    """
+    Operational engineering estimates (speed-consumption curves, voyage models).
+    Strictly segregated from verified statutory vessel particulars.
+    Traces to Pelagos Stage F1.2 and IMO GHG engineering models.
+    """
+    __tablename__ = "vessel_operational_estimates"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    vessel_id = Column(Integer, ForeignKey("vessels.id", ondelete="CASCADE"), index=True, nullable=False)
+    model_name = Column(String(64), nullable=False)
+    model_version = Column(String(32), nullable=True)
+    eco_speed_knots = Column(Float, nullable=True)
+    laden_consumption_mt_per_day = Column(Float, nullable=True)
+    ballast_consumption_mt_per_day = Column(Float, nullable=True)
+    port_idle_consumption_mt_per_day = Column(Float, nullable=True)
+    formula_reference = Column(String(256), nullable=True)
+    assumptions = Column(Text, nullable=True)
+    computed_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    vessel = relationship("Vessel", back_populates="operational_estimates")
+
+    __table_args__ = (
+        Index("idx_vessel_op_est", "vessel_id", "model_name"),
+    )
 
 
 class TradeObservation(Base):

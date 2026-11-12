@@ -229,6 +229,7 @@ class SuitabilityStatus(str, Enum):
     """Standardized suitability classification for vessel candidate matching."""
 
     POTENTIALLY_SUITABLE = "potentially_suitable"
+    UNVERIFIED = "unverified"
     INSUFFICIENT_DATA = "insufficient_data"
     DIMENSION_MISMATCH = "dimension_mismatch"
     UNSUITABLE_TYPE = "unsuitable_type"
@@ -370,6 +371,26 @@ class VesselCandidateMatch(BaseModel):
     cargo_capacity_status: str = Field(
         default="UNVERIFIED",
         description="Verification status of vessel cargo capacity: 'UNVERIFIED' from AIS telemetry.",
+    )
+    is_physically_compatible: bool = Field(
+        default=False,
+        description="Physical compatibility based on LOA, beam, operational draft, and port/canal envelope.",
+    )
+    cargo_capacity_passed: Optional[bool] = Field(
+        default=None,
+        description="True if verified DWT from accredited source covers cargo parcel; False if exceeded or unverified.",
+    )
+    overall_suitability_passed: bool = Field(
+        default=False,
+        description="True ONLY when both physical compatibility AND accredited cargo capacity verification pass.",
+    )
+    overall_suitability: SuitabilityStatus = Field(
+        default=SuitabilityStatus.UNVERIFIED,
+        description="Fail-closed overall suitability reflecting both physical compatibility and verified cargo capacity.",
+    )
+    overall_suitability_status: str = Field(
+        default="insufficient_data",
+        description="Granular 5-way classification of physical compatibility vs cargo capacity verification.",
     )
     screening_stage: str = Field(
         default="dimensionally_screened",

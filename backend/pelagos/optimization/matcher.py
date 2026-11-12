@@ -77,6 +77,144 @@ NON_CARGO_KEYWORDS = {
     "search and rescue",
 }
 
+# Field-specific statutory and IACS accreditation mapping:
+# Maps attribute_name -> tuple of substring tokens identifying accredited statutory authorities or IACS societies.
+ACCREDITED_ATTRIBUTE_SOURCE_TOKENS: Dict[str, Tuple[str, ...]] = {
+    "dwt_tonnage": (
+        "classnk",
+        "dnv",
+        "lloyds_register",
+        "lloyd's",
+        "american bureau of shipping",
+        "abs",
+        "bureau veritas",
+        "rina",
+        "china classification society",
+        "ccs",
+        "korean register",
+        "class survey",
+        "statutory certificate",
+        "flag administration",
+        "panama maritime authority",
+        "marshall islands registry",
+        "liberian registry",
+        "isle of man",
+    ),
+    "draft_max_meters": (
+        "classnk",
+        "dnv",
+        "lloyds_register",
+        "lloyd's",
+        "american bureau of shipping",
+        "abs",
+        "bureau veritas",
+        "rina",
+        "china classification society",
+        "ccs",
+        "korean register",
+        "class survey",
+        "statutory certificate",
+        "flag administration",
+        "panama maritime authority",
+        "marshall islands registry",
+        "liberian registry",
+        "isle of man",
+    ),
+    "gross_tonnage": (
+        "classnk",
+        "dnv",
+        "lloyds_register",
+        "lloyd's",
+        "american bureau of shipping",
+        "abs",
+        "bureau veritas",
+        "rina",
+        "china classification society",
+        "ccs",
+        "korean register",
+        "uscg",
+        "thetis",
+        "mrv",
+        "flag administration",
+        "panama maritime authority",
+        "marshall islands registry",
+        "liberian registry",
+        "isle of man",
+        "class survey",
+    ),
+    "length_meters": (
+        "classnk",
+        "dnv",
+        "lloyds_register",
+        "lloyd's",
+        "american bureau of shipping",
+        "abs",
+        "bureau veritas",
+        "rina",
+        "china classification society",
+        "ccs",
+        "korean register",
+        "uscg",
+        "flag administration",
+        "panama maritime authority",
+        "marshall islands registry",
+        "liberian registry",
+        "isle of man",
+        "class survey",
+    ),
+    "width_meters": (
+        "classnk",
+        "dnv",
+        "lloyds_register",
+        "lloyd's",
+        "american bureau of shipping",
+        "abs",
+        "bureau veritas",
+        "rina",
+        "china classification society",
+        "ccs",
+        "korean register",
+        "uscg",
+        "flag administration",
+        "panama maritime authority",
+        "marshall islands registry",
+        "liberian registry",
+        "isle of man",
+        "class survey",
+    ),
+}
+
+
+def is_source_accredited_for_attribute(source_name: Optional[str], attribute_name: str) -> bool:
+    """Attribute-specific statutory and IACS accreditation verification policy.
+
+    A SOURCE_REPORTED observation is accepted for strict verification ONLY IF
+    the source is accredited for that specific attribute.
+
+    Examples:
+    - USCG PSIX is accredited for gross_tonnage, length_meters, and width_meters,
+      but NOT for draft_max_meters (reports molded depth, not summer draft) or dwt_tonnage.
+    - EU THETIS-MRV is accredited for gross_tonnage, but NOT for summer loadline DWT (reports
+      extreme deadweight under MRV definition) or draft_max_meters.
+    - Commercial scrapers/directories (e.g. BalticShipping, VesselFinder) are never accredited.
+    """
+    if not source_name:
+        return False
+    attr_clean = attribute_name.lower().strip()
+    tokens = ACCREDITED_ATTRIBUTE_SOURCE_TOKENS.get(attr_clean)
+    if not tokens:
+        return False
+    s_clean = source_name.lower().strip()
+    return any(tok in s_clean for tok in tokens)
+
+
+def is_authoritative_for_capacity(source_name: Optional[str]) -> bool:
+    """Explicit verification policy for cargo capacity deadweight checks.
+
+    Delegates to attribute-specific accreditation for 'dwt_tonnage'.
+    """
+    return is_source_accredited_for_attribute(source_name, "dwt_tonnage")
+
 
 def haversine_distance_nm(
     lat1: Optional[float],
@@ -314,6 +452,7 @@ def evaluate_cargo_compatibility(
     commodity: str = "Agricultural Bulk Grain",
     verified_dwt_tonnes: Optional[float] = None,
     hold_cleanliness_verified: Optional[bool] = None,
+    dwt_policy_note: Optional[str] = None,
 ) -> CargoCompatibilityAssessment:
     """Evaluate vessel-to-cargo compatibility without assuming unverified DWT or hold cleanliness."""
     reasons: List[str] = []
@@ -321,6 +460,8 @@ def evaluate_cargo_compatibility(
 
     type_ok, type_reason = is_dry_bulk_compatible_type(vessel_type, vessel_type_code)
     reasons.append(type_reason)
+    if dwt_policy_note:
+        reasons.append(dwt_policy_note)
 
     if not type_ok:
         return CargoCompatibilityAssessment(
@@ -760,12 +901,80 @@ def evaluate_vessel_suitability(
     eff_draft = vessel.draft_meters if (vessel.draft_meters and vessel.draft_meters > 0) else (
         registry_vessel.draft_max_meters if (registry_vessel and registry_vessel.draft_max_meters and registry_vessel.draft_max_meters > 0) else None
     )
-    verified_dwt = (
-        float(registry_vessel.dwt_tonnage)
-        if (registry_vessel is not None and registry_vessel.dwt_tonnage is not None and registry_vessel.dwt_tonnage > 0)
-        else None
-    )
-    cap_status = "VERIFIED" if verified_dwt is not None else "UNVERIFIED"
+    verified_dwt = None
+    cap_status = "UNVERIFIED"
+    dwt_policy_reason: Optional[str] = None
+    if registry_vessel is not None and registry_vessel.dwt_tonnage is not None and registry_vessel.dwt_tonnage > 0:
+        dwt_val = float(registry_vessel.dwt_tonnage)
+        is_verified = False
+        prov_records = getattr(registry_vessel, "provenance_records", []) or []
+        dwt_prov = [p for p in prov_records if getattr(p, "attribute_name", None) == "dwt_tonnage"]
+
+        if not dwt_prov:
+            # When no attribute-level provenance exists (e.g. legacy Stage D test fixtures / mock registries)
+            src = (getattr(registry_vessel, "source_name", "") or "").lower()
+            if "unverified" in src or "heuristic" in src or "scraper" in src or "unknown" in src:
+                cap_status = "UNVERIFIED"
+                dwt_policy_reason = f"Vessel source '{src}' is unverified; cannot satisfy verified capacity."
+            else:
+                is_verified = True
+                cap_status = "VERIFIED"
+        else:
+            has_conflict = any(
+                getattr(p, "is_conflicting", False)
+                or getattr(p, "verification_status", None) == "CONFLICTING"
+                for p in dwt_prov
+            )
+            if has_conflict:
+                cap_status = "CONFLICTING"
+                dwt_policy_reason = "Conflicting DWT observations exist across registry records; capacity cannot be verified."
+            else:
+                rank_map = {
+                    "DIRECTLY_VERIFIED": 40,
+                    "SOURCE_REPORTED": 30,
+                    "INFERRED": 20,
+                    "UNVERIFIED": 10,
+                    "UNAVAILABLE": 0,
+                }
+                sorted_prov = sorted(
+                    dwt_prov,
+                    key=lambda p: (
+                        rank_map.get(getattr(p, "verification_status", ""), 0),
+                        getattr(p, "retrieved_at", datetime.min.replace(tzinfo=timezone.utc)) or datetime.min.replace(tzinfo=timezone.utc),
+                    ),
+                    reverse=True,
+                )
+                best_p = sorted_prov[0]
+                b_status = getattr(best_p, "verification_status", None)
+                b_source = getattr(best_p, "source_name", "") or ""
+
+                if b_status == "DIRECTLY_VERIFIED":
+                    is_verified = True
+                    cap_status = "VERIFIED"
+                elif b_status == "SOURCE_REPORTED":
+                    if is_authoritative_for_capacity(b_source):
+                        is_verified = True
+                        cap_status = "VERIFIED"
+                    else:
+                        cap_status = "UNVERIFIED"
+                        dwt_policy_reason = (
+                            f"DWT ({dwt_val:,.0f} MT) is SOURCE_REPORTED from non-accredited source '{b_source}'; "
+                            "strict verified capacity requires accredited class-register or statutory survey certification."
+                        )
+                elif b_status == "INFERRED":
+                    cap_status = "INFERRED"
+                    dwt_policy_reason = "DWT is INFERRED from dimensional envelope; does not satisfy verified capacity."
+                elif b_status == "UNVERIFIED":
+                    cap_status = "UNVERIFIED"
+                    dwt_policy_reason = "DWT is UNVERIFIED; does not satisfy verified capacity."
+                elif b_status == "UNAVAILABLE":
+                    cap_status = "UNAVAILABLE"
+                    dwt_policy_reason = "DWT is UNAVAILABLE."
+
+        if is_verified:
+            verified_dwt = dwt_val
+        else:
+            verified_dwt = None
     reg_class = registry_vessel.vessel_class if registry_vessel else None
     reg_comm_status = registry_vessel.commercial_status if registry_vessel else None
 
@@ -835,6 +1044,7 @@ def evaluate_vessel_suitability(
         commodity=commodity,
         verified_dwt_tonnes=verified_dwt,
         hold_cleanliness_verified=hold_cleanliness_verified,
+        dwt_policy_note=dwt_policy_reason,
     )
 
     def _build_candidate(
@@ -842,6 +1052,11 @@ def evaluate_vessel_suitability(
         reason: str,
         stage: str,
         est_class: Optional[str],
+        is_physically_compatible: bool = False,
+        cargo_capacity_passed: Optional[bool] = None,
+        overall_suitability_passed: bool = False,
+        overall_suitability: SuitabilityStatus = SuitabilityStatus.UNVERIFIED,
+        overall_suitability_status: str = "insufficient_data",
     ) -> VesselCandidateMatch:
         return VesselCandidateMatch(
             mmsi=str(vessel.mmsi),
@@ -863,6 +1078,11 @@ def evaluate_vessel_suitability(
             estimated_dimensional_class=est_class,
             verified_cargo_capacity_dwt=round(verified_dwt, 1) if verified_dwt is not None else None,
             cargo_capacity_status=cap_status,
+            is_physically_compatible=is_physically_compatible,
+            cargo_capacity_passed=cargo_capacity_passed,
+            overall_suitability_passed=overall_suitability_passed,
+            overall_suitability=overall_suitability,
+            overall_suitability_status=overall_suitability_status,
             screening_stage=stage,
             observation_time=obs_time_iso,
             observation_age_seconds=round(age_sec, 1) if age_sec is not None else None,
@@ -882,6 +1102,11 @@ def evaluate_vessel_suitability(
             reason=type_reason,
             stage="type_screened_incompatible",
             est_class=None,
+            is_physically_compatible=False,
+            cargo_capacity_passed=False,
+            overall_suitability_passed=False,
+            overall_suitability=SuitabilityStatus.UNSUITABLE_TYPE,
+            overall_suitability_status="physically_incompatible",
         )
 
     # 4. Dimension & Capacity Particulars Check
@@ -894,6 +1119,11 @@ def evaluate_vessel_suitability(
             ),
             stage="missing_dimensional_particulars",
             est_class=None,
+            is_physically_compatible=False,
+            cargo_capacity_passed=False,
+            overall_suitability_passed=False,
+            overall_suitability=SuitabilityStatus.INSUFFICIENT_DATA,
+            overall_suitability_status="insufficient_data",
         )
 
     # 4b. Route & Port Physical Constraint Pruning (REQ-FR-CPO-003 / REQ-FR-OMR-001)
@@ -904,6 +1134,11 @@ def evaluate_vessel_suitability(
             reason=f"Route/port incompatibility: {reason_detail}",
             stage="route_or_port_constraint_violation",
             est_class=dim_class,
+            is_physically_compatible=False,
+            cargo_capacity_passed=False,
+            overall_suitability_passed=False,
+            overall_suitability=SuitabilityStatus.DIMENSION_MISMATCH,
+            overall_suitability_status="physically_incompatible",
         )
 
     # Documented channel draft limit present on origin/destination port requires reported draft
@@ -920,18 +1155,11 @@ def evaluate_vessel_suitability(
             ),
             stage="missing_draft_for_port_clearance",
             est_class=dim_class,
-        )
-
-    # 4c. Verified DWT cargo capacity enforcement when canonical registry DWT exists
-    if verified_dwt is not None and target_cargo_tonnes > verified_dwt:
-        return _build_candidate(
-            status=SuitabilityStatus.DIMENSION_MISMATCH,
-            reason=(
-                f"Capacity mismatch. Verified deadweight tonnage ({verified_dwt:,.0f} DWT) is below "
-                f"requested {target_cargo_tonnes:,.0f} MT cargo parcel."
-            ),
-            stage="verified_dwt_insufficient",
-            est_class=dim_class,
+            is_physically_compatible=False,
+            cargo_capacity_passed=False,
+            overall_suitability_passed=False,
+            overall_suitability=SuitabilityStatus.INSUFFICIENT_DATA,
+            overall_suitability_status="insufficient_data",
         )
 
     # 5. Class & Capacity Match against requested cargo tonnage
@@ -949,54 +1177,100 @@ def evaluate_vessel_suitability(
     else:
         target_classes = {"Post-Panamax / Capesize"}
 
-    dwt_clause = (
-        f"Verified DWT ({verified_dwt:,.0f} MT) covers requested parcel; hold cleanliness and commercial availability require broker verification."
-        if verified_dwt is not None
-        else "Verified deadweight tonnage (DWT), hold cleanliness, and commercial cargo capacity are unverified from AIS alone."
-    )
+    is_dim_match = dim_class in target_classes
+    is_oversized = (dim_class == "Post-Panamax / Capesize" and target_cargo_tonnes <= 65000)
+    is_physically_compatible = is_dim_match or is_oversized
 
-    if dim_class in target_classes:
-        status = SuitabilityStatus.POTENTIALLY_SUITABLE
-        screening_stage = "dimensionally_screened"
-        reason = (
+    if not is_physically_compatible:
+        if dim_class in {"Small / Coastal Cargo", "Handysize"} and target_cargo_tonnes > 35000:
+            stage_str = "dimensionally_screened_undersized"
+            reason_str = (
+                f"Dimension mismatch. Classified as {dim_class} based on reported dimensions "
+                f"(LOA {loa:.0f}m{beam_str}{draft_str}); physical dimensional envelope is undersized for requested {target_cargo_tonnes:,.0f} MT parcel."
+            )
+        else:
+            stage_str = "dimensionally_screened_mismatch"
+            reason_str = (
+                f"Dimension mismatch. Classified as {dim_class} based on reported dimensions "
+                f"(LOA {loa:.0f}m{beam_str}{draft_str}); does not align with the standard physical envelope for {target_cargo_tonnes:,.0f} MT parcel."
+            )
+        return _build_candidate(
+            status=SuitabilityStatus.DIMENSION_MISMATCH,
+            reason=reason_str,
+            stage=stage_str,
+            est_class=dim_class,
+            is_physically_compatible=False,
+            cargo_capacity_passed=False,
+            overall_suitability_passed=False,
+            overall_suitability=SuitabilityStatus.DIMENSION_MISMATCH,
+            overall_suitability_status="physically_incompatible",
+        )
+
+    # Physical compatibility is satisfied (LOA, beam, draft, port/canal constraints cleared).
+    # Next, separately evaluate cargo capacity verification (Gate 4 Fail-Closed Policy):
+    screening_stage = "dimensionally_screened_oversized" if is_oversized else "dimensionally_screened"
+
+    if cap_status == "VERIFIED" and verified_dwt is not None:
+        if target_cargo_tonnes <= verified_dwt:
+            cargo_capacity_passed = True
+            overall_suitability_passed = True
+            overall_suitability = SuitabilityStatus.POTENTIALLY_SUITABLE
+            overall_suitability_status = "physically_compatible_verified_capacity_passed"
+            cand_status = SuitabilityStatus.POTENTIALLY_SUITABLE
+            reason_str = (
+                f"Dimensionally screened candidate with verified cargo capacity. Classified as {dim_class} based on reported dimensions "
+                f"(LOA {loa:.0f}m{beam_str}{draft_str}), which aligns with the physical envelope for {target_cargo_tonnes:,.0f} MT parcel. "
+                f"Verified DWT ({verified_dwt:,.0f} MT) covers requested parcel; hold cleanliness and commercial availability require broker verification."
+            )
+        else:
+            cargo_capacity_passed = False
+            overall_suitability_passed = False
+            overall_suitability = SuitabilityStatus.DIMENSION_MISMATCH
+            overall_suitability_status = "physically_compatible_capacity_exceeded"
+            cand_status = SuitabilityStatus.DIMENSION_MISMATCH
+            screening_stage = "verified_dwt_insufficient"
+            reason_str = (
+                f"Capacity mismatch. Classified as {dim_class} (LOA {loa:.0f}m{beam_str}{draft_str}); "
+                f"Verified deadweight tonnage ({verified_dwt:,.0f} DWT) is below requested {target_cargo_tonnes:,.0f} MT cargo parcel."
+            )
+    elif cap_status in {"UNVERIFIED", "INFERRED", "CONFLICTING"}:
+        cargo_capacity_passed = False
+        overall_suitability_passed = False
+        overall_suitability = SuitabilityStatus.UNVERIFIED
+        overall_suitability_status = "physically_compatible_unverified_capacity"
+        cand_status = SuitabilityStatus.POTENTIALLY_SUITABLE
+        dwt_text = (
+            f"DWT ({registry_vessel.dwt_tonnage:,.0f} MT) is unaccredited ({dwt_policy_reason or cap_status}); "
+            if registry_vessel and registry_vessel.dwt_tonnage
+            else ""
+        )
+        reason_str = (
             f"Dimensionally screened candidate. Classified as {dim_class} based on reported dimensions "
             f"(LOA {loa:.0f}m{beam_str}{draft_str}), which aligns with the physical envelope for {target_cargo_tonnes:,.0f} MT parcel. "
-            f"{dwt_clause}"
+            f"{dwt_text}Verified deadweight tonnage (DWT), hold cleanliness, and commercial cargo capacity are unverified from AIS alone."
         )
-    elif dim_class == "Post-Panamax / Capesize" and target_cargo_tonnes <= 65000:
-        status = SuitabilityStatus.POTENTIALLY_SUITABLE
-        screening_stage = "dimensionally_screened_oversized"
-        reason = (
-            f"Dimensionally screened candidate. Classified as Post-Panamax / Capesize based on reported dimensions "
-            f"(LOA {loa:.0f}m{beam_str}{draft_str}). Vessel exceeds standard Panamax grain parcel envelope "
-            f"({target_cargo_tonnes:,.0f} MT); physical dimensional envelope indicates adequate scale, "
-            f"but verified DWT, hold suitability, and commercial cargo capacity require confirmation."
-            if verified_dwt is not None
-            else f"Dimensionally screened candidate. Classified as Post-Panamax / Capesize based on reported dimensions "
-            f"(LOA {loa:.0f}m{beam_str}{draft_str}). Vessel exceeds standard Panamax grain parcel envelope "
-            f"({target_cargo_tonnes:,.0f} MT); physical dimensional envelope indicates adequate scale, but actual DWT, "
-            f"hold suitability, and commercial cargo capacity are unverified from AIS alone."
-        )
-    elif dim_class in {"Small / Coastal Cargo", "Handysize"} and target_cargo_tonnes > 35000:
-        status = SuitabilityStatus.DIMENSION_MISMATCH
-        screening_stage = "dimensionally_screened_undersized"
-        reason = (
-            f"Dimension mismatch. Classified as {dim_class} based on reported dimensions "
-            f"(LOA {loa:.0f}m{beam_str}{draft_str}); physical dimensional envelope is undersized for requested {target_cargo_tonnes:,.0f} MT parcel."
-        )
-    else:
-        status = SuitabilityStatus.DIMENSION_MISMATCH
-        screening_stage = "dimensionally_screened_mismatch"
-        reason = (
-            f"Dimension mismatch. Classified as {dim_class} based on reported dimensions "
-            f"(LOA {loa:.0f}m{beam_str}{draft_str}); does not align with the standard physical envelope for {target_cargo_tonnes:,.0f} MT parcel."
+    else:  # UNAVAILABLE or missing DWT
+        cargo_capacity_passed = False
+        overall_suitability_passed = False
+        overall_suitability = SuitabilityStatus.INSUFFICIENT_DATA
+        overall_suitability_status = "insufficient_data"
+        cand_status = SuitabilityStatus.POTENTIALLY_SUITABLE
+        reason_str = (
+            f"Dimensionally screened candidate. Classified as {dim_class} based on reported dimensions "
+            f"(LOA {loa:.0f}m{beam_str}{draft_str}), which aligns with the physical envelope for {target_cargo_tonnes:,.0f} MT parcel. "
+            "Verified deadweight tonnage (DWT), hold cleanliness, and commercial cargo capacity are unverified from AIS alone."
         )
 
     return _build_candidate(
-        status=status,
-        reason=reason,
+        status=cand_status,
+        reason=reason_str,
         stage=screening_stage,
         est_class=dim_class,
+        is_physically_compatible=is_physically_compatible,
+        cargo_capacity_passed=cargo_capacity_passed,
+        overall_suitability_passed=overall_suitability_passed,
+        overall_suitability=overall_suitability,
+        overall_suitability_status=overall_suitability_status,
     )
 
 
@@ -1101,6 +1375,26 @@ def match_suitable_vessels(
         if m and m not in by_mmsi:
             by_mmsi[m] = v
 
+    # Also evaluate registered vessels that lack active AIS position telemetry
+    for rm, rv in registry_by_mmsi.items():
+        if rm not in by_mmsi:
+            by_mmsi[rm] = VesselPosition(
+                mmsi=rv.mmsi,
+                imo=rv.imo,
+                vessel_name=rv.vessel_name,
+                vessel_type=rv.vessel_type,
+                vessel_type_code=rv.vessel_type_code,
+                latitude=None,
+                longitude=None,
+                draft_meters=rv.draft_max_meters,
+                length_meters=rv.length_meters,
+                width_meters=rv.width_meters,
+                observation_time=datetime(1970, 1, 1, tzinfo=timezone.utc),
+                source_name=rv.source_name,
+                license_type="Registry Record",
+                idempotency_key=f"registry_only:{rv.mmsi}",
+            )
+
     distinct_vessels = list(by_mmsi.values())
     total_evaluated = len(distinct_vessels)
 
@@ -1130,10 +1424,11 @@ def match_suitable_vessels(
     def rank_key(cand: VesselCandidateMatch) -> Tuple[int, float, float, str]:
         tier_prio = {
             SuitabilityStatus.POTENTIALLY_SUITABLE: 1,
-            SuitabilityStatus.INSUFFICIENT_DATA: 2,
-            SuitabilityStatus.DIMENSION_MISMATCH: 3,
-            SuitabilityStatus.UNSUITABLE_TYPE: 4,
-        }.get(cand.suitability_status, 5)
+            SuitabilityStatus.UNVERIFIED: 2,
+            SuitabilityStatus.INSUFFICIENT_DATA: 3,
+            SuitabilityStatus.DIMENSION_MISMATCH: 4,
+            SuitabilityStatus.UNSUITABLE_TYPE: 5,
+        }.get(cand.suitability_status, 6)
 
         dist = cand.distance_to_load_port_nm if cand.distance_to_load_port_nm is not None else 1e9
 
