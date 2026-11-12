@@ -142,7 +142,7 @@ ML_CANDIDATE_CONFIGS: Dict[str, Dict[str, Any]] = {
             "max_depth": 5,
             "min_samples_split": 4,
             "random_state": DEFAULT_RANDOM_SEED,
-            "n_jobs": -1,
+            "n_jobs": 1,
         },
         "requires_scaling": False,
         "is_experimental": True,
@@ -382,7 +382,7 @@ def evaluate_ml_walk_forward(
                     max_depth=hyperparams.get("max_depth", 5),
                     min_samples_split=hyperparams.get("min_samples_split", 4),
                     random_state=seed,
-                    n_jobs=hyperparams.get("n_jobs", -1),
+                    n_jobs=hyperparams.get("n_jobs", 1),
                 )
                 rf.fit(X_train_proc, y_train)
                 pred_raw = float(rf.predict(X_test_proc)[0])

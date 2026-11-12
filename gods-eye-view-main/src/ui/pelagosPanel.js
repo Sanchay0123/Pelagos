@@ -27,6 +27,8 @@ import {
   formatRelativeAge,
 } from './pelagosVessels.js';
 import { PelagosOverviewController } from './pelagosOverview.js';
+import { PelagosAssessmentController } from './pelagosAssessment.js';
+import { PelagosReadinessController } from './pelagosReadiness.js';
 
 /** Verified hydrographic ports fallback dataset from backend/pelagos/routing/fixtures/ports.json */
 export const VERIFIED_HYDROGRAPHIC_PORTS = Object.freeze([
@@ -144,6 +146,35 @@ export class PelagosPanelController {
         this.actions?.navigateToExplorer?.(domain),
     });
 
+    this.assessment = new PelagosAssessmentController({
+      document: this.doc,
+      getPorts: () => this.ports,
+      onCargoChange: (val) => {
+        this.currentCargoTonnes = val;
+        if (this.elements.cargoTonnesInput) {
+          this.elements.cargoTonnesInput.value = String(val);
+        }
+        if (this.readiness?.elements?.cargoInput) {
+          this.readiness.elements.cargoInput.value = String(val);
+        }
+      },
+    });
+
+    this.readiness = new PelagosReadinessController({
+      document: this.doc,
+      getPorts: () => this.ports,
+      getCorridorFreightContext: () => this.currentFreight,
+      onCargoChange: (val) => {
+        this.currentCargoTonnes = val;
+        if (this.elements.cargoTonnesInput) {
+          this.elements.cargoTonnesInput.value = String(val);
+        }
+        if (this.assessment?.elements?.cargoInput) {
+          this.assessment.elements.cargoInput.value = String(val);
+        }
+      },
+    });
+
     this._resolveElements();
   }
 
@@ -157,6 +188,7 @@ export class PelagosPanelController {
       destSelect: d.getElementById('pelagos-dest-select'),
       originFilter: d.getElementById('pelagos-origin-filter'),
       destFilter: d.getElementById('pelagos-dest-filter'),
+      canalPolicySelect: d.getElementById('pelagos-canal-policy'),
       swapBtn: d.getElementById('pelagos-swap-btn'),
       calculateBtn: d.getElementById('pelagos-calculate-btn'),
       resetBtn: d.getElementById('pelagos-reset-btn'),
@@ -171,6 +203,7 @@ export class PelagosPanelController {
       distKm: d.getElementById('pelagos-dist-km'),
       routeMethod: d.getElementById('pelagos-route-method'),
       canalsVal: d.getElementById('pelagos-canals-val'),
+      routeCanalPolicy: d.getElementById('pelagos-route-canal-policy'),
       waypointCount: d.getElementById('pelagos-waypoint-count'),
 
       // Corridor
@@ -181,6 +214,7 @@ export class PelagosPanelController {
       corridorCode: d.getElementById('pelagos-corridor-code'),
       corridorCargo: d.getElementById('pelagos-corridor-cargo'),
       corridorVesselClass: d.getElementById('pelagos-corridor-vessel-class'),
+      corridorDist: d.getElementById('pelagos-corridor-dist'),
       unmonitoredNotice: d.getElementById('pelagos-unmonitored-notice'),
       unmonitoredDesc: d.getElementById('pelagos-unmonitored-desc'),
 
@@ -193,6 +227,7 @@ export class PelagosPanelController {
       rateDate: d.getElementById('pelagos-rate-date'),
       rateSource: d.getElementById('pelagos-rate-source'),
       rateType: d.getElementById('pelagos-rate-type'),
+      rateDatasetId: d.getElementById('pelagos-rate-dataset-id'),
       rateEmpty: d.getElementById('pelagos-rate-empty'),
 
       // Voyage Freight Calculator (OPT-001)
@@ -205,34 +240,83 @@ export class PelagosPanelController {
       costVal: d.getElementById('pelagos-cost-val'),
       costCurrency: d.getElementById('pelagos-cost-currency'),
       costFormula: d.getElementById('pelagos-cost-formula'),
+      costRoute: d.getElementById('pelagos-cost-route'),
       costRate: d.getElementById('pelagos-cost-rate'),
       costCargo: d.getElementById('pelagos-cost-cargo'),
       costSource: d.getElementById('pelagos-cost-source'),
+      costRateMeta: d.getElementById('pelagos-cost-rate-meta'),
+      costCanalPolicy: d.getElementById('pelagos-cost-canal-policy'),
       costDistance: d.getElementById('pelagos-cost-distance'),
       costDistProvenance: d.getElementById('pelagos-cost-distance-provenance'),
+      costDisclaimerCallout: d.getElementById(
+        'pelagos-cost-disclaimer-callout',
+      ),
+      costDisclaimers: d.getElementById('pelagos-cost-disclaimers'),
       costEmpty: d.getElementById('pelagos-cost-empty'),
 
       // Candidate Vessel Suitability (OPT-002)
       suitabilityCard: d.getElementById('pelagos-suitability-card'),
       suitabilityTag: d.getElementById('pelagos-suitability-tag'),
       suitabilityContext: d.getElementById('pelagos-suitability-context'),
+      suitabilityHistoricalBanner: d.getElementById(
+        'pelagos-suitability-historical-banner',
+      ),
+      suitabilityRouteCompat: d.getElementById(
+        'pelagos-suitability-route-compat',
+      ),
       suitabilityMetrics: d.getElementById('pelagos-suitability-metrics'),
-      suitabilityTotalCount: d.getElementById('pelagos-suitability-total-count'),
-      suitabilityMatchedCount: d.getElementById('pelagos-suitability-matched-count'),
-      suitabilityIncompatibleCount: d.getElementById('pelagos-suitability-incompatible-count'),
-      suitabilityListContainer: d.getElementById('pelagos-suitability-list-container'),
+      suitabilityTotalCount: d.getElementById(
+        'pelagos-suitability-total-count',
+      ),
+      suitabilityMatchedCount: d.getElementById(
+        'pelagos-suitability-matched-count',
+      ),
+      suitabilityIncompatibleCount: d.getElementById(
+        'pelagos-suitability-incompatible-count',
+      ),
+      suitabilityListContainer: d.getElementById(
+        'pelagos-suitability-list-container',
+      ),
       suitabilityList: d.getElementById('pelagos-suitability-list'),
       suitabilityEmpty: d.getElementById('pelagos-suitability-empty'),
+      suitabilityCommercialDistinction: d.getElementById(
+        'pelagos-suitability-commercial-distinction',
+      ),
+      suitabilityDisclaimers: d.getElementById(
+        'pelagos-suitability-disclaimers',
+      ),
 
       // Forecast
       forecastCard: d.getElementById('pelagos-forecast-card'),
+      forecastTag: d.getElementById('pelagos-forecast-tag'),
       forecastContent: d.getElementById('pelagos-forecast-content'),
       forecastVal: d.getElementById('pelagos-forecast-val'),
       forecastUnit: d.getElementById('pelagos-forecast-unit'),
       forecastPeriod: d.getElementById('pelagos-forecast-period'),
       forecastModel: d.getElementById('pelagos-forecast-model'),
       forecastHorizon: d.getElementById('pelagos-forecast-horizon'),
+      forecastHorizonsList: d.getElementById('pelagos-forecast-horizons-list'),
+      forecastNote: d.getElementById('pelagos-forecast-note'),
       forecastEmpty: d.getElementById('pelagos-forecast-empty'),
+
+      // Environmental Conditions (Buoy Stations)
+      envCard: d.getElementById('pelagos-env-card'),
+      envTag: d.getElementById('pelagos-env-tag'),
+      envContent: d.getElementById('pelagos-env-content'),
+      envMeta: d.getElementById('pelagos-env-meta'),
+      envStations: d.getElementById('pelagos-env-stations'),
+      envNotes: d.getElementById('pelagos-env-notes'),
+      envEmpty: d.getElementById('pelagos-env-empty'),
+
+      // Bunker Fuel References
+      bunkerCard: d.getElementById('pelagos-bunker-card'),
+      bunkerTag: d.getElementById('pelagos-bunker-tag'),
+      bunkerContent: d.getElementById('pelagos-bunker-content'),
+      bunkerProvider: d.getElementById('pelagos-bunker-provider'),
+      bunkerHubs: d.getElementById('pelagos-bunker-hubs'),
+      bunkerBenchmarks: d.getElementById('pelagos-bunker-benchmarks'),
+      bunkerDisclaimer: d.getElementById('pelagos-bunker-disclaimer'),
+      bunkerEmpty: d.getElementById('pelagos-bunker-empty'),
 
       // Fleet
       fleetCard: d.getElementById('pelagos-fleet-card'),
@@ -287,8 +371,11 @@ export class PelagosPanelController {
     this._bindEvents();
     this._initGlobeEventListeners();
     const overviewPromise = this.overview?.init?.();
+    const assessmentPromise = this.assessment?.init?.();
+    this.readiness?.init?.();
     await this.loadPorts();
     if (overviewPromise) await overviewPromise;
+    if (assessmentPromise) await assessmentPromise;
   }
 
   _bind(element, event, handler) {
@@ -411,6 +498,12 @@ export class PelagosPanelController {
     if (el.cargoTonnesInput) {
       this._bind(el.cargoTonnesInput, 'input', () => {
         this.clearCostValidationMessage();
+        if (this.assessment?.elements?.cargoInput) {
+          this.assessment.elements.cargoInput.value = el.cargoTonnesInput.value;
+        }
+        if (this.readiness?.elements?.cargoInput) {
+          this.readiness.elements.cargoInput.value = el.cargoTonnesInput.value;
+        }
       });
       this._bind(el.cargoTonnesInput, 'keydown', (e) => {
         if (e.key === 'Enter') {
@@ -437,6 +530,8 @@ export class PelagosPanelController {
 
     this.ports.sort((a, b) => a.name.localeCompare(b.name));
     this.populateSelects();
+    this.assessment?.syncVoyageSummary?.();
+    this.readiness?.syncVoyageSummary?.();
   }
 
   findPort(identifier) {
@@ -527,6 +622,8 @@ export class PelagosPanelController {
     }
 
     this.clearValidationMessage();
+    this.assessment?.syncVoyageSummary?.();
+    this.readiness?.syncVoyageSummary?.();
   }
 
   validateEndpoints() {
@@ -648,11 +745,12 @@ export class PelagosPanelController {
       const originPort = this.findPort(originId);
       const destPort = this.findPort(destId);
 
+      const canalPolicy = this.elements.canalPolicySelect?.value || 'allow';
       const payload = {
         origin: originId,
         destination: destId,
         routing_mode: 'marnet',
-        canal_policy: 'allow',
+        canal_policy: canalPolicy,
         supports_segments: true,
       };
 
@@ -953,6 +1051,11 @@ export class PelagosPanelController {
       }
     }
 
+    if (el.routeCanalPolicy) {
+      el.routeCanalPolicy.textContent =
+        route.canalPolicyApplied || el.canalPolicySelect?.value || 'allow';
+    }
+
     if (el.waypointCount) {
       el.waypointCount.textContent = `${route.steps?.length || 0} sea-lane waypoints`;
     }
@@ -977,6 +1080,15 @@ export class PelagosPanelController {
       if (el.corridorVesselClass)
         el.corridorVesselClass.textContent =
           c.vessel_class || 'Panamax / Supramax';
+      if (el.corridorDist) {
+        el.corridorDist.textContent =
+          c.benchmark_distance_nm !== null &&
+          c.benchmark_distance_nm !== undefined
+            ? `${Number(c.benchmark_distance_nm).toLocaleString('en-US', {
+                maximumFractionDigits: 1,
+              })} NM`
+            : '—';
+      }
     } else {
       if (el.corridorStatusTag) {
         el.corridorStatusTag.className = 'pelagos-tag tag-unmonitored';
@@ -1011,6 +1123,9 @@ export class PelagosPanelController {
           ? 'Derived Analytical Estimate'
           : 'Verified Published Benchmark (Not Derived)';
       }
+      if (el.rateDatasetId) {
+        el.rateDatasetId.textContent = obs.source_dataset_id || '—';
+      }
     } else {
       if (el.observedContent) el.observedContent.style.display = 'none';
       if (el.rateEmpty) {
@@ -1020,6 +1135,7 @@ export class PelagosPanelController {
           : 'No freight rate observations available for this unmonitored route.';
       }
       if (el.observedTag) el.observedTag.style.display = 'none';
+      if (el.rateDatasetId) el.rateDatasetId.textContent = '—';
     }
 
     // 3b. Voyage Freight Calculator Card (OPT-001)
@@ -1041,6 +1157,7 @@ export class PelagosPanelController {
         el.costStatusTag.textContent = 'UNAVAILABLE';
       }
       if (el.costContent) el.costContent.style.display = 'none';
+      if (el.costDisclaimers) el.costDisclaimers.innerHTML = '';
       if (el.costEmpty) {
         el.costEmpty.style.display = 'block';
         el.costEmpty.textContent =
@@ -1054,33 +1171,20 @@ export class PelagosPanelController {
       });
     }
 
-    // 4. Freight Forecast
-    const fc = isMonitored ? freight.baseline_forecast : null;
-    if (fc && Number.isFinite(Number(fc.predicted_value))) {
-      if (el.forecastContent) el.forecastContent.style.display = 'block';
-      if (el.forecastEmpty) el.forecastEmpty.style.display = 'none';
+    // 4. Multi-Horizon Production Freight Forecasts (T+1, T+3, T+6)
+    this._renderMultiHorizonForecasts(freight, isMonitored);
 
-      if (el.forecastVal)
-        el.forecastVal.textContent = Number(fc.predicted_value).toFixed(2);
-      if (el.forecastUnit) el.forecastUnit.textContent = fc.unit || 'USD/MT';
-      if (el.forecastPeriod)
-        el.forecastPeriod.textContent = fc.target_date || 'Unavailable';
-      const modelName = fc.model_type
-        ? fc.model_type.charAt(0).toUpperCase() + fc.model_type.slice(1)
-        : 'Persistence';
-      if (el.forecastModel)
-        el.forecastModel.textContent = `${modelName} Baseline`;
-      if (el.forecastHorizon)
-        el.forecastHorizon.textContent = `${fc.horizon_months || 1} Month Forward`;
-    } else {
-      if (el.forecastContent) el.forecastContent.style.display = 'none';
-      if (el.forecastEmpty) {
-        el.forecastEmpty.style.display = 'block';
-        el.forecastEmpty.textContent = isMonitored
-          ? 'No forecast generated for this period.'
-          : 'No predictive forecast model active for this trade lane.';
-      }
-    }
+    // 4b. Environmental Conditions (Buoy Stations)
+    this._renderEnvironmentalConditions(
+      freight?.environmental_conditions,
+      isMonitored,
+    );
+
+    // 4c. Bunker Fuel References
+    this._renderBunkerReferences(
+      freight?.bunker_fuel_references || freight?.bunker_fuel,
+      isMonitored,
+    );
 
     // 5. Data Coverage & Limitations
     if (el.limitationsList) {
@@ -1102,6 +1206,428 @@ export class PelagosPanelController {
 
     // 6. Vessel Availability / Fleet Telemetry Status
     void this.updateFleetAvailability(freight);
+  }
+
+  /**
+   * Render multi-horizon production forecasts (T+1, T+3, T+6) without client-side extrapolation.
+   */
+  _renderMultiHorizonForecasts(freight, isMonitored) {
+    const el = this.elements;
+    const forecastsList = Array.isArray(freight?.forecasts)
+      ? freight.forecasts
+      : [];
+    const multiMap =
+      freight?.multi_horizon_forecasts &&
+      typeof freight.multi_horizon_forecasts === 'object'
+        ? freight.multi_horizon_forecasts
+        : {};
+    const fc = isMonitored
+      ? freight?.baseline_forecast ||
+        forecastsList[0] ||
+        multiMap['T+1'] ||
+        null
+      : null;
+
+    if (el.forecastHorizonsList) {
+      el.forecastHorizonsList.innerHTML = '';
+    }
+
+    if (fc && Number.isFinite(Number(fc.predicted_value))) {
+      if (el.forecastContent) el.forecastContent.style.display = 'block';
+      if (el.forecastEmpty) el.forecastEmpty.style.display = 'none';
+      if (el.forecastTag) {
+        const isExp =
+          Boolean(fc.is_experimental) || fc.model_family === 'experimental_ml';
+        el.forecastTag.className = isExp
+          ? 'pelagos-tag tag-warning'
+          : 'pelagos-tag tag-model';
+        el.forecastTag.textContent = isExp
+          ? 'EXPERIMENTAL MODEL'
+          : 'PERSISTENCE (ACTIVE PRODUCTION)';
+      }
+
+      if (el.forecastVal)
+        el.forecastVal.textContent = Number(fc.predicted_value).toFixed(2);
+      if (el.forecastUnit) el.forecastUnit.textContent = fc.unit || 'USD/MT';
+      if (el.forecastPeriod)
+        el.forecastPeriod.textContent = fc.target_date || 'Unavailable';
+
+      const modelRaw = fc.model_type || 'persistence';
+      const modelName = modelRaw.charAt(0).toUpperCase() + modelRaw.slice(1);
+      const familyLabel =
+        fc.model_family === 'experimental_ml' || fc.is_experimental
+          ? 'Experimental'
+          : 'Active Production';
+      if (el.forecastModel)
+        el.forecastModel.textContent = `${modelName} Baseline (${familyLabel})`;
+      if (el.forecastHorizon)
+        el.forecastHorizon.textContent = `T+${fc.horizon_months || 1} (${fc.horizon_months || 1} Month Forward)`;
+
+      if (el.forecastHorizonsList) {
+        [1, 3, 6].forEach((h) => {
+          const item =
+            multiMap[`T+${h}`] ||
+            forecastsList.find((f) => Number(f?.horizon_months) === h) ||
+            null;
+          const row = this.doc.createElement('div');
+          row.className = 'pelagos-forecast-horizon-row';
+
+          const hBadge = this.doc.createElement('span');
+          hBadge.className = 'fh-horizon';
+          hBadge.textContent = `T+${h}`;
+          row.appendChild(hBadge);
+
+          const targetSpan = this.doc.createElement('span');
+          targetSpan.className = 'fh-target';
+          targetSpan.textContent = item?.target_date || 'Target unavailable';
+          row.appendChild(targetSpan);
+
+          const valSpan = this.doc.createElement('span');
+          if (item && Number.isFinite(Number(item.predicted_value))) {
+            valSpan.className = 'fh-value';
+            const mType = item.model_type || 'persistence';
+            valSpan.textContent = `$${Number(item.predicted_value).toFixed(2)} ${item.unit || 'USD/MT'} (${mType})`;
+          } else {
+            valSpan.className = 'fh-value is-unavailable';
+            valSpan.textContent = 'UNAVAILABLE';
+          }
+          row.appendChild(valSpan);
+
+          el.forecastHorizonsList.appendChild(row);
+        });
+      }
+
+      if (el.forecastNote) {
+        const extraNote = fc.warning || fc.notes || '';
+        el.forecastNote.textContent = `${extraNote ? `${extraNote} ` : ''}Active Production Baseline: Persistence (C3.2/C3.3 experimental ML models are NOT promoted to production). Flat multi-horizon persistence values are naive benchmarks, NOT directional market-timing signals.`;
+      }
+    } else {
+      if (el.forecastTag) {
+        el.forecastTag.className = 'pelagos-tag tag-unmonitored';
+        el.forecastTag.textContent = 'UNAVAILABLE';
+      }
+      if (el.forecastContent) el.forecastContent.style.display = 'none';
+      if (el.forecastEmpty) {
+        el.forecastEmpty.style.display = 'block';
+        el.forecastEmpty.textContent = isMonitored
+          ? freight?.baseline_forecast?.notes ||
+            'Forecast horizons unavailable for this period.'
+          : 'No predictive forecast model active for this trade lane.';
+      }
+    }
+  }
+
+  /**
+   * Render coastal buoy environmental observations with explicit freshness and null handling.
+   */
+  _renderEnvironmentalConditions(env, isMonitored) {
+    const el = this.elements;
+    if (!el.envCard) return;
+
+    if (el.envStations) el.envStations.innerHTML = '';
+    if (el.envMeta) el.envMeta.textContent = '';
+    if (el.envNotes) el.envNotes.textContent = '';
+
+    if (!env) {
+      if (el.envTag) {
+        el.envTag.className = 'pelagos-tag tag-unmonitored';
+        el.envTag.textContent = 'UNAVAILABLE';
+      }
+      if (el.envContent) el.envContent.style.display = 'none';
+      if (el.envEmpty) {
+        el.envEmpty.style.display = 'block';
+        el.envEmpty.textContent = isMonitored
+          ? 'No environmental buoy station data returned for this corridor.'
+          : 'Environmental buoy observations are surfaced for monitored corridors only.';
+      }
+      return;
+    }
+
+    const statusUpper = String(env.status || 'unavailable').toUpperCase();
+    if (el.envTag) {
+      el.envTag.className =
+        env.status === 'available'
+          ? 'pelagos-tag tag-verified'
+          : env.status === 'partial'
+            ? 'pelagos-tag tag-warning'
+            : 'pelagos-tag tag-unmonitored';
+      el.envTag.textContent = statusUpper;
+    }
+
+    const stations = Array.isArray(env.stations) ? env.stations : [];
+    if (el.envContent) el.envContent.style.display = 'block';
+    if (el.envEmpty) el.envEmpty.style.display = 'none';
+
+    if (el.envMeta) {
+      const fairPt = env.corridor_reference_point || 'Departure fairway';
+      const covStatus = env.coverage_status || 'unknown';
+      const covExtent = env.coverage_extent || 'coastal_departure_fairway';
+      const count = env.stations_count ?? stations.length;
+      el.envMeta.textContent = `Coverage: ${covStatus} · Scope: ${covExtent} · Reference: ${fairPt} · Stations: ${count}`;
+    }
+
+    if (el.envStations) {
+      if (stations.length === 0) {
+        const emptyNote = this.doc.createElement('div');
+        emptyNote.className = 'pelagos-empty-state';
+        emptyNote.textContent =
+          'No active moored buoy observations recorded for this corridor.';
+        el.envStations.appendChild(emptyNote);
+      } else {
+        const varDefs = [
+          ['wind_speed_knots', 'Wind Speed'],
+          ['wind_direction_degrees', 'Wind Dir'],
+          ['wave_height_meters', 'Wave Height'],
+          ['wave_period_seconds', 'Wave Period'],
+          ['sea_surface_temp_c', 'Sea Temp'],
+          ['air_pressure_hpa', 'Air Pressure'],
+        ];
+
+        stations.forEach((st) => {
+          const card = this.doc.createElement('div');
+          card.className = 'pelagos-env-station-item';
+
+          const top = this.doc.createElement('div');
+          top.className = 'env-station-top';
+
+          const titleWrap = this.doc.createElement('div');
+          titleWrap.className = 'env-station-title';
+          titleWrap.textContent = `${st.station_name || st.station_id} (${st.station_id || '—'})`;
+          top.appendChild(titleWrap);
+
+          const freshness = String(st.freshness || 'unknown').toLowerCase();
+          const freshBadge = this.doc.createElement('span');
+          freshBadge.className = `env-freshness-badge freshness-${freshness}`;
+          freshBadge.textContent = freshness.toUpperCase();
+          top.appendChild(freshBadge);
+          card.appendChild(top);
+
+          const meta = this.doc.createElement('div');
+          meta.className = 'env-station-meta';
+          const coords =
+            st.coordinates &&
+            Number.isFinite(Number(st.coordinates.latitude)) &&
+            Number.isFinite(Number(st.coordinates.longitude))
+              ? `${Number(st.coordinates.latitude).toFixed(2)}°, ${Number(st.coordinates.longitude).toFixed(2)}°`
+              : 'Coords: —';
+          const fairDist =
+            st.distance_to_corridor_fairway_nm !== null &&
+            st.distance_to_corridor_fairway_nm !== undefined
+              ? `${Number(st.distance_to_corridor_fairway_nm).toFixed(1)} NM to fairway`
+              : 'Fairway dist: —';
+          const origDist =
+            st.distance_to_origin_port_nm !== null &&
+            st.distance_to_origin_port_nm !== undefined
+              ? ` · ${Number(st.distance_to_origin_port_nm).toFixed(1)} NM to origin`
+              : '';
+          const ageStr =
+            st.data_age_hours !== null && st.data_age_hours !== undefined
+              ? `${Number(st.data_age_hours).toFixed(1)}h age`
+              : 'Age: —';
+          meta.textContent = `${st.sea_area || 'Offshore'} · ${coords} · ${fairDist}${origDist} · Quality: ${st.quality_status || '—'} · Obs: ${st.observation_time || '—'} (${ageStr}) · ${st.source_name || 'NOAA NDBC'}`;
+          card.appendChild(meta);
+
+          const grid = this.doc.createElement('div');
+          grid.className = 'env-vars-grid';
+          varDefs.forEach(([key, label]) => {
+            const cell = this.doc.createElement('div');
+            cell.className = 'env-var-cell';
+
+            const kSpan = this.doc.createElement('span');
+            kSpan.className = 'env-var-k';
+            kSpan.textContent = label;
+            cell.appendChild(kSpan);
+
+            const vInfo = st.variables?.[key];
+            const vSpan = this.doc.createElement('span');
+            if (vInfo && vInfo.value !== null && vInfo.value !== undefined) {
+              vSpan.className = 'env-var-v';
+              vSpan.textContent = `${vInfo.value} ${vInfo.unit || ''}`.trim();
+            } else {
+              vSpan.className = 'env-var-v is-null';
+              vSpan.textContent = '— (NULL)';
+            }
+            cell.appendChild(vSpan);
+            grid.appendChild(cell);
+          });
+          card.appendChild(grid);
+          el.envStations.appendChild(card);
+        });
+      }
+    }
+
+    if (el.envNotes) {
+      const parts = [
+        env.aggregation?.summary,
+        env.spatial_coverage_notes,
+        env.disclaimer,
+      ].filter(Boolean);
+      el.envNotes.textContent =
+        parts.join(' · ') ||
+        'Point observations at coastal departure buoys only; not interpolated across open ocean.';
+    }
+  }
+
+  /**
+   * Render bunker fuel reference hubs and non-substituted regional benchmarks.
+   */
+  _renderBunkerReferences(bunker, isMonitored) {
+    const el = this.elements;
+    if (!el.bunkerCard) return;
+
+    if (el.bunkerProvider) el.bunkerProvider.textContent = '';
+    if (el.bunkerHubs) el.bunkerHubs.innerHTML = '';
+    if (el.bunkerBenchmarks) el.bunkerBenchmarks.innerHTML = '';
+    if (el.bunkerDisclaimer) el.bunkerDisclaimer.textContent = '';
+
+    if (!bunker) {
+      if (el.bunkerTag) {
+        el.bunkerTag.className = 'pelagos-tag tag-unmonitored';
+        el.bunkerTag.textContent = 'UNAVAILABLE';
+      }
+      if (el.bunkerContent) el.bunkerContent.style.display = 'none';
+      if (el.bunkerEmpty) {
+        el.bunkerEmpty.style.display = 'block';
+        el.bunkerEmpty.textContent = isMonitored
+          ? 'No bunker fuel reference summary returned.'
+          : 'Bunker fuel references are surfaced for monitored corridors only.';
+      }
+      return;
+    }
+
+    const status = String(bunker.status || 'unavailable').toLowerCase();
+    if (el.bunkerTag) {
+      el.bunkerTag.className =
+        status === 'available'
+          ? 'pelagos-tag tag-verified'
+          : status === 'partial'
+            ? 'pelagos-tag tag-warning'
+            : 'pelagos-tag tag-unmonitored';
+      el.bunkerTag.textContent = status.toUpperCase();
+    }
+
+    if (el.bunkerContent) el.bunkerContent.style.display = 'block';
+    if (el.bunkerEmpty) el.bunkerEmpty.style.display = 'none';
+
+    const hubs = Array.isArray(bunker.bunkering_hubs_in_scope)
+      ? bunker.bunkering_hubs_in_scope
+      : [];
+    const latestQuotes = Array.isArray(bunker.latest_quotes)
+      ? bunker.latest_quotes
+      : [];
+    const benchmarks = Array.isArray(bunker.regional_benchmarks)
+      ? bunker.regional_benchmarks
+      : [];
+
+    if (el.bunkerProvider) {
+      const quotedCount = bunker.hubs_with_prices_count ?? 0;
+      el.bunkerProvider.textContent = `Provider: ${bunker.provider || '—'} · Corridor Quotes: ${status.toUpperCase()} (${quotedCount}/${hubs.length} hubs quoted) · ${bunker.reason || ''}`;
+    }
+
+    const createQuoteRow = (q, isBenchmark = false) => {
+      const row = this.doc.createElement('div');
+      row.className = isBenchmark
+        ? 'pelagos-bunker-quote-row is-benchmark'
+        : 'pelagos-bunker-quote-row';
+
+      const main = this.doc.createElement('div');
+      main.className = 'bunker-quote-main';
+      const priceText = Number.isFinite(Number(q.price_usd_per_mt))
+        ? `$${Number(q.price_usd_per_mt).toFixed(2)} ${q.unit || q.currency || 'USD/MT'}`
+        : '—';
+      main.textContent = `${q.port_name || '—'} (${q.port_code || '—'}) · ${q.fuel_grade || '—'} · ${priceText}`;
+      row.appendChild(main);
+
+      const sub = this.doc.createElement('div');
+      sub.className = 'bunker-quote-sub';
+      const basis = q.delivery_basis || '—';
+      const pType = q.pricing_type || 'indicative';
+      const fresh = String(q.freshness || 'stale').toUpperCase();
+      sub.textContent = `${isBenchmark ? 'External Regional Benchmark (NOT corridor hub pricing) · ' : ''}Type: ${pType} · Basis: ${basis} · Freshness: ${fresh} · Obs: ${q.observation_time || '—'} · Retrieved: ${q.retrieval_time_utc || '—'}`;
+      row.appendChild(sub);
+
+      return row;
+    };
+
+    if (el.bunkerHubs) {
+      const heading = this.doc.createElement('div');
+      heading.className = 'bunker-section-heading';
+      heading.textContent = 'CORRIDOR BUNKERING HUBS IN SCOPE';
+      el.bunkerHubs.appendChild(heading);
+
+      if (hubs.length === 0 && latestQuotes.length === 0) {
+        const none = this.doc.createElement('div');
+        none.className = 'pelagos-empty-state';
+        none.textContent = 'No corridor bunkering hubs configured.';
+        el.bunkerHubs.appendChild(none);
+      } else {
+        hubs.forEach((hub) => {
+          const item = this.doc.createElement('div');
+          item.className = 'pelagos-bunker-hub-item';
+
+          const hTop = this.doc.createElement('div');
+          hTop.className = 'bunker-hub-top';
+          const hName = this.doc.createElement('span');
+          hName.textContent = `${hub.name || '—'} (${hub.port_id || '—'}) · ${hub.region || '—'}`;
+          hTop.appendChild(hName);
+
+          const hStat = this.doc.createElement('span');
+          const hubAvailable = hub.status === 'available';
+          hStat.className = hubAvailable
+            ? 'pelagos-tag tag-verified'
+            : 'pelagos-tag tag-unmonitored';
+          hStat.textContent = String(hub.status || 'unavailable').toUpperCase();
+          hTop.appendChild(hStat);
+          item.appendChild(hTop);
+
+          const hRole = this.doc.createElement('div');
+          hRole.className = 'bunker-hub-meta';
+          hRole.textContent = `Role: ${hub.role || '—'}${hub.availability_reason ? ` · ${hub.availability_reason}` : hubAvailable ? '' : ' · Corridor hub pricing unavailable (no substitution)'}`;
+          item.appendChild(hRole);
+
+          if (Array.isArray(hub.quotes) && hub.quotes.length > 0) {
+            hub.quotes.forEach((q) => {
+              item.appendChild(createQuoteRow(q, false));
+            });
+          }
+
+          el.bunkerHubs.appendChild(item);
+        });
+
+        if (
+          latestQuotes.length > 0 &&
+          !hubs.some((h) => Array.isArray(h.quotes) && h.quotes.length > 0)
+        ) {
+          latestQuotes.forEach((q) => {
+            el.bunkerHubs.appendChild(createQuoteRow(q, false));
+          });
+        }
+      }
+    }
+
+    if (el.bunkerBenchmarks) {
+      const bHead = this.doc.createElement('div');
+      bHead.className = 'bunker-section-heading';
+      bHead.textContent =
+        'EXTERNAL REGIONAL BENCHMARKS (NOT SUBSTITUTED FOR CORRIDOR HUBS)';
+      el.bunkerBenchmarks.appendChild(bHead);
+
+      if (benchmarks.length === 0) {
+        const none = this.doc.createElement('div');
+        none.className = 'bunker-hub-meta';
+        none.textContent =
+          'No external regional benchmark quotes returned. Corridor bunkering hub pricing remains unavailable and is never synthesized.';
+        el.bunkerBenchmarks.appendChild(none);
+      } else {
+        benchmarks.forEach((q) => {
+          el.bunkerBenchmarks.appendChild(createQuoteRow(q, true));
+        });
+      }
+    }
+
+    if (el.bunkerDisclaimer) {
+      el.bunkerDisclaimer.textContent = `${bunker.disclaimer || 'Indicative bunker quotes only.'} Voyage fuel expenditure is NOT calculated without verified vessel fuel consumption and corridor hub stem quotes.`;
+    }
   }
 
   /**
@@ -1303,10 +1829,12 @@ export class PelagosPanelController {
     this._costAbortController = controller;
 
     try {
+      const canalPolicy = el.canalPolicySelect?.value || 'allow';
       const payload = {
         origin: originId,
         destination: destId,
         cargo_tonnes: tonnes,
+        canal_policy: canalPolicy,
       };
 
       const res = await fetch('/api/v1/calculator/voyage-freight', {
@@ -1340,7 +1868,9 @@ export class PelagosPanelController {
       if (seq !== this._costSeq) return false;
       if (err.name === 'AbortError') return false;
 
-      this.renderCostError(err.message || 'Cost calculation service unavailable');
+      this.renderCostError(
+        err.message || 'Cost calculation service unavailable',
+      );
       return false;
     } finally {
       if (seq === this._costSeq) {
@@ -1353,6 +1883,10 @@ export class PelagosPanelController {
   renderCostResult(data) {
     const el = this.elements;
     if (!el.costCard) return;
+
+    if (el.costDisclaimers) {
+      el.costDisclaimers.innerHTML = '';
+    }
 
     if (
       data.status === 'calculated' &&
@@ -1382,6 +1916,18 @@ export class PelagosPanelController {
         const cargoT = data.cargo_tonnes ?? this.currentCargoTonnes;
         el.costFormula.textContent = `Gross Ocean Freight: ${Number(cargoT).toLocaleString('en-US')} MT × $${Number(rateVal).toFixed(2)}/MT`;
       }
+      if (el.costRoute) {
+        const origLabel =
+          data.origin_port_name || data.origin_port_id || 'Origin';
+        const destLabel =
+          data.destination_port_name ||
+          data.destination_port_id ||
+          'Destination';
+        const corridorCode = data.corridor?.route_code
+          ? ` · ${data.corridor.route_code}`
+          : '';
+        el.costRoute.textContent = `${origLabel} → ${destLabel}${corridorCode}`;
+      }
       if (el.costRate && data.applicable_rate) {
         el.costRate.textContent = `$${Number(data.applicable_rate.rate_value).toFixed(2)} ${data.applicable_rate.unit || 'USD/MT'} (${data.applicable_rate.currency || 'USD'})`;
       }
@@ -1391,17 +1937,85 @@ export class PelagosPanelController {
       if (el.costSource && data.applicable_rate) {
         el.costSource.textContent = `${data.applicable_rate.observation_date || '—'} · ${data.applicable_rate.source_name || 'USDA Benchmark'}`;
       }
+      if (el.costRateMeta && data.applicable_rate) {
+        const rateNature = data.applicable_rate.is_derived
+          ? 'derived'
+          : data.applicable_rate.rate_type || 'observed benchmark';
+        const period = data.applicable_rate.observation_period || 'monthly';
+        const dsId = data.applicable_rate.source_dataset_id || '—';
+        const license = data.applicable_rate.license_type || '—';
+        el.costRateMeta.textContent = `${rateNature} (${period}) · Dataset: ${dsId} · License: ${license}`;
+      }
+      if (el.costCanalPolicy) {
+        el.costCanalPolicy.textContent =
+          el.canalPolicySelect?.value ||
+          this.currentRoute?.canalPolicyApplied ||
+          'allow';
+      }
       if (el.costDistance) {
         const distNm = data.distance?.distance_nm;
+        const distKm = data.distance?.distance_km;
+        const distSrc = data.distance?.distance_source || '';
+        const srcBadge =
+          distSrc === 'corridor_benchmark_distance'
+            ? 'Benchmark'
+            : distSrc === 'marnet_operational_routing' ||
+                distSrc === 'eurostat_marnet_network'
+              ? 'MARNET Routing'
+              : 'Route';
         if (distNm !== undefined && distNm !== null) {
-          el.costDistance.textContent = `${Number(distNm).toLocaleString('en-US', { maximumFractionDigits: 1 })} NM (Benchmark)`;
+          const kmPart =
+            distKm !== undefined && distKm !== null
+              ? ` / ${Number(distKm).toLocaleString('en-US', { maximumFractionDigits: 0 })} km`
+              : '';
+          el.costDistance.textContent = `${Number(distNm).toLocaleString('en-US', { maximumFractionDigits: 1 })} NM${kmPart} (${srcBadge})`;
         } else {
           el.costDistance.textContent = '—';
         }
       }
       if (el.costDistProvenance) {
-        el.costDistProvenance.textContent =
-          'Prototype Benchmark (Unverified for navigation)';
+        const prov = data.distance?.provenance || {};
+        const dSrc = data.distance?.distance_source || '';
+        const parts = [
+          dSrc || null,
+          prov.dataset_name || null,
+          prov.authority || null,
+          prov.licensing || null,
+          prov.qualification || null,
+        ].filter(Boolean);
+        if (
+          prov.qualification ||
+          prov.dataset_name ||
+          prov.authority ||
+          prov.licensing
+        ) {
+          el.costDistProvenance.textContent = parts.join(' · ');
+        } else if (dSrc === 'corridor_benchmark_distance') {
+          el.costDistProvenance.textContent =
+            'corridor_benchmark_distance · Official Corridor Benchmark Reference';
+        } else if (
+          dSrc === 'marnet_operational_routing' ||
+          dSrc === 'eurostat_marnet_network'
+        ) {
+          el.costDistProvenance.textContent = `${dSrc} · MARNET Sea-Lane Routing Network`;
+        } else {
+          el.costDistProvenance.textContent =
+            'Prototype Benchmark (Unverified for navigation)';
+        }
+      }
+      if (el.costDisclaimers) {
+        const disclaimers =
+          Array.isArray(data.disclaimers) && data.disclaimers.length > 0
+            ? data.disclaimers
+            : [
+                'GROSS OCEAN FREIGHT ONLY: Calculated exclusively as (cargo tonnes × published freight rate per MT).',
+                'Excludes bunker fuel surcharges, canal tolls, port disbursements, stevedoring, demurrage/despatch, and insurance.',
+              ];
+        disclaimers.forEach((disc) => {
+          const li = this.doc.createElement('li');
+          li.textContent = disc;
+          el.costDisclaimers.appendChild(li);
+        });
       }
     } else if (data.status === 'unavailable') {
       if (el.costStatusTag) {
@@ -1420,6 +2034,7 @@ export class PelagosPanelController {
         el.costStatusTag.className = 'pelagos-tag tag-offline';
         el.costStatusTag.textContent = 'INVALID INPUT';
       }
+      if (el.costContent) el.costContent.style.display = 'none';
       this.showCostValidationMessage(
         data.message || 'Invalid cargo tonnage or route parameters.',
       );
@@ -1434,6 +2049,7 @@ export class PelagosPanelController {
       el.costStatusTag.textContent = 'ERROR';
     }
     if (el.costContent) el.costContent.style.display = 'none';
+    if (el.costDisclaimers) el.costDisclaimers.innerHTML = '';
     if (el.costEmpty) {
       el.costEmpty.style.display = 'block';
       el.costEmpty.textContent = `Cost calculation service error: ${errorMsg}`;
@@ -1459,7 +2075,9 @@ export class PelagosPanelController {
 
     const tonnes = Number(
       cargoTonnes ||
-        (el.cargoTonnesInput ? el.cargoTonnesInput.value : this.currentCargoTonnes),
+        (el.cargoTonnesInput
+          ? el.cargoTonnesInput.value
+          : this.currentCargoTonnes),
     );
     if (!Number.isFinite(tonnes) || tonnes <= 0) {
       return false;
@@ -1497,10 +2115,12 @@ export class PelagosPanelController {
     this._suitabilityAbortController = controller;
 
     try {
+      const canalPolicy = el.canalPolicySelect?.value || 'allow';
       const payload = {
         origin: originId,
         destination: destId,
         cargo_tonnes: tonnes,
+        canal_policy: canalPolicy,
         max_vessels: 50,
       };
 
@@ -1544,6 +2164,81 @@ export class PelagosPanelController {
     const el = this.elements;
     if (!el.suitabilityCard) return;
 
+    if (el.suitabilityDisclaimers) {
+      el.suitabilityDisclaimers.innerHTML = '';
+      if (Array.isArray(data.disclaimers) && data.disclaimers.length > 0) {
+        data.disclaimers.forEach((disc) => {
+          const li = this.doc.createElement('li');
+          li.textContent = disc;
+          el.suitabilityDisclaimers.appendChild(li);
+        });
+      }
+    }
+
+    if (el.suitabilityHistoricalBanner && data.data_mode_notice) {
+      const modeLabel =
+        String(data.data_mode || 'historical').toLowerCase() === 'live'
+          ? 'Live AIS Stream Notice:'
+          : 'Historical Dataset Notice:';
+      el.suitabilityHistoricalBanner.textContent = `ℹ ${modeLabel} ${data.data_mode_notice}`;
+    }
+
+    if (
+      el.suitabilityCommercialDistinction &&
+      data.ais_vs_commercial_distinction
+    ) {
+      el.suitabilityCommercialDistinction.textContent = `ℹ Commercial Scope & Registry Distinction: ${data.ais_vs_commercial_distinction}`;
+    }
+
+    if (el.suitabilityRouteCompat) {
+      el.suitabilityRouteCompat.innerHTML = '';
+      const rcs = data.route_compatibility_summary;
+      if (rcs && typeof rcs === 'object') {
+        el.suitabilityRouteCompat.style.display = 'block';
+        const title = this.doc.createElement('div');
+        title.className = 'route-compat-title';
+        title.textContent = 'CORRIDOR & PORT COMPATIBILITY AUDIT';
+        el.suitabilityRouteCompat.appendChild(title);
+
+        const navRow = this.doc.createElement('div');
+        navRow.className = 'route-compat-row';
+        const navState =
+          rcs.route_navigable === true
+            ? 'NAVIGABLE'
+            : rcs.route_navigable === false
+              ? 'BLOCKED / NOT NAVIGABLE'
+              : 'UNVERIFIED';
+        const canalsText =
+          Array.isArray(rcs.canals_transited) && rcs.canals_transited.length > 0
+            ? rcs.canals_transited.join(', ')
+            : 'None';
+        const distPart =
+          rcs.route_distance_nm !== null && rcs.route_distance_nm !== undefined
+            ? ` · ${Number(rcs.route_distance_nm).toLocaleString('en-US', { maximumFractionDigits: 1 })} NM`
+            : '';
+        navRow.textContent = `Routing: ${navState} (${rcs.routing_status || '—'})${distPart} · Canals: ${canalsText}`;
+        el.suitabilityRouteCompat.appendChild(navRow);
+
+        const origDraft =
+          rcs.origin_documented_draft_limit_meters !== null &&
+          rcs.origin_documented_draft_limit_meters !== undefined
+            ? `${Number(rcs.origin_documented_draft_limit_meters).toFixed(1)}m (${rcs.origin_limit_source || 'documented'})`
+            : `Unverified (${rcs.origin_limit_source || 'no port draft limit documented'})`;
+        const destDraft =
+          rcs.destination_documented_draft_limit_meters !== null &&
+          rcs.destination_documented_draft_limit_meters !== undefined
+            ? `${Number(rcs.destination_documented_draft_limit_meters).toFixed(1)}m (${rcs.destination_limit_source || 'documented'})`
+            : `Unverified (${rcs.destination_limit_source || 'no port draft limit documented'})`;
+
+        const draftRow = this.doc.createElement('div');
+        draftRow.className = 'route-compat-row';
+        draftRow.textContent = `Origin Port Draft Limit: ${origDraft} · Destination Port Draft Limit: ${destDraft}`;
+        el.suitabilityRouteCompat.appendChild(draftRow);
+      } else {
+        el.suitabilityRouteCompat.style.display = 'none';
+      }
+    }
+
     if (
       data.status === 'matched' ||
       data.status === 'unmonitored_corridor_matched'
@@ -1567,17 +2262,18 @@ export class PelagosPanelController {
       if (el.suitabilityContext) {
         const loadName =
           data.loading_port_name || data.loading_port_id || 'Origin';
-        const corridorTitle =
-          data.corridor?.route_name || 'Selected Sea Route';
+        const corridorTitle = data.corridor?.route_name || 'Selected Sea Route';
         const vesselClassStr = data.target_vessel_class
           ? ` (${data.target_vessel_class})`
           : '';
-        el.suitabilityContext.textContent = `${corridorTitle} · Loading: ${loadName} · Target: ${Number(data.cargo_tonnes).toLocaleString('en-US')} MT${vesselClassStr}`;
+        const modeTag = data.data_mode ? ` · Mode: ${data.data_mode}` : '';
+        el.suitabilityContext.textContent = `${corridorTitle} · Loading: ${loadName} · Target: ${Number(data.cargo_tonnes).toLocaleString('en-US')} MT${vesselClassStr}${modeTag}`;
       }
 
       if (el.suitabilityMetrics) el.suitabilityMetrics.style.display = 'grid';
       if (el.suitabilityTotalCount)
-        el.suitabilityTotalCount.textContent = totalCount.toLocaleString('en-US');
+        el.suitabilityTotalCount.textContent =
+          totalCount.toLocaleString('en-US');
       if (el.suitabilityMatchedCount)
         el.suitabilityMatchedCount.textContent =
           suitableCount.toLocaleString('en-US');
@@ -1595,6 +2291,7 @@ export class PelagosPanelController {
           if (el.suitabilityEmpty) {
             el.suitabilityEmpty.style.display = 'block';
             el.suitabilityEmpty.textContent =
+              data.message ||
               'No vessel telemetry records evaluated for this route.';
           }
         } else {
@@ -1629,8 +2326,13 @@ export class PelagosPanelController {
             const idMeta = this.doc.createElement('span');
             idMeta.className = 'candidate-id-meta';
             const imoStr = cand.imo ? ` · IMO: ${cand.imo}` : '';
-            const classStr = cand.estimated_dimensional_class ? ` · ${cand.estimated_dimensional_class}` : '';
-            idMeta.textContent = `MMSI: ${cand.mmsi}${imoStr}${classStr}`;
+            const classStr = cand.estimated_dimensional_class
+              ? ` · ${cand.estimated_dimensional_class}`
+              : '';
+            const regClassStr = cand.registry_vessel_class
+              ? ` (Registry: ${cand.registry_vessel_class})`
+              : '';
+            idMeta.textContent = `MMSI: ${cand.mmsi}${imoStr}${classStr}${regClassStr}`;
             nameGroup.appendChild(idMeta);
             topRow.appendChild(nameGroup);
 
@@ -1662,7 +2364,9 @@ export class PelagosPanelController {
               const distEl = this.doc.createElement('span');
               const portLabel =
                 data.loading_port_name || data.loading_port_id || 'load port';
-              const distFormatted = Number(cand.distance_to_load_port_nm).toLocaleString('en-US', {
+              const distFormatted = Number(
+                cand.distance_to_load_port_nm,
+              ).toLocaleString('en-US', {
                 minimumFractionDigits: 1,
                 maximumFractionDigits: 1,
               });
@@ -1705,15 +2409,20 @@ export class PelagosPanelController {
             metricsRow.appendChild(speedEl);
 
             const ageEl = this.doc.createElement('span');
+            const ageSecsStr =
+              cand.observation_age_seconds !== null &&
+              cand.observation_age_seconds !== undefined
+                ? ` · ${Math.round(cand.observation_age_seconds / 3600)}h age`
+                : '';
             if (cand.is_stale) {
               ageEl.className = 'vessel-age stale';
               const dateStr = cand.observation_time
                 ? cand.observation_time.split('T')[0]
                 : 'Historical';
-              ageEl.textContent = `Historical Fix (${dateStr} · Stale)`;
+              ageEl.textContent = `Historical Fix (${dateStr} · Stale${ageSecsStr})`;
             } else {
               ageEl.className = 'vessel-age live';
-              ageEl.textContent = 'Live Fix (<30m)';
+              ageEl.textContent = `Live Fix (<30m)${ageSecsStr}`;
             }
             metricsRow.appendChild(ageEl);
 
@@ -1731,36 +2440,140 @@ export class PelagosPanelController {
             reasonBox.textContent = `${prefix}${cand.suitability_reason}`;
             item.appendChild(reasonBox);
 
-            // Sub-badges row: DWT Capacity & Laycan Feasibility (Commercial Boundaries)
+            // Sub-badges row: DWT Capacity & Commercial / Laycan Boundaries
             const metaBadgesRow = this.doc.createElement('div');
             metaBadgesRow.className = 'candidate-meta-badges';
 
+            const hasVerifiedDwt =
+              cand.verified_cargo_capacity_dwt !== null &&
+              cand.verified_cargo_capacity_dwt !== undefined &&
+              cand.cargo_capacity_status !== 'UNVERIFIED';
             const capacityPill = this.doc.createElement('span');
-            capacityPill.className = 'candidate-sub-pill capacity-unverified';
-            capacityPill.textContent = 'DWT Capacity: UNVERIFIED (AIS Broadcast Only)';
+            capacityPill.className = hasVerifiedDwt
+              ? 'candidate-sub-pill capacity-verified'
+              : 'candidate-sub-pill capacity-unverified';
+            capacityPill.textContent = hasVerifiedDwt
+              ? `Verified DWT: ${Number(cand.verified_cargo_capacity_dwt).toLocaleString('en-US')} t`
+              : 'DWT Capacity: UNVERIFIED (AIS Broadcast Only)';
             metaBadgesRow.appendChild(capacityPill);
 
             const laycanPill = this.doc.createElement('span');
             laycanPill.className = 'candidate-sub-pill laycan-unconfirmed';
-            laycanPill.textContent =
-              'Laycan: UNCONFIRMED · Commercial Commitments Unverified';
+            laycanPill.textContent = `Commercial: ${cand.commercial_availability || 'UNCONFIRMED'} · Laycan: ${cand.laycan_feasibility || 'UNCONFIRMED'}`;
             metaBadgesRow.appendChild(laycanPill);
 
             item.appendChild(metaBadgesRow);
 
+            // Three-Layer Compatibility & Particulars Completeness Audit Box
+            const layersBox = this.doc.createElement('div');
+            layersBox.className = 'candidate-layers-box';
+
+            const compStatus =
+              cand.particulars_completeness?.completeness_status ||
+              cand.screening_stage ||
+              'partial';
+            const missingParts =
+              Array.isArray(cand.missing_particulars) &&
+              cand.missing_particulars.length > 0
+                ? cand.missing_particulars
+                : Array.isArray(
+                      cand.particulars_completeness?.missing_particulars,
+                    )
+                  ? cand.particulars_completeness.missing_particulars
+                  : [];
+
+            const partLine = this.doc.createElement('div');
+            partLine.className = 'candidate-layer-row';
+            partLine.textContent = `Particulars (${compStatus}): Missing [${missingParts.length > 0 ? missingParts.join(', ') : 'None'}]`;
+            layersBox.appendChild(partLine);
+
+            if (cand.cargo_compatibility) {
+              const cc = cand.cargo_compatibility;
+              const cargoLine = this.doc.createElement('div');
+              cargoLine.className = 'candidate-layer-row';
+              const dwtStr =
+                cc.verified_dwt_tonnes !== null &&
+                cc.verified_dwt_tonnes !== undefined
+                  ? `${Number(cc.verified_dwt_tonnes).toLocaleString('en-US')} t`
+                  : 'UNVERIFIED';
+              const ccReasons =
+                Array.isArray(cc.reasons) && cc.reasons.length > 0
+                  ? ` — ${cc.reasons.join('; ')}`
+                  : '';
+              cargoLine.textContent = `Cargo Layer: ${cc.status} (Basis: ${cc.capacity_check_basis || '—'}, DWT: ${dwtStr})${ccReasons}`;
+              layersBox.appendChild(cargoLine);
+            }
+
+            if (cand.route_compatibility) {
+              const rc = cand.route_compatibility;
+              const routeLine = this.doc.createElement('div');
+              routeLine.className = 'candidate-layer-row';
+              const oStat = rc.origin_port?.status || '—';
+              const dStat = rc.destination_port?.status || '—';
+              const canalNotes =
+                Array.isArray(rc.canal_compatibility_notes) &&
+                rc.canal_compatibility_notes.length > 0
+                  ? ` · ${rc.canal_compatibility_notes.join('; ')}`
+                  : '';
+              const rcReasons =
+                Array.isArray(rc.reasons) && rc.reasons.length > 0
+                  ? ` — ${rc.reasons.join('; ')}`
+                  : '';
+              routeLine.textContent = `Route/Port Layer: ${rc.status} (Load: ${oStat}, Discharge: ${dStat})${canalNotes}${rcReasons}`;
+              layersBox.appendChild(routeLine);
+            }
+
+            const regStat = cand.registry_commercial_status || 'untracked';
+            const commLine = this.doc.createElement('div');
+            commLine.className = 'candidate-layer-row';
+            commLine.textContent = `Registry Sync: "${regStat}" (AIS registry sync indicator ONLY, NOT commercial open tonnage) · Data Mode: ${cand.data_mode || data.data_mode || 'historical'}`;
+            layersBox.appendChild(commLine);
+
+            if (
+              cand.commercial_availability_note ||
+              cand.laycan_feasibility_note
+            ) {
+              const noteLine = this.doc.createElement('div');
+              noteLine.className = 'candidate-layer-row is-muted';
+              noteLine.textContent =
+                cand.commercial_availability_note ||
+                cand.laycan_feasibility_note;
+              layersBox.appendChild(noteLine);
+            }
+
+            item.appendChild(layersBox);
+
             // Selection & camera interaction
             item.addEventListener('click', () => {
-              this.selectVessel(cand.mmsi, { syncGlobe: true, flyCamera: true });
+              this.selectVessel(cand.mmsi, {
+                syncGlobe: true,
+                flyCamera: true,
+              });
             });
 
             el.suitabilityList.appendChild(item);
           });
         }
       }
-    } else if (data.status === 'invalid_input') {
+    } else if (
+      data.status === 'unavailable' ||
+      data.status === 'invalid_input'
+    ) {
+      const isUnavailable = data.status === 'unavailable';
       if (el.suitabilityTag) {
-        el.suitabilityTag.className = 'pelagos-tag tag-offline';
-        el.suitabilityTag.textContent = 'INVALID INPUT';
+        el.suitabilityTag.className = isUnavailable
+          ? 'pelagos-tag tag-unmonitored'
+          : 'pelagos-tag tag-offline';
+        el.suitabilityTag.textContent = isUnavailable
+          ? 'UNAVAILABLE'
+          : 'INVALID INPUT';
+      }
+      if (el.suitabilityContext) {
+        el.suitabilityContext.textContent =
+          data.message ||
+          (isUnavailable
+            ? 'Candidate vessel suitability matching is unavailable for this route.'
+            : 'Invalid parameters for candidate vessel suitability matching.');
       }
       if (el.suitabilityMetrics) el.suitabilityMetrics.style.display = 'none';
       if (el.suitabilityListContainer)
@@ -1769,7 +2582,9 @@ export class PelagosPanelController {
         el.suitabilityEmpty.style.display = 'block';
         el.suitabilityEmpty.textContent =
           data.message ||
-          'Invalid parameters for candidate vessel suitability matching.';
+          (isUnavailable
+            ? 'Candidate vessel suitability matching is unavailable for this route.'
+            : 'Invalid parameters for candidate vessel suitability matching.');
       }
     }
   }
@@ -1781,9 +2596,12 @@ export class PelagosPanelController {
       el.suitabilityTag.className = 'pelagos-tag tag-offline';
       el.suitabilityTag.textContent = 'ERROR';
     }
+    if (el.suitabilityRouteCompat)
+      el.suitabilityRouteCompat.style.display = 'none';
     if (el.suitabilityMetrics) el.suitabilityMetrics.style.display = 'none';
     if (el.suitabilityListContainer)
       el.suitabilityListContainer.style.display = 'none';
+    if (el.suitabilityDisclaimers) el.suitabilityDisclaimers.innerHTML = '';
     if (el.suitabilityEmpty) {
       el.suitabilityEmpty.style.display = 'block';
       el.suitabilityEmpty.textContent = `Candidate suitability service error: ${errorMsg}`;
@@ -2153,6 +2971,13 @@ export class PelagosPanelController {
     this._costAbortController?.abort();
     this._suitabilityAbortController?.abort();
 
+    if (this.elements.suitabilityRouteCompat) {
+      this.elements.suitabilityRouteCompat.style.display = 'none';
+      this.elements.suitabilityRouteCompat.innerHTML = '';
+    }
+    if (this.elements.suitabilityDisclaimers) {
+      this.elements.suitabilityDisclaimers.innerHTML = '';
+    }
     if (this.elements.suitabilityMetrics) {
       this.elements.suitabilityMetrics.style.display = 'none';
     }
@@ -2169,6 +2994,39 @@ export class PelagosPanelController {
       this.elements.suitabilityTag.textContent = 'AWAITING ROUTE';
     }
 
+    if (this.elements.forecastHorizonsList) {
+      this.elements.forecastHorizonsList.innerHTML = '';
+    }
+    if (this.elements.envStations) this.elements.envStations.innerHTML = '';
+    if (this.elements.envContent)
+      this.elements.envContent.style.display = 'none';
+    if (this.elements.envEmpty) {
+      this.elements.envEmpty.style.display = 'block';
+      this.elements.envEmpty.textContent =
+        'No buoy environmental observations loaded.';
+    }
+    if (this.elements.envTag) {
+      this.elements.envTag.className = 'pelagos-tag tag-unmonitored';
+      this.elements.envTag.textContent = 'UNAVAILABLE';
+    }
+    if (this.elements.bunkerHubs) this.elements.bunkerHubs.innerHTML = '';
+    if (this.elements.bunkerBenchmarks)
+      this.elements.bunkerBenchmarks.innerHTML = '';
+    if (this.elements.bunkerContent)
+      this.elements.bunkerContent.style.display = 'none';
+    if (this.elements.bunkerEmpty) {
+      this.elements.bunkerEmpty.style.display = 'block';
+      this.elements.bunkerEmpty.textContent =
+        'No bunker fuel reference quotes loaded.';
+    }
+    if (this.elements.bunkerTag) {
+      this.elements.bunkerTag.className = 'pelagos-tag tag-unmonitored';
+      this.elements.bunkerTag.textContent = 'UNAVAILABLE';
+    }
+
+    if (this.elements.costDisclaimers) {
+      this.elements.costDisclaimers.innerHTML = '';
+    }
     if (this.elements.costContent) {
       this.elements.costContent.style.display = 'none';
     }
@@ -2191,9 +3049,13 @@ export class PelagosPanelController {
     if (this.elements.destSelect) this.elements.destSelect.value = '';
     if (this.elements.originFilter) this.elements.originFilter.value = '';
     if (this.elements.destFilter) this.elements.destFilter.value = '';
+    if (this.elements.canalPolicySelect)
+      this.elements.canalPolicySelect.value = 'allow';
 
     this.filterPortOptions(this.elements.originSelect, '');
     this.filterPortOptions(this.elements.destSelect, '');
+    this.assessment?.clearResult?.();
+    this.readiness?.clearResult?.();
 
     // Refresh vessel corridor proximity calculations without active route
     if (this.vesselsRaw && this.vesselsRaw.length > 0) {
@@ -2204,6 +3066,8 @@ export class PelagosPanelController {
   /** Teardown all event listeners, graphics, and abort pending requests. */
   destroy() {
     this.overview?.destroy();
+    this.assessment?.destroy();
+    this.readiness?.destroy();
     this._abortController?.abort();
     this._costAbortController?.abort();
     this._suitabilityAbortController?.abort();

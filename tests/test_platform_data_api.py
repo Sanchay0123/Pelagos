@@ -496,3 +496,117 @@ def test_live_sqlite_database_counts_parity():
     assert bd["canonical_vessels"] == 120
     assert bd["identifier_mappings_port_aliases"] == 77
     assert bd["derived_dataset_rows"] == 2148
+
+
+def test_explorer_datasets_full_c32_c33_benchmark_parity(
+    isolated_client: tuple[TestClient, sessionmaker],
+) -> None:
+    """`/explorer/datasets` exposes verbatim C3.2/C3.3 evidence while `/overview` stays lightweight."""
+    client, _ = isolated_client
+
+    ov_resp = client.get("/api/v1/platform-data/overview")
+    assert ov_resp.status_code == 200
+    ov_bench = ov_resp.json()["benchmarks"]
+    assert ov_bench["production_baseline"] == DEFAULT_BASELINE_MODEL == "persistence"
+    assert ov_bench["c32_available"] is True
+    assert ov_bench["c33_available"] is True
+    assert len(ov_bench["c32_highlights"]) == 6
+    assert len(ov_bench["c33_highlights"]) == 6
+    assert "c32_experiments" not in ov_bench
+    assert "c33_experiments" not in ov_bench
+    assert "c32_metadata" not in ov_bench
+    assert "c33_metadata" not in ov_bench
+
+    ds_resp = client.get("/api/v1/platform-data/explorer/datasets")
+    assert ds_resp.status_code == 200
+    bench = ds_resp.json()["secondary_panels"]["benchmarks"]
+    assert bench["production_baseline"] == "persistence"
+    assert len(bench["c32_highlights"]) == 6
+    assert len(bench["c33_highlights"]) == 6
+
+    artifacts_dir = Path(__file__).resolve().parent.parent / "docs" / "forecasting" / "artifacts"
+    raw_c32 = json.loads((artifacts_dir / "c32_ml_benchmark_results.json").read_text(encoding="utf-8"))
+    raw_c33 = json.loads((artifacts_dir / "c33_regime_investigation_results.json").read_text(encoding="utf-8"))
+
+    assert bench["c32_metadata"]["lightgbm_available"] is False
+    c32_by_key = {e["experiment_key"]: e for e in bench["c32_experiments"]}
+    assert set(c32_by_key.keys()) == set(raw_c32["experiments"].keys())
+
+    for key, src_exp in raw_c32["experiments"].items():
+        exp = c32_by_key[key]
+        src_common = src_exp["common_sample_comparison"]
+        assert exp["common_sample_size"] == src_common["common_sample_size"]
+        assert exp["common_start_date"] == src_common["common_start_date"]
+        assert exp["common_end_date"] == src_common["common_end_date"]
+        assert exp["total_labeled_rows"] == src_exp["total_labeled_rows"]
+
+        models_by_name = {m["model_name"]: m for m in exp["models"]}
+        for model_name, src_m in src_common["models"].items():
+            m = models_by_name[model_name]
+            assert m["mae"] == src_m["mae"]
+            assert m["rmse"] == src_m["rmse"]
+            assert m["mape"] == src_m["mape"]
+            assert m["mase"] == src_m["mase"]
+            assert m["directional_accuracy_non_flat"] == src_m["directional_accuracy_non_flat"]
+            assert m["relative_mae_percent_change"] == src_m["relative_mae_percent_change"]
+            src_cmp = src_exp.get("statistical_comparisons", {}).get(model_name) or {}
+            assert m["dm_statistic"] == src_cmp.get("dm_statistic")
+            assert m["hln_statistic"] == src_cmp.get("hln_statistic")
+            assert m["p_value"] == src_cmp.get("p_value")
+            assert m["holm_adjusted_p_value"] == src_cmp.get("holm_adjusted_p_value")
+            assert m["bootstrap_ci_lower"] == src_cmp.get("bootstrap_ci_lower")
+            assert m["bootstrap_ci_upper"] == src_cmp.get("bootstrap_ci_upper")
+            assert m["research_classification"] == src_cmp.get("research_classification")
+
+        pers = models_by_name["persistence"]
+        assert pers["dm_statistic"] is None
+        assert pers["hln_statistic"] is None
+        assert pers["holm_adjusted_p_value"] is None
+        assert pers["bootstrap_ci_lower"] is None
+
+        unavail_by_name = {u["model_name"]: u for u in exp["unavailable_models"]}
+        assert "lightgbm" in unavail_by_name
+        assert unavail_by_name["lightgbm"]["status"] == "UNAVAILABLE"
+        assert "lightgbm" in unavail_by_name["lightgbm"]["unavailability_reason"].lower()
+
+    c33_by_key = {e["experiment_key"]: e for e in bench["c33_experiments"]}
+    assert set(c33_by_key.keys()) == set(raw_c33["experiments"].keys())
+    for key, src_exp in raw_c33["experiments"].items():
+        exp = c33_by_key[key]
+        src_common = src_exp["common_sample_comparison"]
+        assert exp["common_sample_size"] == src_common["common_sample_size"]
+        assert exp["regime_sample_audit"] == src_exp["regime_sample_audit"]
+        src_part = src_exp["regime_partitioned_analysis"]
+        part = exp["regime_partitioned_analysis"]
+        assert part["matched_subset_sample_size"] == src_part["matched_subset_comparison"]["common_sample_size"]
+        assert part["skipped_steps_count"] == src_part["experiment"]["summary"]["skipped_steps_count"]
+        part_models = {m["model_name"]: m for m in part["models"]}
+        for m_name, src_pm in src_part["matched_subset_comparison"]["models"].items():
+            assert part_models[m_name]["mae"] == src_pm["mae"]
+            assert part_models[m_name]["holm_adjusted_p_value"] == (
+                src_part.get("matched_subset_statistical_comparisons", {}).get(m_name, {}).get("holm_adjusted_p_value")
+            )
+
+
+def test_benchmarks_missing_artifacts_graceful_fallback(
+    isolated_client: tuple[TestClient, sessionmaker],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Missing benchmark JSON artifacts return honest availability flags without synthetic values."""
+    import pelagos.storage.platform_data as pd_mod
+
+    client, _ = isolated_client
+    monkeypatch.setattr(pd_mod, "_ARTIFACTS_DIR", tmp_path / "does_not_exist")
+    clear_platform_data_cache()
+
+    ds_resp = client.get("/api/v1/platform-data/explorer/datasets")
+    assert ds_resp.status_code == 200
+    bench = ds_resp.json()["secondary_panels"]["benchmarks"]
+    assert bench["production_baseline"] == "persistence"
+    assert bench["c32_available"] is False
+    assert bench["c33_available"] is False
+    assert bench["c32_highlights"] == []
+    assert bench["c33_highlights"] == []
+    assert bench["c32_experiments"] == []
+    assert bench["c33_experiments"] == []

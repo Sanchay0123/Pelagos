@@ -49,6 +49,9 @@ export class PelagosExplorerController {
 
     this.lastPayload = null;
     this.selectedRow = null;
+    this.selectedBenchmarkRoute = 'PNW-JPN-BULK';
+    this.selectedBenchmarkHorizon = 1;
+    this.showBenchmarkStatsDetails = false;
     this._abortController = null;
     this._reqSeq = 0;
     this._searchTimer = null;
@@ -88,6 +91,8 @@ export class PelagosExplorerController {
       totalPages: d.getElementById('explorer-total-pages'),
       pageSizeSelect: d.getElementById('explorer-page-size-select'),
       provenanceContent: d.getElementById('explorer-provenance-content'),
+      tablePane: d.querySelector?.('.explorer-table-pane') || null,
+      benchmarkWorkspace: d.getElementById('explorer-benchmark-workspace'),
     };
   }
 
@@ -278,6 +283,9 @@ export class PelagosExplorerController {
     }
 
     this._syncDomainTabs();
+    if (this.domain !== 'datasets') {
+      this._hideBenchmarkWorkspace();
+    }
     void this.loadDomainData();
   }
 
@@ -404,6 +412,7 @@ export class PelagosExplorerController {
     if (el.provenanceContent) {
       el.provenanceContent.innerHTML = `<div class="prov-notice notice-error">${escapeHtml(message)}</div>`;
     }
+    this._hideBenchmarkWorkspace();
   }
 
   renderPayload(payload) {
@@ -412,6 +421,7 @@ export class PelagosExplorerController {
     this._renderTable(payload);
     this._updatePaginationControls(payload);
     this._renderProvenanceDrawer(payload);
+    this._renderBenchmarkWorkspace(payload);
 
     if (payload.status === 'unavailable') {
       this._renderBanner(
@@ -710,11 +720,17 @@ export class PelagosExplorerController {
     if (sec.benchmarks) {
       const bm = sec.benchmarks;
       const rows = (bm.c32_highlights || []).slice(0, 6);
+      const anyArtifacts = Boolean(bm.c32_available || bm.c33_available);
       sections.push(`
         <div class="drawer-section">
           <div class="drawer-section-title">BASELINE VS EXPERIMENTAL BENCHMARKS</div>
           <div class="drawer-badge-baseline">PRODUCTION BASELINE: ${escapeHtml(String(bm.production_baseline || 'persistence').toUpperCase())}</div>
-          <p class="drawer-prose">${escapeHtml(bm.production_note)}</p>
+          <p class="drawer-prose">${escapeHtml(bm.production_note || 'No experimental model has been promoted to production.')}</p>
+          ${
+            !anyArtifacts
+              ? '<div class="prov-notice notice-warning">Benchmark artifacts are currently unavailable (c32_available=false, c33_available=false).</div>'
+              : ''
+          }
           ${
             rows.length > 0
               ? `<div class="drawer-kv-list">
@@ -723,11 +739,12 @@ export class PelagosExplorerController {
                       (r) => `
                     <div class="drawer-kv-item">
                       <span class="kv-k">${escapeHtml(r.route_code)} T+${escapeHtml(r.horizon_months)} (N=${escapeHtml(r.common_sample_size)})</span>
-                      <span class="kv-v">Pers ${formatNumberCell(r.persistence_mae, 2)} · Exp (${escapeHtml(r.best_experimental_candidate)}): ${formatNumberCell(r.best_experimental_mae, 2)}</span>
+                      <span class="kv-v">Pers ${escapeHtml(this._formatBenchmarkNumber(r.persistence_mae))} · Exp (${escapeHtml(r.best_experimental_candidate)}): ${escapeHtml(this._formatBenchmarkNumber(r.best_experimental_mae))}</span>
                     </div>`,
                     )
                     .join('')}
-                </div>`
+                </div>
+                <p class="drawer-prose">Full C3.2/C3.3 statistical evidence (DM/HLN, Holm-Bonferroni, 95% CI, LightGBM unavailability, regime audit) is displayed in the Datasets benchmark workspace.</p>`
               : ''
           }
         </div>`);
@@ -780,6 +797,637 @@ export class PelagosExplorerController {
     }
 
     container.innerHTML = sections.join('');
+  }
+
+  _formatBenchmarkNumber(value, suffix = '') {
+    if (value === null || value === undefined || value === '') {
+      return '— (NULL)';
+    }
+    if (typeof value === 'boolean') {
+      return value ? 'true' : 'false';
+    }
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) return '— (NULL)';
+      return `${String(value)}${suffix}`;
+    }
+    return `${String(value)}${suffix}`;
+  }
+
+  _classificationBadgeClass(classification, isBaseline = false) {
+    if (isBaseline || classification === 'PRODUCTION_BASELINE') {
+      return 'bench-badge-baseline';
+    }
+    if (classification === 'NOT_BETTER_THAN_BASELINE') {
+      return 'bench-badge-not-better';
+    }
+    if (classification === 'INCONCLUSIVE') {
+      return 'bench-badge-inconclusive';
+    }
+    return 'bench-badge-unavailable';
+  }
+
+  _hideBenchmarkWorkspace() {
+    const el = this.elements;
+    if (el.benchmarkWorkspace) {
+      el.benchmarkWorkspace.hidden = true;
+      el.benchmarkWorkspace.innerHTML = '';
+    }
+    el.tablePane?.classList?.remove('has-benchmarks');
+  }
+
+  _findBenchmarkExperiment(experiments, routeCode, horizonMonths) {
+    if (!Array.isArray(experiments)) return null;
+    return (
+      experiments.find(
+        (exp) =>
+          exp?.route_code === routeCode &&
+          Number(exp?.horizon_months) === Number(horizonMonths),
+      ) || null
+    );
+  }
+
+  _collectRouteAndHorizonOptions(benchmarks) {
+    const allExps = [
+      ...(benchmarks?.c32_experiments || []),
+      ...(benchmarks?.c33_experiments || []),
+    ];
+    const routes = [];
+    const horizons = [];
+    for (const exp of allExps) {
+      if (exp?.route_code && !routes.includes(exp.route_code)) {
+        routes.push(exp.route_code);
+      }
+      const h = Number(exp?.horizon_months);
+      if (Number.isFinite(h) && !horizons.includes(h)) {
+        horizons.push(h);
+      }
+    }
+    horizons.sort((a, b) => a - b);
+    return { routes, horizons };
+  }
+
+  _renderBenchmarkControls(container, routes, horizons) {
+    const controlsBar = this.doc.createElement('div');
+    controlsBar.className = 'benchmark-controls-bar';
+
+    const routeGroup = this.doc.createElement('div');
+    routeGroup.className = 'benchmark-selector-group';
+    const routeLabel = this.doc.createElement('span');
+    routeLabel.className = 'benchmark-selector-label';
+    routeLabel.textContent = 'CORRIDOR:';
+    routeGroup.appendChild(routeLabel);
+
+    for (const route of routes) {
+      const btn = this.doc.createElement('button');
+      const isSelected = route === this.selectedBenchmarkRoute;
+      btn.type = 'button';
+      btn.className = `benchmark-selector-btn benchmark-route-btn${isSelected ? ' active' : ''}`;
+      btn.dataset.route = route;
+      btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+      btn.textContent = route;
+      btn.addEventListener('click', () => {
+        this.selectedBenchmarkRoute = route;
+        if (this.lastPayload) this._renderBenchmarkWorkspace(this.lastPayload);
+      });
+      routeGroup.appendChild(btn);
+    }
+    controlsBar.appendChild(routeGroup);
+
+    const horizonGroup = this.doc.createElement('div');
+    horizonGroup.className = 'benchmark-selector-group';
+    const horizonLabel = this.doc.createElement('span');
+    horizonLabel.className = 'benchmark-selector-label';
+    horizonLabel.textContent = 'HORIZON:';
+    horizonGroup.appendChild(horizonLabel);
+
+    for (const h of horizons) {
+      const btn = this.doc.createElement('button');
+      const isSelected = Number(h) === Number(this.selectedBenchmarkHorizon);
+      btn.type = 'button';
+      btn.className = `benchmark-selector-btn benchmark-horizon-btn${isSelected ? ' active' : ''}`;
+      btn.dataset.horizon = String(h);
+      btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+      btn.textContent = `T+${h}`;
+      btn.addEventListener('click', () => {
+        this.selectedBenchmarkHorizon = Number(h);
+        if (this.lastPayload) this._renderBenchmarkWorkspace(this.lastPayload);
+      });
+      horizonGroup.appendChild(btn);
+    }
+    controlsBar.appendChild(horizonGroup);
+
+    const toggleBtn = this.doc.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = `benchmark-stats-toggle${this.showBenchmarkStatsDetails ? ' active' : ''}`;
+    toggleBtn.setAttribute(
+      'aria-pressed',
+      this.showBenchmarkStatsDetails ? 'true' : 'false',
+    );
+    toggleBtn.textContent = this.showBenchmarkStatsDetails
+      ? 'Hide Statistical Details & Regime Breakdown'
+      : 'Expand Statistical Details & Regime Breakdown';
+    toggleBtn.addEventListener('click', () => {
+      this.showBenchmarkStatsDetails = !this.showBenchmarkStatsDetails;
+      if (this.lastPayload) this._renderBenchmarkWorkspace(this.lastPayload);
+    });
+    controlsBar.appendChild(toggleBtn);
+
+    container.appendChild(controlsBar);
+  }
+
+  _buildStatsDetailTableHtml(models, title) {
+    const rows = Array.isArray(models)
+      ? models.filter((m) => m.is_available !== false)
+      : [];
+    return `
+      <div class="benchmark-subsection">
+        <div class="benchmark-subsection-title">${escapeHtml(title)}</div>
+        <p class="benchmark-method-note">
+          DM/HLN two-sided hypothesis tests and Holm-Bonferroni family-wise error correction compare candidate errors against Persistence. An insignificant or INCONCLUSIVE result (p &gt;= 0.05 or bootstrap CI containing 0) does NOT prove statistical equivalence or candidate superiority.
+        </p>
+        <div class="benchmark-table-scroll">
+          <table class="benchmark-table benchmark-table-compact">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>DM Stat</th>
+                <th>HLN Stat</th>
+                <th>Raw p-value</th>
+                <th>Holm p-value</th>
+                <th>Holm Sig</th>
+                <th>Favors Cand.</th>
+                <th>Favors Base.</th>
+                <th>95% Bootstrap CI</th>
+                <th>Block / Boot</th>
+                <th>Classification</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows
+                .map((m) => {
+                  const ciText =
+                    m.bootstrap_ci_lower === null &&
+                    m.bootstrap_ci_upper === null
+                      ? '— (NULL)'
+                      : `[${this._formatBenchmarkNumber(m.bootstrap_ci_lower)}, ${this._formatBenchmarkNumber(m.bootstrap_ci_upper)}] (contains_zero=${this._formatBenchmarkNumber(m.ci_contains_zero)})`;
+                  const blockBoot =
+                    m.block_length === null && m.bootstrap_iterations === null
+                      ? '— (NULL)'
+                      : `b=${this._formatBenchmarkNumber(m.block_length)} / n=${this._formatBenchmarkNumber(m.bootstrap_iterations)}`;
+                  const clsBadge = this._classificationBadgeClass(
+                    m.research_classification,
+                    m.is_baseline,
+                  );
+                  return `
+                    <tr class="${m.is_baseline ? 'is-baseline-row' : ''}">
+                      <td><strong>${escapeHtml(m.display_name || m.model_name)}</strong></td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.dm_statistic))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.hln_statistic))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.p_value))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.holm_adjusted_p_value))}</td>
+                      <td>${escapeHtml(this._formatBenchmarkNumber(m.holm_statistically_significant))}</td>
+                      <td>${escapeHtml(this._formatBenchmarkNumber(m.favors_candidate))}</td>
+                      <td>${escapeHtml(this._formatBenchmarkNumber(m.favors_baseline))}</td>
+                      <td class="num-cell">${escapeHtml(ciText)}</td>
+                      <td class="num-cell">${escapeHtml(blockBoot)}</td>
+                      <td><span class="bench-badge ${clsBadge}">${escapeHtml(m.research_classification || m.status || '—')}</span></td>
+                    </tr>`;
+                })
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  _buildRegimeBreakdownHtml(breakdownList, title) {
+    if (!Array.isArray(breakdownList) || breakdownList.length === 0) {
+      return '';
+    }
+    return `
+      <div class="benchmark-subsection">
+        <div class="benchmark-subsection-title">${escapeHtml(title)}</div>
+        <div class="benchmark-regime-grid">
+          ${breakdownList
+            .map(
+              (reg) => `
+            <div class="benchmark-regime-card">
+              <div class="benchmark-regime-header">
+                <strong>${escapeHtml(reg.display_name || reg.regime_id)}</strong>
+                <span>N=${escapeHtml(this._formatBenchmarkNumber(reg.sample_size))} · ${escapeHtml(reg.start_date || '—')} to ${escapeHtml(reg.end_date || '—')}</span>
+              </div>
+              <div class="benchmark-table-scroll">
+                <table class="benchmark-table benchmark-table-compact">
+                  <thead>
+                    <tr>
+                      <th>Model</th>
+                      <th>MAE</th>
+                      <th>RMSE</th>
+                      <th>MAPE %</th>
+                      <th>MASE</th>
+                      <th>Rel. MAE Δ%</th>
+                      <th>Dir. Acc.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${(reg.models || [])
+                      .map(
+                        (rm) => `
+                      <tr class="${rm.model_name === 'persistence' ? 'is-baseline-row' : ''}">
+                        <td>${escapeHtml(rm.model_name)}</td>
+                        <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(rm.mae))}</td>
+                        <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(rm.rmse))}</td>
+                        <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(rm.mape))}</td>
+                        <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(rm.mase))}</td>
+                        <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(rm.relative_mae_percent_change))}</td>
+                        <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(rm.directional_accuracy_non_flat))}</td>
+                      </tr>`,
+                      )
+                      .join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>`,
+            )
+            .join('')}
+        </div>
+      </div>`;
+  }
+
+  _buildC32SectionHtml(benchmarks) {
+    if (!benchmarks.c32_available) {
+      return `
+        <div class="benchmark-section">
+          <div class="benchmark-section-header">
+            <h3>C3.2 EXPERIMENTAL CANDIDATE ML BENCHMARK</h3>
+            <span class="bench-badge bench-badge-unavailable">ARTIFACT UNAVAILABLE</span>
+          </div>
+          <p class="benchmark-empty-note">C3.2 benchmark artifact is unavailable; Persistence remains the production baseline.</p>
+        </div>`;
+    }
+
+    const exp = this._findBenchmarkExperiment(
+      benchmarks.c32_experiments,
+      this.selectedBenchmarkRoute,
+      this.selectedBenchmarkHorizon,
+    );
+    if (!exp) {
+      return `
+        <div class="benchmark-section">
+          <div class="benchmark-section-header">
+            <h3>C3.2 EXPERIMENTAL CANDIDATE ML BENCHMARK</h3>
+          </div>
+          <p class="benchmark-empty-note">No C3.2 experiment record found for ${escapeHtml(this.selectedBenchmarkRoute)} T+${escapeHtml(this.selectedBenchmarkHorizon)}.</p>
+        </div>`;
+    }
+
+    const unavailableList = exp.unavailable_models || [];
+    const evaluatedModels = (exp.models || []).filter(
+      (m) => m.is_available !== false,
+    );
+    return `
+      <section class="benchmark-section" aria-label="C3.2 Experimental ML Benchmarks">
+        <div class="benchmark-section-header">
+          <div>
+            <h3>C3.2 EXPERIMENTAL ML BENCHMARK — ${escapeHtml(exp.route_code)} · T+${escapeHtml(exp.horizon_months)}</h3>
+            <p class="benchmark-section-subtitle">
+              Strict-forward expanding-window out-of-sample evaluation across common sample N=${escapeHtml(this._formatBenchmarkNumber(exp.common_sample_size))} (labeled rows: ${escapeHtml(this._formatBenchmarkNumber(exp.total_labeled_rows))}, min train: ${escapeHtml(this._formatBenchmarkNumber(exp.min_training_samples))}, window: ${escapeHtml(exp.common_start_date || '—')} to ${escapeHtml(exp.common_end_date || '—')}).
+            </p>
+          </div>
+          <span class="bench-badge bench-badge-experimental">EXPERIMENTAL COMPARISON</span>
+        </div>
+
+        <div class="benchmark-table-scroll">
+          <table class="benchmark-table">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>N</th>
+                <th>MAE</th>
+                <th>RMSE</th>
+                <th>MAPE</th>
+                <th>MASE</th>
+                <th>Rel. MAE Δ%</th>
+                <th>Dir. Acc.</th>
+                <th>Holm p-value</th>
+                <th>Classification</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${evaluatedModels
+                .map((m) => {
+                  const clsBadge = this._classificationBadgeClass(
+                    m.research_classification,
+                    m.is_baseline,
+                  );
+                  return `
+                    <tr class="${m.is_baseline ? 'is-baseline-row' : ''}">
+                      <td>
+                        <div class="bench-model-name">${escapeHtml(m.display_name || m.model_name)}</div>
+                        <div class="bench-model-meta">${escapeHtml(m.model_name)} · ${escapeHtml(m.feature_subset_name || '—')} (${escapeHtml(this._formatBenchmarkNumber(m.feature_count))} features)</div>
+                      </td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.sample_size))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.mae))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.rmse))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.mape))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.mase))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.relative_mae_percent_change))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.directional_accuracy_non_flat))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.holm_adjusted_p_value))}</td>
+                      <td>
+                        <span class="bench-badge ${clsBadge}">
+                          ${escapeHtml(m.is_baseline ? 'PRODUCTION BASELINE' : m.research_classification || '—')}
+                        </span>
+                      </td>
+                    </tr>`;
+                })
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+
+        ${
+          unavailableList.length > 0
+            ? `<div class="benchmark-unavailable-panel">
+                <div class="benchmark-unavailable-title">UNAVAILABLE CANDIDATE MODELS (NOT SUBSTITUTED WITH ZERO)</div>
+                ${unavailableList
+                  .map(
+                    (um) => `
+                  <div class="benchmark-unavailable-row">
+                    <span class="bench-badge bench-badge-unavailable">UNAVAILABLE</span>
+                    <strong>${escapeHtml(um.display_name || um.model_name)} (${escapeHtml(um.model_name)})</strong>
+                    <span class="benchmark-unavailable-reason">Optional dependency lightgbm not installed · ${escapeHtml(um.unavailability_reason || um.status || 'UNAVAILABLE')}</span>
+                  </div>`,
+                  )
+                  .join('')}
+              </div>`
+            : ''
+        }
+
+        ${
+          this.showBenchmarkStatsDetails
+            ? `${this._buildStatsDetailTableHtml(exp.models, 'C3.2 STATISTICAL HYPOTHESIS TESTS & BOOTSTRAP CIs (VS PERSISTENCE)')}${this._buildRegimeBreakdownHtml(exp.regime_breakdown, 'C3.2 REGIME BREAKDOWN (PER MACRO REGIME)')}`
+            : ''
+        }
+      </section>`;
+  }
+
+  _buildC33SectionHtml(benchmarks) {
+    if (!benchmarks.c33_available) {
+      return `
+        <div class="benchmark-section">
+          <div class="benchmark-section-header">
+            <h3>C3.3 EXPERIMENTAL REGIME-AWARE INVESTIGATION</h3>
+            <span class="bench-badge bench-badge-unavailable">ARTIFACT UNAVAILABLE</span>
+          </div>
+          <p class="benchmark-empty-note">C3.3 regime-aware investigation artifact is unavailable.</p>
+        </div>`;
+    }
+
+    const exp = this._findBenchmarkExperiment(
+      benchmarks.c33_experiments,
+      this.selectedBenchmarkRoute,
+      this.selectedBenchmarkHorizon,
+    );
+    if (!exp) {
+      return `
+        <div class="benchmark-section">
+          <div class="benchmark-section-header">
+            <h3>C3.3 EXPERIMENTAL REGIME-AWARE INVESTIGATION</h3>
+          </div>
+          <p class="benchmark-empty-note">No C3.3 experiment record found for ${escapeHtml(this.selectedBenchmarkRoute)} T+${escapeHtml(this.selectedBenchmarkHorizon)}.</p>
+        </div>`;
+    }
+
+    const audit = exp.regime_sample_audit || {};
+    const originCounts = audit.origin_regime_counts || {};
+    const maxTrainPairs = audit.max_eligible_same_origin_train_pairs || {};
+    const trainableSteps = audit.trainable_steps_at_threshold || {};
+    const insufficientList = audit.completely_insufficient_regimes || [];
+    const regimeKeys = Object.keys(originCounts);
+    const partitioned = exp.regime_partitioned_analysis || null;
+    const evaluatedModels = (exp.models || []).filter(
+      (m) => m.is_available !== false,
+    );
+
+    return `
+      <section class="benchmark-section benchmark-section-c33" aria-label="C3.3 Experimental Regime-Aware Investigation">
+        <div class="benchmark-section-header">
+          <div>
+            <h3>C3.3 EXPERIMENTAL REGIME-AWARE INVESTIGATION — ${escapeHtml(exp.route_code)} · T+${escapeHtml(exp.horizon_months)}</h3>
+            <p class="benchmark-section-subtitle">
+              Experimental only — C3.3 regime-aware and cross-corridor models do not outperform Persistence overall. Common sample N=${escapeHtml(this._formatBenchmarkNumber(exp.common_sample_size))} (${escapeHtml(exp.common_start_date || '—')} to ${escapeHtml(exp.common_end_date || '—')}, min regime selection samples: ${escapeHtml(this._formatBenchmarkNumber(exp.min_regime_selection_samples))}).
+            </p>
+          </div>
+          <span class="bench-badge bench-badge-experimental">EXPERIMENTAL REGIME STUDY</span>
+        </div>
+
+        <div class="benchmark-table-scroll">
+          <table class="benchmark-table">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Origin Regime</th>
+                <th>N</th>
+                <th>MAE</th>
+                <th>RMSE</th>
+                <th>MAPE</th>
+                <th>MASE</th>
+                <th>Rel. MAE Δ%</th>
+                <th>Holm p-value</th>
+                <th>Classification</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${evaluatedModels
+                .map((m) => {
+                  const clsBadge = this._classificationBadgeClass(
+                    m.research_classification,
+                    m.is_baseline,
+                  );
+                  return `
+                    <tr class="${m.is_baseline ? 'is-baseline-row' : ''}">
+                      <td>
+                        <div class="bench-model-name">${escapeHtml(m.display_name || m.model_name)}</div>
+                        <div class="bench-model-meta">${escapeHtml(m.model_name)} · ${escapeHtml(m.feature_subset_name || '—')}</div>
+                      </td>
+                      <td>${escapeHtml(m.uses_origin_regime ? 'Decision-time regime' : 'No')}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.sample_size))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.mae))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.rmse))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.mape))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.mase))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.relative_mae_percent_change))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(m.holm_adjusted_p_value))}</td>
+                      <td>
+                        <span class="bench-badge ${clsBadge}">
+                          ${escapeHtml(m.is_baseline ? 'PRODUCTION BASELINE' : m.research_classification || '—')}
+                        </span>
+                      </td>
+                    </tr>`;
+                })
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="benchmark-c33-audit-grid">
+          <div class="benchmark-subsection benchmark-audit-card">
+            <div class="benchmark-subsection-title">REGIME SAMPLE SUFFICIENCY AUDIT</div>
+            ${
+              insufficientList.length > 0
+                ? `<div class="benchmark-insufficient-flag">Insufficient regime training samples: ${escapeHtml(insufficientList.join(', '))} (trainable_steps_at_threshold=0 at threshold ${escapeHtml(this._formatBenchmarkNumber(audit.min_regime_training_samples))}).</div>`
+                : ''
+            }
+            <div class="benchmark-table-scroll">
+              <table class="benchmark-table benchmark-table-compact">
+                <thead>
+                  <tr>
+                    <th>Regime</th>
+                    <th>Origin Rows</th>
+                    <th>Max Train Pairs</th>
+                    <th>Trainable Steps</th>
+                    <th>Sufficient (&gt;=${escapeHtml(this._formatBenchmarkNumber(audit.min_regime_training_samples))})?</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${regimeKeys
+                    .map((regName) => {
+                      const steps = trainableSteps[regName];
+                      const isSufficient =
+                        typeof steps === 'number' ? steps > 0 : null;
+                      return `
+                    <tr>
+                      <td><strong>${escapeHtml(regName)}</strong></td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(originCounts[regName]))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(maxTrainPairs[regName]))}</td>
+                      <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(steps))}</td>
+                      <td>${escapeHtml(this._formatBenchmarkNumber(isSufficient))}</td>
+                    </tr>`;
+                    })
+                    .join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          ${
+            partitioned
+              ? `<div class="benchmark-subsection benchmark-audit-card">
+                  <div class="benchmark-subsection-title">MATCHED REGIME-PARTITIONED SUBSET (N=${escapeHtml(this._formatBenchmarkNumber(partitioned.matched_subset_sample_size))} vs FULL N=${escapeHtml(this._formatBenchmarkNumber(exp.common_sample_size))})</div>
+                  <p class="benchmark-section-subtitle">
+                    Matched window: ${escapeHtml(partitioned.common_start_date || '—')} to ${escapeHtml(partitioned.common_end_date || '—')} · Skipped steps: ${escapeHtml(this._formatBenchmarkNumber(partitioned.skipped_steps_count))} (${escapeHtml(Object.keys(partitioned.skipped_reasons || {}).join(', ') || 'none')}).
+                  </p>
+                  <div class="benchmark-table-scroll">
+                    <table class="benchmark-table benchmark-table-compact">
+                      <thead>
+                        <tr>
+                          <th>Model</th>
+                          <th>N</th>
+                          <th>MAE</th>
+                          <th>RMSE</th>
+                          <th>Rel. MAE Δ%</th>
+                          <th>Holm p-value</th>
+                          <th>Classification</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${(partitioned.models || [])
+                          .map(
+                            (pm) => `
+                          <tr class="${pm.is_baseline ? 'is-baseline-row' : ''}">
+                            <td>${escapeHtml(pm.display_name || pm.model_name)}</td>
+                            <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(pm.sample_size))}</td>
+                            <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(pm.mae))}</td>
+                            <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(pm.rmse))}</td>
+                            <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(pm.relative_mae_percent_change))}</td>
+                            <td class="num-cell">${escapeHtml(this._formatBenchmarkNumber(pm.holm_adjusted_p_value))}</td>
+                            <td><span class="bench-badge ${this._classificationBadgeClass(pm.research_classification, pm.is_baseline)}">${escapeHtml(pm.is_baseline ? 'PRODUCTION BASELINE' : pm.research_classification || '—')}</span></td>
+                          </tr>`,
+                          )
+                          .join('')}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>`
+              : ''
+          }
+        </div>
+
+        ${
+          this.showBenchmarkStatsDetails
+            ? `${this._buildStatsDetailTableHtml(exp.models, 'C3.3 STATISTICAL HYPOTHESIS TESTS & BOOTSTRAP CIs (VS PERSISTENCE)')}${this._buildRegimeBreakdownHtml(exp.regime_breakdown, 'C3.3 REGIME BREAKDOWN (PER MACRO REGIME)')}`
+            : ''
+        }
+      </section>`;
+  }
+
+  _renderBenchmarkWorkspace(payload) {
+    const ws = this.elements.benchmarkWorkspace;
+    if (!ws) return;
+
+    if (this.domain !== 'datasets') {
+      this._hideBenchmarkWorkspace();
+      return;
+    }
+
+    ws.hidden = false;
+    ws.innerHTML = '';
+    this.elements.tablePane?.classList?.add('has-benchmarks');
+
+    const benchmarks = payload?.secondary_panels?.benchmarks;
+    const baselineName = String(
+      benchmarks?.production_baseline || 'persistence',
+    ).toUpperCase();
+    const baselineNote =
+      benchmarks?.production_note ||
+      'Persistence remains the active production forecasting baseline; no experimental candidate outperformed it with statistical significance.';
+
+    const banner = this.doc.createElement('div');
+    banner.className = 'benchmark-production-banner';
+    banner.innerHTML = `
+      <div class="benchmark-production-headline">
+        <span class="bench-badge bench-badge-baseline">ACTIVE PRODUCTION MODEL: ${escapeHtml(baselineName)}</span>
+        <strong>No experimental model has been promoted to production.</strong>
+      </div>
+      <div class="benchmark-production-note">${escapeHtml(baselineNote)}</div>
+    `;
+    ws.appendChild(banner);
+
+    if (
+      !benchmarks ||
+      (!benchmarks.c32_available && !benchmarks.c33_available)
+    ) {
+      const missingNotice = this.doc.createElement('div');
+      missingNotice.className = 'benchmark-unavailable-banner';
+      missingNotice.textContent =
+        'Experimental C3.2/C3.3 benchmark artifacts are currently unavailable; Persistence remains the production baseline and no synthetic metrics are generated.';
+      ws.appendChild(missingNotice);
+      return;
+    }
+
+    const { routes, horizons } =
+      this._collectRouteAndHorizonOptions(benchmarks);
+    if (routes.length > 0 && !routes.includes(this.selectedBenchmarkRoute)) {
+      this.selectedBenchmarkRoute = routes[0];
+    }
+    if (
+      horizons.length > 0 &&
+      !horizons.includes(Number(this.selectedBenchmarkHorizon))
+    ) {
+      this.selectedBenchmarkHorizon = horizons[0];
+    }
+
+    if (routes.length > 0 && horizons.length > 0) {
+      this._renderBenchmarkControls(ws, routes, horizons);
+    }
+
+    const sectionsBody = this.doc.createElement('div');
+    sectionsBody.className = 'benchmark-sections-body';
+    sectionsBody.innerHTML =
+      this._buildC32SectionHtml(benchmarks) +
+      this._buildC33SectionHtml(benchmarks);
+    ws.appendChild(sectionsBody);
   }
 
   exportCurrentPageCsv() {

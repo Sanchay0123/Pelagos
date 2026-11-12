@@ -8,6 +8,7 @@ enforces Pelagos data integrity rules across UI/API consumers.
 
 from __future__ import annotations
 
+import copy
 import datetime
 import json
 import logging
@@ -102,6 +103,10 @@ _DATASET_ITEMS_CACHE: Dict[
     Tuple[str, Tuple[Any, ...], Tuple[str, ...], Tuple[int, ...]],
     Tuple[float, Dict[str, Any]],
 ] = {}
+_BENCHMARK_CACHE: Dict[
+    Tuple[str, Optional[int], Optional[int], bool],
+    Dict[str, Any],
+] = {}
 
 
 def clear_platform_data_cache() -> None:
@@ -110,6 +115,7 @@ def clear_platform_data_cache() -> None:
         _OVERVIEW_CACHE.clear()
         _DATASET_CACHE.clear()
         _DATASET_ITEMS_CACHE.clear()
+        _BENCHMARK_CACHE.clear()
 
 
 def _utc_now() -> datetime.datetime:
@@ -330,8 +336,184 @@ def _summarize_forecast_datasets_fast(db: Session) -> Dict[str, Any]:
     }
 
 
-def _load_benchmark_artifacts_summary() -> Dict[str, Any]:
-    """Load saved C3.2 & C3.3 research benchmark artifacts cleanly if present."""
+def _extract_model_comparisons(
+    *,
+    common_models: Dict[str, Any],
+    stats_map: Dict[str, Any],
+    evaluated_map: Dict[str, Any],
+    config_map: Dict[str, Any],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Assemble ordered per-model metric and statistical rows preserving source precision and nulls."""
+    ordered_names: List[str] = []
+    seen = set()
+    for source in (common_models, evaluated_map, stats_map):
+        for name in source.keys():
+            if name not in seen:
+                seen.add(name)
+                ordered_names.append(name)
+
+    rows: List[Dict[str, Any]] = []
+    unavailable: List[Dict[str, Any]] = []
+    for name in ordered_names:
+        cm = common_models.get(name) if isinstance(common_models.get(name), dict) else {}
+        ev = evaluated_map.get(name) if isinstance(evaluated_map.get(name), dict) else {}
+        st = stats_map.get(name) if isinstance(stats_map.get(name), dict) else {}
+        cfg = config_map.get(name) if isinstance(config_map.get(name), dict) else {}
+        ev_summary = ev.get("summary") if isinstance(ev.get("summary"), dict) else {}
+
+        is_available = ev.get("is_available")
+        if is_available is None:
+            is_available = st.get("is_available", True) if st else True
+        is_available = bool(is_available)
+        unavailability_reason = ev.get("unavailability_reason") or st.get("reason")
+        display_name = ev.get("display_name") or cfg.get("display_name") or name
+        model_family = ev.get("model_family") or cfg.get("model_family")
+
+        row: Dict[str, Any] = {
+            "model_name": name,
+            "display_name": display_name,
+            "model_family": model_family,
+            "feature_subset_name": ev.get("feature_subset_name") or cfg.get("feature_subset_name"),
+            "feature_count": ev.get("feature_count"),
+            "uses_origin_regime": cfg.get("uses_origin_regime"),
+            "is_baseline": name == DEFAULT_BASELINE_MODEL,
+            "is_available": is_available,
+            "unavailability_reason": unavailability_reason,
+            "sample_size": cm.get("sample_size"),
+            "valid_steps_count": ev_summary.get("valid_steps_count"),
+            "skipped_steps_count": ev_summary.get("skipped_steps_count"),
+            "mae": cm.get("mae"),
+            "rmse": cm.get("rmse"),
+            "mape": cm.get("mape"),
+            "mase": cm.get("mase"),
+            "directional_accuracy_non_flat": cm.get("directional_accuracy_non_flat"),
+            "relative_mae_ratio": cm.get("relative_mae_ratio"),
+            "relative_mae_percent_change": cm.get("relative_mae_percent_change"),
+            "relative_rmse_ratio": cm.get("relative_rmse_ratio"),
+            "dm_statistic": st.get("dm_statistic"),
+            "hln_statistic": st.get("hln_statistic"),
+            "p_value": st.get("p_value"),
+            "statistically_significant": st.get("statistically_significant"),
+            "holm_adjusted_p_value": st.get("holm_adjusted_p_value"),
+            "holm_statistically_significant": st.get("holm_statistically_significant"),
+            "favors_candidate": st.get("favors_candidate"),
+            "favors_baseline": st.get("favors_baseline"),
+            "bootstrap_ci_lower": st.get("bootstrap_ci_lower"),
+            "bootstrap_ci_upper": st.get("bootstrap_ci_upper"),
+            "ci_contains_zero": st.get("ci_contains_zero"),
+            "block_length": st.get("block_length"),
+            "bootstrap_iterations": st.get("bootstrap_iterations"),
+            "degrees_of_freedom": st.get("degrees_of_freedom"),
+            "research_classification": st.get("research_classification"),
+            "status": st.get("status"),
+        }
+        rows.append(row)
+        if not is_available:
+            unavailable.append(
+                {
+                    "model_name": name,
+                    "display_name": display_name,
+                    "model_family": model_family,
+                    "unavailability_reason": unavailability_reason,
+                    "status": st.get("status") or "UNAVAILABLE",
+                }
+            )
+    return rows, unavailable
+
+
+def _extract_regime_breakdown(
+    breakdown: Dict[str, Any],
+    *,
+    config_map: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Extract ordered per-regime metrics and statistical comparisons without rounding or zero-filling."""
+    regimes: List[Dict[str, Any]] = []
+    for reg_key, reg_val in (breakdown or {}).items():
+        if not isinstance(reg_val, dict):
+            continue
+        reg_models = reg_val.get("models") if isinstance(reg_val.get("models"), dict) else {}
+        reg_stats = (
+            reg_val.get("statistical_comparisons")
+            if isinstance(reg_val.get("statistical_comparisons"), dict)
+            else {}
+        )
+        sample_size = None
+        for mvals in reg_models.values():
+            if isinstance(mvals, dict) and mvals.get("valid_steps_count") is not None:
+                sample_size = mvals.get("valid_steps_count")
+                break
+        model_rows, _ = _extract_model_comparisons(
+            common_models=reg_models,
+            stats_map=reg_stats,
+            evaluated_map={},
+            config_map=config_map,
+        )
+        for row in model_rows:
+            raw_m = reg_models.get(row["model_name"])
+            if isinstance(raw_m, dict):
+                row["sample_size"] = raw_m.get("valid_steps_count")
+                row["valid_steps_count"] = raw_m.get("valid_steps_count")
+                row["skipped_steps_count"] = raw_m.get("skipped_steps_count")
+                row["is_sample_sufficient"] = raw_m.get("is_sample_sufficient")
+                row["sample_warning"] = raw_m.get("sample_warning")
+        regimes.append(
+            {
+                "regime_id": reg_val.get("regime_id") or reg_key,
+                "display_name": reg_val.get("display_name") or reg_key,
+                "start_date": reg_val.get("start_date"),
+                "end_date": reg_val.get("end_date"),
+                "sample_size": sample_size,
+                "models": model_rows,
+            }
+        )
+    return regimes
+
+
+def _build_highlight_entry(key: str, exp: Dict[str, Any]) -> Dict[str, Any]:
+    """Build backward-compatible abbreviated highlight row for overview and drawer."""
+    common_comp = exp.get("common_sample_comparison") or {}
+    common = common_comp.get("models") or {}
+    pers = common.get("persistence") or {}
+    best_cand_name = None
+    best_cand_mae = None
+    for mname, mvals in common.items():
+        if mname == "persistence":
+            continue
+        mae = mvals.get("mae")
+        if mae is not None and (best_cand_mae is None or mae < best_cand_mae):
+            best_cand_mae = mae
+            best_cand_name = mname
+    return {
+        "experiment_key": key,
+        "route_code": exp.get("route_code"),
+        "horizon_months": exp.get("horizon_months"),
+        "common_sample_size": common_comp.get("common_sample_size"),
+        "persistence_mae": pers.get("mae"),
+        "best_experimental_candidate": best_cand_name,
+        "best_experimental_mae": best_cand_mae,
+        "classification": "experimental_not_promoted",
+    }
+
+
+def _load_benchmark_artifacts_summary(include_details: bool = False) -> Dict[str, Any]:
+    """Load saved C3.2 & C3.3 research benchmark artifacts cleanly if present.
+
+    When ``include_details=False`` (used by ``/overview``), returns only the lightweight
+    abbreviated highlights. When ``include_details=True`` (used by ``/explorer/datasets``),
+    includes complete source-truth per-model metrics, DM/HLN/Holm statistics, bootstrap CIs,
+    regime breakdowns, and LightGBM unavailability provenance.
+    """
+    c32_path = _ARTIFACTS_DIR / "c32_ml_benchmark_results.json"
+    c33_path = _ARTIFACTS_DIR / "c33_regime_investigation_results.json"
+    c32_mtime = c32_path.stat().st_mtime_ns if c32_path.exists() else None
+    c33_mtime = c33_path.stat().st_mtime_ns if c33_path.exists() else None
+    cache_key = (str(_ARTIFACTS_DIR), c32_mtime, c33_mtime, include_details)
+
+    with _CACHE_LOCK:
+        cached = _BENCHMARK_CACHE.get(cache_key)
+        if cached is not None:
+            return copy.deepcopy(cached)
+
     artifacts: Dict[str, Any] = {
         "production_baseline": DEFAULT_BASELINE_MODEL,
         "production_note": (
@@ -343,71 +525,131 @@ def _load_benchmark_artifacts_summary() -> Dict[str, Any]:
         "c32_highlights": [],
         "c33_highlights": [],
     }
+    if include_details:
+        artifacts["c32_metadata"] = None
+        artifacts["c32_experiments"] = []
+        artifacts["c33_metadata"] = None
+        artifacts["c33_experiments"] = []
 
-    c32_path = _ARTIFACTS_DIR / "c32_ml_benchmark_results.json"
     if c32_path.exists():
         try:
             data = json.loads(c32_path.read_text(encoding="utf-8"))
             artifacts["c32_available"] = True
+            meta = data.get("metadata") or {}
+            model_configs = meta.get("model_configs") or {}
+            if include_details:
+                artifacts["c32_metadata"] = {
+                    "benchmark_type": meta.get("benchmark_type"),
+                    "evaluated_routes": meta.get("evaluated_routes"),
+                    "evaluated_horizons": meta.get("evaluated_horizons"),
+                    "min_training_samples": meta.get("min_training_samples"),
+                    "random_seed": meta.get("random_seed"),
+                    "lightgbm_available": meta.get("lightgbm_available"),
+                    "artifact_path": "docs/forecasting/artifacts/c32_ml_benchmark_results.json",
+                }
             for key, exp in (data.get("experiments") or {}).items():
-                common = (exp.get("common_sample_comparison") or {}).get("models") or {}
-                pers = common.get("persistence") or {}
-                best_cand_name = None
-                best_cand_mae = None
-                for mname, mvals in common.items():
-                    if mname == "persistence":
-                        continue
-                    mae = mvals.get("mae")
-                    if mae is not None and (best_cand_mae is None or mae < best_cand_mae):
-                        best_cand_mae = mae
-                        best_cand_name = mname
-                artifacts["c32_highlights"].append(
-                    {
-                        "experiment_key": key,
-                        "route_code": exp.get("route_code"),
-                        "horizon_months": exp.get("horizon_months"),
-                        "common_sample_size": (exp.get("common_sample_comparison") or {}).get("common_sample_size"),
-                        "persistence_mae": pers.get("mae"),
-                        "best_experimental_candidate": best_cand_name,
-                        "best_experimental_mae": best_cand_mae,
-                        "classification": "experimental_not_promoted",
-                    }
-                )
+                artifacts["c32_highlights"].append(_build_highlight_entry(key, exp))
+                if include_details:
+                    common_comp = exp.get("common_sample_comparison") or {}
+                    models, unavailable_models = _extract_model_comparisons(
+                        common_models=common_comp.get("models") or {},
+                        stats_map=exp.get("statistical_comparisons") or {},
+                        evaluated_map=exp.get("models_evaluated") or {},
+                        config_map=model_configs,
+                    )
+                    artifacts["c32_experiments"].append(
+                        {
+                            "experiment_key": key,
+                            "route_code": exp.get("route_code"),
+                            "horizon_months": exp.get("horizon_months"),
+                            "total_labeled_rows": exp.get("total_labeled_rows"),
+                            "min_training_samples": exp.get("min_training_samples"),
+                            "common_sample_size": common_comp.get("common_sample_size"),
+                            "common_start_date": common_comp.get("common_start_date"),
+                            "common_end_date": common_comp.get("common_end_date"),
+                            "models": models,
+                            "unavailable_models": unavailable_models,
+                            "regime_breakdown": _extract_regime_breakdown(
+                                exp.get("regime_breakdown") or {},
+                                config_map=model_configs,
+                            ),
+                        }
+                    )
         except Exception as exc:
             logger.warning("Failed to parse C3.2 benchmark artifact: %s", exc)
 
-    c33_path = _ARTIFACTS_DIR / "c33_regime_investigation_results.json"
     if c33_path.exists():
         try:
             data = json.loads(c33_path.read_text(encoding="utf-8"))
             artifacts["c33_available"] = True
+            meta = data.get("metadata") or {}
+            exp_configs = meta.get("experiment_configs") or {}
+            if include_details:
+                artifacts["c33_metadata"] = {
+                    "investigation_stage": meta.get("investigation_stage"),
+                    "evaluated_routes": meta.get("evaluated_routes"),
+                    "evaluated_horizons": meta.get("evaluated_horizons"),
+                    "min_training_samples": meta.get("min_training_samples"),
+                    "min_regime_selection_samples": meta.get("min_regime_selection_samples"),
+                    "random_seed": meta.get("random_seed"),
+                    "production_baseline": meta.get("production_baseline"),
+                    "artifact_path": "docs/forecasting/artifacts/c33_regime_investigation_results.json",
+                }
             for key, exp in (data.get("experiments") or {}).items():
-                common = (exp.get("common_sample_comparison") or {}).get("models") or {}
-                pers = common.get("persistence") or {}
-                best_cand_name = None
-                best_cand_mae = None
-                for mname, mvals in common.items():
-                    if mname == "persistence":
-                        continue
-                    mae = mvals.get("mae")
-                    if mae is not None and (best_cand_mae is None or mae < best_cand_mae):
-                        best_cand_mae = mae
-                        best_cand_name = mname
-                artifacts["c33_highlights"].append(
-                    {
-                        "experiment_key": key,
-                        "route_code": exp.get("route_code"),
-                        "horizon_months": exp.get("horizon_months"),
-                        "common_sample_size": (exp.get("common_sample_comparison") or {}).get("common_sample_size"),
-                        "persistence_mae": pers.get("mae"),
-                        "best_experimental_candidate": best_cand_name,
-                        "best_experimental_mae": best_cand_mae,
-                        "classification": "experimental_not_promoted",
-                    }
-                )
+                artifacts["c33_highlights"].append(_build_highlight_entry(key, exp))
+                if include_details:
+                    common_comp = exp.get("common_sample_comparison") or {}
+                    models, _ = _extract_model_comparisons(
+                        common_models=common_comp.get("models") or {},
+                        stats_map=exp.get("statistical_comparisons") or {},
+                        evaluated_map=exp.get("experiments_evaluated") or {},
+                        config_map=exp_configs,
+                    )
+                    rpa = exp.get("regime_partitioned_analysis")
+                    rpa_out: Optional[Dict[str, Any]] = None
+                    if isinstance(rpa, dict):
+                        matched_comp = rpa.get("matched_subset_comparison") or {}
+                        matched_exp = (rpa.get("experiment") or {}) if isinstance(rpa.get("experiment"), dict) else {}
+                        matched_models, _ = _extract_model_comparisons(
+                            common_models=matched_comp.get("models") or {},
+                            stats_map=rpa.get("matched_subset_statistical_comparisons") or {},
+                            evaluated_map={"regime_partitioned_ridge_ar": matched_exp} if matched_exp else {},
+                            config_map=exp_configs,
+                        )
+                        rpa_summary = matched_exp.get("summary") if isinstance(matched_exp.get("summary"), dict) else {}
+                        rpa_out = {
+                            "matched_subset_sample_size": rpa.get("matched_subset_sample_size"),
+                            "common_start_date": matched_comp.get("common_start_date"),
+                            "common_end_date": matched_comp.get("common_end_date"),
+                            "skipped_steps_count": rpa_summary.get("skipped_steps_count"),
+                            "skipped_reasons": rpa_summary.get("skipped_reasons"),
+                            "models": matched_models,
+                        }
+                    artifacts["c33_experiments"].append(
+                        {
+                            "experiment_key": key,
+                            "route_code": exp.get("route_code"),
+                            "horizon_months": exp.get("horizon_months"),
+                            "total_labeled_rows": exp.get("total_labeled_rows"),
+                            "min_training_samples": exp.get("min_training_samples"),
+                            "min_regime_selection_samples": exp.get("min_regime_selection_samples"),
+                            "common_sample_size": common_comp.get("common_sample_size"),
+                            "common_start_date": common_comp.get("common_start_date"),
+                            "common_end_date": common_comp.get("common_end_date"),
+                            "regime_sample_audit": exp.get("regime_sample_audit"),
+                            "models": models,
+                            "regime_breakdown": _extract_regime_breakdown(
+                                exp.get("regime_breakdown") or {},
+                                config_map=exp_configs,
+                            ),
+                            "regime_partitioned_analysis": rpa_out,
+                        }
+                    )
         except Exception as exc:
             logger.warning("Failed to parse C3.3 regime artifact: %s", exc)
 
+    with _CACHE_LOCK:
+        _BENCHMARK_CACHE[cache_key] = copy.deepcopy(artifacts)
     return artifacts
 
 
@@ -2157,7 +2399,7 @@ def _query_datasets_explorer(
     d_from = _parse_iso_date(date_from, "date_from")
     d_to = _parse_iso_date(date_to, "date_to")
 
-    benchmarks = _load_benchmark_artifacts_summary()
+    benchmarks = _load_benchmark_artifacts_summary(include_details=True)
 
     # Reject derived spread route explicitly with honest unavailable status rather than silent coercion
     if route_code in DISALLOWED_DERIVED_ROUTES:

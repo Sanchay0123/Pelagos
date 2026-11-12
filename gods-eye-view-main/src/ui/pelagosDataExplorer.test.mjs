@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import test, { beforeEach } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_EXPLORER_DOMAIN,
   EXPLORER_DOMAIN_IDS,
@@ -162,6 +165,8 @@ function createStageE1MockDom() {
     'explorer-total-pages',
     'explorer-page-size-select',
     'explorer-provenance-content',
+    'explorer-benchmark-workspace',
+    'explorer-table-pane-mock',
   ];
   for (const id of ids) {
     elements.set(id, createMockElement(id));
@@ -184,6 +189,10 @@ function createStageE1MockDom() {
     doc: {
       body,
       getElementById: (id) => elements.get(id) || null,
+      querySelector: (selector) =>
+        selector === '.explorer-table-pane'
+          ? elements.get('explorer-table-pane-mock') || null
+          : null,
       createElement: (tag) => createMockElement(`el_${Math.random()}`, tag),
     },
   };
@@ -575,4 +584,336 @@ test('renderGovernor suspendRendering preserves active continuous holds across E
   shareMgr.onPanelStateChange();
   assert.equal(shareMgr._debounceTimer, null);
   shareMgr.destroy();
+});
+
+function loadRealBenchmarkPayloadFromArtifacts() {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const artifactsDir = path.resolve(
+    __dirname,
+    '../../../docs/forecasting/artifacts',
+  );
+  const c32Raw = JSON.parse(
+    fs.readFileSync(
+      path.join(artifactsDir, 'c32_ml_benchmark_results.json'),
+      'utf-8',
+    ),
+  );
+  const c33Raw = JSON.parse(
+    fs.readFileSync(
+      path.join(artifactsDir, 'c33_regime_investigation_results.json'),
+      'utf-8',
+    ),
+  );
+
+  const mapModels = (commonModels, statsMap, metaConfigs) =>
+    Object.entries(commonModels).map(([mName, m]) => {
+      const cmp = (statsMap && statsMap[mName]) || {};
+      const cfg = (metaConfigs && metaConfigs[mName]) || {};
+      return {
+        model_name: mName,
+        display_name: m.display_name || cfg.display_name || mName,
+        model_family: m.model_family || cfg.model_family || null,
+        feature_subset_name:
+          m.feature_subset_name || cfg.feature_subset_name || null,
+        feature_count: m.feature_count ?? null,
+        uses_origin_regime: Boolean(
+          m.uses_origin_regime ?? cfg.uses_origin_regime,
+        ),
+        is_baseline: mName === 'persistence',
+        is_available: true,
+        unavailability_reason: null,
+        sample_size: m.sample_size,
+        valid_steps_count: m.valid_steps_count ?? null,
+        skipped_steps_count: m.skipped_steps_count ?? null,
+        mae: m.mae,
+        rmse: m.rmse,
+        mape: m.mape,
+        mase: m.mase,
+        directional_accuracy_non_flat: m.directional_accuracy_non_flat,
+        relative_mae_ratio: m.relative_mae_ratio ?? null,
+        relative_mae_percent_change: m.relative_mae_percent_change ?? null,
+        relative_rmse_ratio: m.relative_rmse_ratio ?? null,
+        dm_statistic: cmp.dm_statistic ?? null,
+        hln_statistic: cmp.hln_statistic ?? null,
+        p_value: cmp.p_value ?? null,
+        statistically_significant: cmp.statistically_significant ?? null,
+        holm_adjusted_p_value: cmp.holm_adjusted_p_value ?? null,
+        holm_statistically_significant:
+          cmp.holm_statistically_significant ?? null,
+        favors_candidate: cmp.favors_candidate ?? null,
+        favors_baseline: cmp.favors_baseline ?? null,
+        bootstrap_ci_lower: cmp.bootstrap_ci_lower ?? null,
+        bootstrap_ci_upper: cmp.bootstrap_ci_upper ?? null,
+        ci_contains_zero: cmp.ci_contains_zero ?? null,
+        block_length: cmp.block_length ?? null,
+        bootstrap_iterations: cmp.bootstrap_iterations ?? null,
+        degrees_of_freedom: cmp.degrees_of_freedom ?? null,
+        research_classification:
+          mName === 'persistence'
+            ? 'PRODUCTION_BASELINE'
+            : (cmp.research_classification ?? null),
+        status:
+          cmp.status || (mName === 'persistence' ? 'BASELINE' : 'EVALUATED'),
+      };
+    });
+
+  const mapRegimeBreakdown = (rb) =>
+    Object.entries(rb || {}).map(([regName, regObj]) => ({
+      regime_id: regObj.regime_id || regName,
+      display_name: regObj.display_name || regName,
+      sample_size: regObj.common_sample_size,
+      start_date: regObj.start_date,
+      end_date: regObj.end_date,
+      models: Object.entries(regObj.models || {}).map(([mn, mv]) => ({
+        model_name: mn,
+        sample_size: mv.valid_steps_count,
+        mae: mv.mae,
+        rmse: mv.rmse,
+        mape: mv.mape,
+        mase: mv.mase,
+        directional_accuracy_non_flat: mv.directional_accuracy_non_flat,
+        relative_mae_percent_change: mv.relative_mae_percent_change,
+      })),
+    }));
+
+  const c32Experiments = Object.entries(c32Raw.experiments).map(
+    ([key, exp]) => {
+      const lgbm = exp.models_evaluated?.lightgbm;
+      const unavail =
+        lgbm && lgbm.is_available === false
+          ? [
+              {
+                model_name: 'lightgbm',
+                display_name:
+                  lgbm.display_name || 'M5: LightGBM Regressor (GBDT)',
+                model_family: lgbm.model_family,
+                feature_subset_name: lgbm.feature_subset_name,
+                is_available: false,
+                status: 'UNAVAILABLE',
+                unavailability_reason: lgbm.status,
+              },
+            ]
+          : [];
+      return {
+        experiment_key: key,
+        route_code: exp.route_code,
+        horizon_months: exp.horizon_months,
+        total_labeled_rows: exp.total_labeled_rows,
+        min_training_samples: exp.min_training_samples,
+        common_sample_size: exp.common_sample_comparison.common_sample_size,
+        common_start_date: exp.common_sample_comparison.common_start_date,
+        common_end_date: exp.common_sample_comparison.common_end_date,
+        models: mapModels(
+          exp.common_sample_comparison.models,
+          exp.statistical_comparisons,
+          c32Raw.metadata.model_configs,
+        ),
+        unavailable_models: unavail,
+        regime_breakdown: mapRegimeBreakdown(exp.regime_breakdown),
+      };
+    },
+  );
+
+  const c33Experiments = Object.entries(c33Raw.experiments).map(
+    ([key, exp]) => {
+      const part = exp.regime_partitioned_analysis;
+      return {
+        experiment_key: key,
+        route_code: exp.route_code,
+        horizon_months: exp.horizon_months,
+        total_labeled_rows: exp.total_labeled_rows,
+        min_training_samples: exp.min_training_samples,
+        min_regime_selection_samples: exp.min_regime_selection_samples,
+        common_sample_size: exp.common_sample_comparison.common_sample_size,
+        common_start_date: exp.common_sample_comparison.common_start_date,
+        common_end_date: exp.common_sample_comparison.common_end_date,
+        regime_sample_audit: exp.regime_sample_audit,
+        models: mapModels(
+          exp.common_sample_comparison.models,
+          exp.statistical_comparisons,
+          c33Raw.metadata.experiment_configs,
+        ),
+        regime_breakdown: mapRegimeBreakdown(exp.regime_breakdown),
+        regime_partitioned_analysis: part
+          ? {
+              matched_subset_sample_size:
+                part.matched_subset_comparison.common_sample_size,
+              common_start_date:
+                part.matched_subset_comparison.common_start_date,
+              common_end_date: part.matched_subset_comparison.common_end_date,
+              skipped_steps_count:
+                part.experiment?.summary?.skipped_steps_count,
+              skipped_reasons: part.experiment?.summary?.skipped_reasons,
+              models: mapModels(
+                part.matched_subset_comparison.models,
+                part.matched_subset_statistical_comparisons,
+                c33Raw.metadata.experiment_configs,
+              ),
+            }
+          : null,
+      };
+    },
+  );
+
+  return {
+    c32Raw,
+    c33Raw,
+    benchmarks: {
+      production_baseline: 'persistence',
+      production_note:
+        'Persistence remains the active production forecasting baseline; no experimental candidate outperformed it with statistical significance.',
+      c32_available: true,
+      c33_available: true,
+      c32_highlights: [],
+      c33_highlights: [],
+      c32_metadata: c32Raw.metadata,
+      c33_metadata: c33Raw.metadata,
+      c32_experiments: c32Experiments,
+      c33_experiments: c33Experiments,
+    },
+  };
+}
+
+test('PelagosExplorerController renders full C3.2/C3.3 experimental benchmarks verbatim, switches corridors/horizons, expands statistical details, and preserves null & LightGBM unavailable states', async () => {
+  const { doc, elements } = createStageE1MockDom();
+  const { c32Raw, c33Raw, benchmarks } =
+    loadRealBenchmarkPayloadFromArtifacts();
+  let benchOverride = benchmarks;
+
+  const explorer = new PelagosExplorerController({
+    document: doc,
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 'ok',
+        domain: 'datasets',
+        availability_status: 'populated',
+        page: 1,
+        page_size: 25,
+        total_count: 2148,
+        total_pages: 86,
+        allowed_sort_fields: ['observation_date'],
+        filter_options: {
+          route_codes: ['PNW-JPN-BULK', 'USG-JPN-BULK'],
+          horizons: [1, 3, 6],
+        },
+        summary: { total_forecast_dataset_rows: 2148 },
+        integrity_notices: ['Strict-forward dataset'],
+        secondary_panels: {
+          benchmarks: benchOverride,
+          feature_inventory: [],
+        },
+        items: [
+          {
+            id: 1,
+            observation_date: '2026-09-01',
+            route_code: 'PNW-JPN-BULK',
+            horizon_months: 1,
+            target_next_rate: 38.0,
+          },
+        ],
+      }),
+    }),
+  });
+
+  explorer.init();
+  explorer.syncFromHash('#/explorer/datasets');
+  await new Promise((r) => setTimeout(r, 15));
+
+  const ws = elements.get('explorer-benchmark-workspace');
+  const getWorkspaceMarkup = () =>
+    ws.children.map((c) => c.innerHTML || c.textContent).join(' ');
+
+  assert.equal(ws.hidden, false);
+  let html = getWorkspaceMarkup();
+
+  // Production guard banner + absence of promotion/selection controls
+  assert.match(html, /ACTIVE PRODUCTION MODEL: PERSISTENCE/);
+  assert.match(html, /No experimental model has been promoted to production\./);
+  assert.doesNotMatch(html, /promote.*model|activate.*candidate/i);
+  assert.equal(ws.querySelectorAll('.benchmark-promote-btn').length, 0);
+
+  // Default corridor PNW-JPN-BULK T+1 metrics match JSON verbatim
+  const pnwT1 = c32Raw.experiments['PNW-JPN-BULK_T1'];
+  const persPnwT1 = pnwT1.common_sample_comparison.models.persistence;
+  const rfPnwT1 = pnwT1.common_sample_comparison.models.random_forest;
+  const rfPnwT1Stats = pnwT1.statistical_comparisons.random_forest;
+
+  assert.ok(
+    html.includes(`N=${pnwT1.common_sample_comparison.common_sample_size}`),
+  );
+  assert.ok(html.includes(String(persPnwT1.mae)));
+  assert.ok(html.includes(String(rfPnwT1.mae)));
+  assert.ok(html.includes(String(rfPnwT1Stats.holm_adjusted_p_value)));
+  assert.ok(html.includes(rfPnwT1Stats.research_classification));
+  // Null preservation & LightGBM UNAVAILABLE notice
+  assert.ok(html.includes('— (NULL)'));
+  assert.match(html, /UNAVAILABLE/);
+  assert.match(html, /Optional dependency lightgbm not installed/);
+
+  // C3.3 regime investigation & N=209 subset & SUPERCYCLE_PEAK_CRASH audit visible
+  const c33PnwT1 = c33Raw.experiments['PNW-JPN-BULK_T1'];
+  assert.match(html, /C3\.3 EXPERIMENTAL REGIME-AWARE INVESTIGATION/);
+  assert.match(
+    html,
+    new RegExp(
+      `N=${c33PnwT1.regime_partitioned_analysis.matched_subset_comparison.common_sample_size}`,
+    ),
+  );
+  assert.match(html, /SUPERCYCLE_PEAK_CRASH/);
+
+  // Switch Corridor to USG-JPN-BULK and Horizon to T+6
+  const routeBtns = ws.querySelectorAll('.benchmark-route-btn');
+  const usgBtn = routeBtns.find((b) => b.dataset.route === 'USG-JPN-BULK');
+  assert.ok(usgBtn);
+  usgBtn.dispatchEvent({ type: 'click' });
+
+  const horizonBtns = ws.querySelectorAll('.benchmark-horizon-btn');
+  const h6Btn = horizonBtns.find((b) => b.dataset.horizon === '6');
+  assert.ok(h6Btn);
+  h6Btn.dispatchEvent({ type: 'click' });
+
+  html = getWorkspaceMarkup();
+  const usgT6 = c32Raw.experiments['USG-JPN-BULK_T6'];
+  assert.match(html, /USG-JPN-BULK · T\+6/);
+  assert.ok(
+    html.includes(String(usgT6.common_sample_comparison.models.lasso.mae)),
+  );
+
+  // Expand Statistical Details & Regime Breakdown
+  const statsToggle = ws.querySelectorAll('.benchmark-stats-toggle')[0];
+  assert.ok(statsToggle);
+  statsToggle.dispatchEvent({ type: 'click' });
+
+  html = getWorkspaceMarkup();
+  const usgT6Stats = usgT6.statistical_comparisons.ridge;
+  assert.ok(html.includes(String(usgT6Stats.dm_statistic)));
+  assert.ok(html.includes(String(usgT6Stats.hln_statistic)));
+  assert.ok(html.includes(String(usgT6Stats.bootstrap_ci_lower)));
+  assert.ok(html.includes(String(usgT6Stats.bootstrap_ci_upper)));
+  assert.match(html, /does NOT prove statistical equivalence/);
+
+  // Unavailable artifacts graceful fallback
+  benchOverride = {
+    production_baseline: 'persistence',
+    production_note:
+      'Persistence remains the active production forecasting baseline.',
+    c32_available: false,
+    c33_available: false,
+    c32_highlights: [],
+    c33_highlights: [],
+    c32_experiments: [],
+    c33_experiments: [],
+  };
+  await explorer.loadDomainData();
+  html = getWorkspaceMarkup();
+  assert.match(html, /ACTIVE PRODUCTION MODEL: PERSISTENCE/);
+  assert.match(html, /artifacts are currently unavailable/);
+
+  // Switching to freight hides benchmark workspace
+  explorer.syncFromHash('#/explorer/freight');
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(ws.hidden, true);
+  explorer.destroy();
 });

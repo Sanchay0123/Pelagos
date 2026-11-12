@@ -3,7 +3,7 @@ title: Pelagos Documentation Index
 document_id: DOC-003
 type: documentation_index
 status: approved
-version: 1.0.27
+version: 1.0.28
 created: 2026-10-10
 updated: 2026-11-12
 tags:
@@ -62,7 +62,7 @@ N/A
 * [Forecast Cadence Reconciliation Decision Record (OD-ROUT-06-01)](./routing/od-rout-06-01-forecasting-horizons-amendment-proposal.md) (v1.0.0, Status: Approved)
 
 ### Engineering and Operations
-* [Stage E1 Platform Data Overview & Detailed Data Explorer Specification (API-001)](./architecture/platform-data-explorer.md) (v1.0.1, Status: Under Review)
+* [Stage E1 Platform Data Overview & Detailed Data Explorer Specification (API-001)](./architecture/platform-data-explorer.md) (v1.0.2, Status: Under Review)
 * Security Specifications (Planned)
 * Testing Specifications (Planned)
 * Runbooks (Planned)
@@ -132,3 +132,4 @@ Links to established, governed documentation within the repository, and maps pla
 | 1.0.25 | 2026-11-11 | Implementation Agent | Registered promoted Stage C3 research documentation (`RES-C31-001`, `REPORT-C32-ML-BENCHMARK-001`, `SPEC-C33-REGIME-001`, `REPORT-C33-REGIME-001` plus JSON artifacts) and Stage D specification (`OPT-001`); synchronized Project Overview (v1.0.4), System Architecture (v1.0.2), and Functional Requirements (v1.0.7). Status: approved. |
 | 1.0.26 | 2026-11-11 | Implementation Agent | Registered Stage E1 Platform Data Overview & Detailed Data Explorer Specification (`API-001`, v1.0.0); synchronized Project Overview (v1.0.5) and System Architecture Specification (v1.0.3). Status: approved. |
 | 1.0.27 | 2026-11-12 | Implementation Agent | Synchronized `API-001` reference (`v1.0.1`, updated `2026-11-12`) after Stage E1 documentation-code alignment pass. Status: approved. |
+| 1.0.28 | 2026-11-12 | Implementation Agent | Synchronized `API-001` reference (`v1.0.2`, updated `2026-11-12`) following C3.2/C3.3 experimental benchmark visibility integration inside `#/explorer/datasets`. Status: approved. |

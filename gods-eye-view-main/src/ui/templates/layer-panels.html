@@ -393,6 +393,18 @@
             </div>
           </div>
 
+          <div class="pelagos-form-group">
+            <label class="pelagos-label" for="pelagos-canal-policy">
+              Canal Routing Policy
+            </label>
+            <select id="pelagos-canal-policy" class="pelagos-select">
+              <option value="allow" selected>Allow Canals (Default)</option>
+              <option value="avoid_panama">Avoid Panama Canal</option>
+              <option value="avoid_suez">Avoid Suez Canal</option>
+              <option value="avoid_all">Avoid All Chokepoints</option>
+            </select>
+          </div>
+
           <div
             id="pelagos-validation-msg"
             class="pelagos-validation-msg"
@@ -427,6 +439,395 @@
           role="status"
           aria-live="polite"
         ></div>
+
+        <!-- Single-Vessel Charter Assessment (D2.1) -->
+        <div id="pelagos-assess-card" class="pelagos-card pelagos-assess-card">
+          <div class="pelagos-card-header">
+            <span class="pelagos-card-title"
+              >SINGLE-VESSEL CHARTER ASSESSMENT</span
+            >
+            <span
+              id="pelagos-assess-status-tag"
+              class="pelagos-tag tag-unmonitored"
+              >AWAITING INPUT</span
+            >
+          </div>
+
+          <div class="pelagos-form-group">
+            <label class="pelagos-label" for="pelagos-assess-vessel-select">
+              Registered Vessel (Name / MMSI / IMO / Type)
+            </label>
+            <div class="pelagos-assess-vessel-controls">
+              <input
+                type="text"
+                id="pelagos-assess-vessel-filter"
+                class="pelagos-filter-input"
+                placeholder="Filter registered vessels by name, MMSI, IMO, or type..."
+                autocomplete="off"
+                aria-label="Filter registered vessels"
+              />
+              <button
+                type="button"
+                id="pelagos-assess-reload-vessels-btn"
+                class="pelagos-btn-secondary pelagos-assess-reload-btn"
+                title="Reload registered vessels from backend"
+              >
+                ↻ Reload
+              </button>
+            </div>
+            <select
+              id="pelagos-assess-vessel-select"
+              class="pelagos-select"
+              aria-label="Select registered vessel"
+            >
+              <option value="">Select registered vessel…</option>
+            </select>
+            <div
+              id="pelagos-assess-vessel-registry-status"
+              class="pelagos-sub-note"
+            >
+              Loading registered vessels from Pelagos registry…
+            </div>
+            <div
+              id="pelagos-assess-vessel-preview"
+              class="pelagos-assess-preview"
+              style="display: none"
+            ></div>
+          </div>
+
+          <div
+            id="pelagos-assess-voyage-summary"
+            class="pelagos-assess-voyage-summary"
+          >
+            Voyage Ports: Select Origin and Destination ports in Route Endpoints
+            above.
+          </div>
+
+          <div class="pelagos-assess-cargo-grid">
+            <div class="pelagos-form-group">
+              <label class="pelagos-label" for="pelagos-assess-cargo-tonnes">
+                Cargo Tonnes (MT)
+              </label>
+              <input
+                type="number"
+                id="pelagos-assess-cargo-tonnes"
+                class="pelagos-filter-input"
+                min="1"
+                step="500"
+                value="52000"
+                aria-label="Assessment cargo tonnage"
+              />
+            </div>
+
+            <div class="pelagos-form-group">
+              <label class="pelagos-label" for="pelagos-assess-commodity">
+                Commodity
+              </label>
+              <input
+                type="text"
+                id="pelagos-assess-commodity"
+                class="pelagos-filter-input"
+                value="Agricultural Bulk Grain"
+                placeholder="e.g., Agricultural Bulk Grain, Crude Oil"
+                aria-label="Assessment cargo commodity"
+              />
+            </div>
+          </div>
+
+          <div
+            id="pelagos-assess-validation-msg"
+            class="pelagos-validation-msg"
+            style="display: none"
+            role="alert"
+            aria-live="polite"
+          ></div>
+
+          <div class="pelagos-actions-row">
+            <button
+              type="button"
+              id="pelagos-assess-submit-btn"
+              class="pelagos-btn-primary"
+            >
+              <span class="btn-spinner" aria-hidden="true"></span>
+              <span class="btn-text">ASSESS VESSEL FOR VOYAGE</span>
+            </button>
+          </div>
+
+          <div
+            id="pelagos-assess-error"
+            class="assess-error-box"
+            style="display: none"
+            role="alert"
+          >
+            <span id="pelagos-assess-error-text"></span>
+            <button
+              type="button"
+              id="pelagos-assess-retry-btn"
+              class="pelagos-btn-secondary"
+            >
+              RETRY ASSESSMENT
+            </button>
+          </div>
+
+          <div id="pelagos-assess-empty" class="pelagos-empty-state">
+            Select a registered vessel, voyage route ports above, and cargo
+            details to screen physical, cargo, route, and commercial boundaries.
+          </div>
+
+          <div
+            id="pelagos-assess-result"
+            class="pelagos-assess-result"
+            style="display: none"
+          >
+            <div
+              id="pelagos-assess-outcome"
+              class="pelagos-assess-outcome"
+            ></div>
+            <div
+              id="pelagos-assess-vessel-section"
+              class="assess-section-box"
+            ></div>
+            <div
+              id="pelagos-assess-cargo-section"
+              class="assess-section-box"
+            ></div>
+            <div
+              id="pelagos-assess-route-section"
+              class="assess-section-box"
+            ></div>
+            <div
+              id="pelagos-assess-ais-commercial-section"
+              class="assess-section-box"
+            ></div>
+            <div
+              id="pelagos-assess-missing-section"
+              class="assess-section-box"
+            ></div>
+            <div class="assess-section-box">
+              <div class="assess-section-title">
+                METHODOLOGY &amp; DATA DISCLAIMERS
+              </div>
+              <ul id="pelagos-assess-disclaimers" class="assess-bullets"></ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charter Readiness Audit (D2.2 — Six Evidence Gates) -->
+        <div
+          id="pelagos-readiness-card"
+          class="pelagos-card pelagos-readiness-card"
+        >
+          <div class="pelagos-card-header">
+            <span class="pelagos-card-title">CHARTER READINESS AUDIT</span>
+            <span
+              id="pelagos-readiness-status-tag"
+              class="pelagos-tag tag-unmonitored"
+              >AWAITING AUDIT</span
+            >
+          </div>
+
+          <div class="pelagos-sub-note">
+            Evaluates the six charter-readiness evidence gates via
+            <code>/api/v1/charter/recommend</code> across corridor markets and
+            fleet candidates (uses route, cargo, and optional laycan — no single
+            vessel MMSI parameter).
+          </div>
+
+          <div class="pelagos-form-group">
+            <label class="pelagos-label" for="pelagos-readiness-route-code">
+              Target Route Source (Ports Above or Direct Corridor Code)
+            </label>
+            <select
+              id="pelagos-readiness-route-code"
+              class="pelagos-select"
+              aria-label="Readiness corridor code override"
+            >
+              <option value="">
+                Use Selected Origin &amp; Destination Ports Above
+              </option>
+              <option value="PNW-JPN-BULK">
+                PNW-JPN-BULK (U.S. Pacific Northwest → Japan)
+              </option>
+              <option value="USG-JPN-BULK">
+                USG-JPN-BULK (U.S. Gulf → Japan via Panama)
+              </option>
+            </select>
+          </div>
+
+          <div
+            id="pelagos-readiness-voyage-summary"
+            class="pelagos-assess-voyage-summary"
+          >
+            Audit Scope: Select Origin and Destination ports above (or choose a
+            monitored corridor code).
+          </div>
+
+          <div class="pelagos-assess-cargo-grid">
+            <div class="pelagos-form-group">
+              <label class="pelagos-label" for="pelagos-readiness-cargo-tonnes">
+                Cargo Tonnes (MT)
+              </label>
+              <input
+                type="number"
+                id="pelagos-readiness-cargo-tonnes"
+                class="pelagos-filter-input"
+                min="1"
+                step="500"
+                value="52000"
+                aria-label="Readiness cargo tonnage"
+              />
+            </div>
+
+            <div class="pelagos-form-group">
+              <label class="pelagos-label" for="pelagos-readiness-commodity">
+                Commodity
+              </label>
+              <input
+                type="text"
+                id="pelagos-readiness-commodity"
+                class="pelagos-filter-input"
+                value="Agricultural Bulk Grain"
+                placeholder="e.g., Agricultural Bulk Grain"
+                aria-label="Readiness cargo commodity"
+              />
+            </div>
+          </div>
+
+          <div class="readiness-optional-grid">
+            <div class="pelagos-form-group">
+              <label class="pelagos-label" for="pelagos-readiness-laycan-start">
+                Laycan Start (Optional)
+              </label>
+              <input
+                type="date"
+                id="pelagos-readiness-laycan-start"
+                class="pelagos-filter-input"
+                aria-label="Optional laycan start date"
+              />
+            </div>
+
+            <div class="pelagos-form-group">
+              <label class="pelagos-label" for="pelagos-readiness-laycan-end">
+                Laycan End (Optional)
+              </label>
+              <input
+                type="date"
+                id="pelagos-readiness-laycan-end"
+                class="pelagos-filter-input"
+                aria-label="Optional laycan cancelling date"
+              />
+            </div>
+
+            <div class="pelagos-form-group">
+              <label class="pelagos-label" for="pelagos-readiness-max-vessels">
+                Max Vessels
+              </label>
+              <input
+                type="number"
+                id="pelagos-readiness-max-vessels"
+                class="pelagos-filter-input"
+                min="1"
+                max="200"
+                step="1"
+                value="20"
+                aria-label="Maximum candidate vessels to return"
+              />
+            </div>
+          </div>
+
+          <div
+            id="pelagos-readiness-validation-msg"
+            class="pelagos-validation-msg"
+            style="display: none"
+            role="alert"
+            aria-live="polite"
+          ></div>
+
+          <div class="pelagos-actions-row">
+            <button
+              type="button"
+              id="pelagos-readiness-submit-btn"
+              class="pelagos-btn-primary"
+            >
+              <span class="btn-spinner" aria-hidden="true"></span>
+              <span class="btn-text">RUN CHARTER READINESS AUDIT</span>
+            </button>
+          </div>
+
+          <div
+            id="pelagos-readiness-error"
+            class="assess-error-box"
+            style="display: none"
+            role="alert"
+          >
+            <span id="pelagos-readiness-error-text"></span>
+            <button
+              type="button"
+              id="pelagos-readiness-retry-btn"
+              class="pelagos-btn-secondary"
+            >
+              RETRY AUDIT
+            </button>
+          </div>
+
+          <div id="pelagos-readiness-empty" class="pelagos-empty-state">
+            Run the Charter Readiness Audit to inspect all six evidence gates
+            and verify whether commercial recommendation requirements are met or
+            withheld.
+          </div>
+
+          <div
+            id="pelagos-readiness-result"
+            class="pelagos-readiness-result"
+            style="display: none"
+          >
+            <div id="pelagos-readiness-outcome" class="readiness-outcome"></div>
+            <div
+              id="pelagos-readiness-summary"
+              class="readiness-section-box"
+            ></div>
+            <div
+              id="pelagos-readiness-contracts"
+              class="readiness-section-box"
+              style="display: none"
+            ></div>
+
+            <div class="readiness-gates-toolbar">
+              <span class="readiness-section-title"
+                >SIX CHARTER READINESS GATES</span
+              >
+              <button
+                type="button"
+                id="pelagos-readiness-toggle-all-btn"
+                class="pelagos-btn-secondary readiness-toggle-all-btn"
+              >
+                Collapse All Gates
+              </button>
+            </div>
+            <div
+              id="pelagos-readiness-gates"
+              class="readiness-gates-list"
+            ></div>
+
+            <div
+              id="pelagos-readiness-missing-inputs"
+              class="readiness-section-box"
+            ></div>
+            <div
+              id="pelagos-readiness-limitations"
+              class="readiness-section-box"
+            ></div>
+            <div class="readiness-section-box">
+              <div class="readiness-section-title">
+                AUTHORITATIVE DATA &amp; SCOPE DISCLAIMERS
+              </div>
+              <ul
+                id="pelagos-readiness-disclaimers"
+                class="readiness-bullets"
+              ></ul>
+            </div>
+          </div>
+        </div>
 
         <!-- Dashboard Result Container -->
         <div
@@ -480,6 +881,12 @@
                   >
                 </div>
                 <div class="meta-row">
+                  <span class="meta-key">Canal Policy:</span>
+                  <span id="pelagos-route-canal-policy" class="meta-val"
+                    >allow</span
+                  >
+                </div>
+                <div class="meta-row">
                   <span class="meta-key">Waypoints:</span>
                   <span id="pelagos-waypoint-count" class="meta-val">—</span>
                 </div>
@@ -516,6 +923,10 @@
                     <span id="pelagos-corridor-vessel-class" class="pill-value"
                       >—</span
                     >
+                  </div>
+                  <div class="meta-pill">
+                    <span class="pill-label">Benchmark Dist:</span>
+                    <span id="pelagos-corridor-dist" class="pill-value">—</span>
                   </div>
                 </div>
               </div>
@@ -565,6 +976,10 @@
                     <span id="pelagos-rate-type" class="meta-val"
                       >Verified Market Benchmark (Not Derived)</span
                     >
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Dataset ID:</span>
+                    <span id="pelagos-rate-dataset-id" class="meta-val">—</span>
                   </div>
                 </div>
               </div>
@@ -630,6 +1045,10 @@
 
                 <div class="pelagos-meta-list">
                   <div class="meta-row">
+                    <span class="meta-key">Corridor / Route:</span>
+                    <span id="pelagos-cost-route" class="meta-val">—</span>
+                  </div>
+                  <div class="meta-row">
                     <span class="meta-key">Applicable Rate:</span>
                     <span id="pelagos-cost-rate" class="meta-val">—</span>
                   </div>
@@ -638,11 +1057,21 @@
                     <span id="pelagos-cost-cargo" class="meta-val">—</span>
                   </div>
                   <div class="meta-row">
-                    <span class="meta-key">Rate Date & Source:</span>
+                    <span class="meta-key">Rate Date &amp; Source:</span>
                     <span id="pelagos-cost-source" class="meta-val">—</span>
                   </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Rate Provenance &amp; License:</span>
+                    <span id="pelagos-cost-rate-meta" class="meta-val">—</span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-key">Canal Policy:</span>
+                    <span id="pelagos-cost-canal-policy" class="meta-val"
+                      >allow</span
+                    >
+                  </div>
                   <div class="meta-row" id="pelagos-cost-dist-row">
-                    <span class="meta-key">Route Distance (Unverified):</span>
+                    <span class="meta-key">Route Distance:</span>
                     <span id="pelagos-cost-distance" class="meta-val">—</span>
                   </div>
                   <div class="meta-row" id="pelagos-cost-dist-prov-row">
@@ -650,17 +1079,36 @@
                     <span
                       id="pelagos-cost-distance-provenance"
                       class="meta-val meta-val-warning"
-                      >Prototype Benchmark (Unverified for navigation)</span
+                      >—</span
                     >
                   </div>
                 </div>
 
-                <div class="pelagos-disclaimer-callout cost-disclaimer-callout">
-                  ℹ <strong>Gross Freight Estimate:</strong> Reflects cargo
-                  tonnes × verified market benchmark rate. Excludes canal tolls,
-                  demurrage/despatch, port tariffs, insurance, and bunker fuel
-                  surcharges (BAF). Not a certified charter contract or spot
-                  fixture quote.
+                <div
+                  id="pelagos-cost-unavailable-components"
+                  class="pelagos-unavailable-box"
+                >
+                  <div class="unavailable-box-title">
+                    GROSS OCEAN FREIGHT ONLY · NOT TOTAL VOYAGE COST
+                  </div>
+                  <div class="unavailable-box-body">
+                    Unavailable voyage cost components (not fabricated):
+                    <strong>Bunker fuel expenditure</strong>,
+                    <strong>Canal tolls</strong>,
+                    <strong>Port disbursements &amp; tariffs</strong>,
+                    <strong>Demurrage / despatch</strong>, and
+                    <strong>Cargo insurance</strong>.
+                  </div>
+                </div>
+
+                <div
+                  class="pelagos-disclaimer-callout cost-disclaimer-callout"
+                  id="pelagos-cost-disclaimer-callout"
+                >
+                  <ul
+                    id="pelagos-cost-disclaimers"
+                    class="pelagos-inline-disclaimers"
+                  ></ul>
                 </div>
               </div>
 
@@ -705,6 +1153,13 @@
                 and do <em>not</em> represent current fleet positions or
                 proximity to loading ports.
               </div>
+
+              <!-- Route & Port Compatibility Audit Summary -->
+              <div
+                class="pelagos-route-compat-summary"
+                id="pelagos-suitability-route-compat"
+                style="display: none"
+              ></div>
 
               <!-- Suitability Metrics Grid -->
               <div
@@ -755,9 +1210,10 @@
                 Calculate a corridor route above to match candidate vessels.
               </div>
 
-              <!-- Scope & Laycan Feasibility Notice -->
+              <!-- Scope & Commercial Distinction Notice -->
               <div
                 class="pelagos-disclaimer-callout suitability-disclaimer-callout"
+                id="pelagos-suitability-commercial-distinction"
               >
                 ℹ <strong>Commercial Scope:</strong> Evaluated strictly on
                 physical criteria (reported AIS dimensions and vessel type).
@@ -767,14 +1223,20 @@
                 >
                 without commercial fixture lists.
               </div>
+              <ul
+                id="pelagos-suitability-disclaimers"
+                class="pelagos-inline-disclaimers"
+              ></ul>
             </div>
           </div>
 
-          <!-- 5. Freight Forecast Card -->
+          <!-- 5. Freight Forecast Card (Multi-Horizon Production Persistence) -->
           <div class="pelagos-card" id="pelagos-forecast-card">
             <div class="card-header">
               <span class="card-title">FREIGHT FORECAST</span>
-              <span class="pelagos-tag tag-model">BASELINE</span>
+              <span id="pelagos-forecast-tag" class="pelagos-tag tag-model"
+                >PERSISTENCE BASELINE</span
+              >
             </div>
             <div class="card-body">
               <div id="pelagos-forecast-content">
@@ -787,24 +1249,32 @@
                 </div>
                 <div class="pelagos-meta-list">
                   <div class="meta-row">
-                    <span class="meta-key">Target Period:</span>
+                    <span class="meta-key">Primary Target Period:</span>
                     <span id="pelagos-forecast-period" class="meta-val">—</span>
                   </div>
                   <div class="meta-row">
-                    <span class="meta-key">Model:</span>
+                    <span class="meta-key">Production Model:</span>
                     <span id="pelagos-forecast-model" class="meta-val">—</span>
                   </div>
                   <div class="meta-row">
-                    <span class="meta-key">Horizon:</span>
+                    <span class="meta-key">Primary Horizon:</span>
                     <span id="pelagos-forecast-horizon" class="meta-val"
                       >1 Month Forward</span
                     >
                   </div>
                 </div>
-                <div class="pelagos-disclaimer-callout">
-                  ⚠ <strong>Baseline forecast model</strong> — for strategic
-                  planning only; not a guaranteed commercial freight quote or
-                  trade execution offer.
+                <div
+                  id="pelagos-forecast-horizons-list"
+                  class="pelagos-forecast-horizons-list"
+                ></div>
+                <div
+                  id="pelagos-forecast-note"
+                  class="pelagos-disclaimer-callout"
+                >
+                  ⚠ <strong>Active Production Baseline: Persistence</strong> —
+                  experimental C3.2/C3.3 models have NOT been promoted to
+                  production. Flat persistence projections are naive benchmarks,
+                  not directional market-timing signals.
                 </div>
               </div>
               <div
@@ -813,6 +1283,76 @@
                 style="display: none"
               >
                 No predictive freight forecast model active for this corridor.
+              </div>
+            </div>
+          </div>
+
+          <!-- 5b. Environmental Conditions (Buoy Stations) -->
+          <div class="pelagos-card" id="pelagos-env-card">
+            <div class="card-header">
+              <span class="card-title">ENVIRONMENTAL CONDITIONS (BUOYS)</span>
+              <span id="pelagos-env-tag" class="pelagos-tag tag-unmonitored"
+                >—</span
+              >
+            </div>
+            <div class="card-body">
+              <div id="pelagos-env-content" style="display: none">
+                <div
+                  id="pelagos-env-meta"
+                  class="pelagos-submeta-summary"
+                ></div>
+                <div
+                  id="pelagos-env-stations"
+                  class="pelagos-env-stations-list"
+                ></div>
+                <div
+                  id="pelagos-env-notes"
+                  class="pelagos-disclaimer-callout"
+                ></div>
+              </div>
+              <div
+                id="pelagos-env-empty"
+                class="pelagos-empty-state"
+                style="display: none"
+              >
+                No corridor buoy observations available.
+              </div>
+            </div>
+          </div>
+
+          <!-- 5c. Bunker Fuel References Card -->
+          <div class="pelagos-card" id="pelagos-bunker-card">
+            <div class="card-header">
+              <span class="card-title">BUNKER FUEL REFERENCES</span>
+              <span id="pelagos-bunker-tag" class="pelagos-tag tag-unmonitored"
+                >—</span
+              >
+            </div>
+            <div class="card-body">
+              <div id="pelagos-bunker-content" style="display: none">
+                <div
+                  id="pelagos-bunker-provider"
+                  class="pelagos-submeta-summary"
+                ></div>
+                <div
+                  id="pelagos-bunker-hubs"
+                  class="pelagos-bunker-hubs-list"
+                ></div>
+                <div
+                  id="pelagos-bunker-benchmarks"
+                  class="pelagos-bunker-benchmarks-list"
+                ></div>
+                <div
+                  id="pelagos-bunker-disclaimer"
+                  class="pelagos-disclaimer-callout"
+                ></div>
+              </div>
+              <div
+                id="pelagos-bunker-empty"
+                class="pelagos-empty-state"
+                style="display: none"
+              >
+                Corridor bunker fuel prices are currently unavailable.
               </div>
             </div>
           </div>
