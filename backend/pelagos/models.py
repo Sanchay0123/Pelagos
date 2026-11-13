@@ -74,11 +74,11 @@ class VesselPosition(Base):
     vessel_name = Column(String(128), nullable=False)
     vessel_type = Column(String(64), nullable=False)
     vessel_type_code = Column(Integer, nullable=True)
-    
+
     # Geographic coordinates (WGS 84 sea-surface observation)
     latitude = Column(Float, nullable=False)
     longitude = Column(Float, nullable=False)
-    
+
     # Kinematics and dimensions
     speed_knots = Column(Float, nullable=True)
     course_degrees = Column(Float, nullable=True)
@@ -88,20 +88,20 @@ class VesselPosition(Base):
     width_meters = Column(Float, nullable=True)
     destination = Column(String(128), nullable=True)
     navigational_status = Column(String(64), nullable=True)
-    
+
     # Multi-dimensional temporal tracking (UTC)
     observation_time = Column(DateTime(timezone=True), nullable=False, index=True)
     publication_time = Column(DateTime(timezone=True), nullable=True)
     ingestion_time = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     processing_time = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
-    
+
     # Source provenance & licensing
     source_name = Column(String(128), nullable=False)
     source_partition = Column(String(128), nullable=True, index=True)
     ingestion_run_id = Column(Integer, nullable=True, index=True)
     license_type = Column(String(64), nullable=False)
     raw_record_id = Column(String(128), nullable=True)
-    
+
     # Deterministic idempotency key for deduplication (source:mmsi:observation_time)
     idempotency_key = Column(String(256), unique=True, index=True, nullable=False)
 
@@ -251,7 +251,7 @@ class FreightObservation(Base):
     raw_payload = Column(Text, nullable=True)
     idempotency_key = Column(String(256), unique=True, index=True, nullable=False)
     ingestion_run_id = Column(Integer, nullable=True)
-    
+
     # Audit-grade reconciliation fields (C1.1)
     is_reconstructed = Column(Boolean, nullable=False, default=False, server_default="0", index=True)
     original_rate_value = Column(Float, nullable=True)
@@ -313,6 +313,12 @@ class Port(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
 
+    # Port restriction and hydrography hierarchy relationships (Stage F1.3.2)
+    terminals = relationship("Terminal", back_populates="port", cascade="all, delete-orphan", foreign_keys="[Terminal.port_id]")
+    channel_reaches = relationship("ChannelReach", back_populates="port", cascade="all, delete-orphan", foreign_keys="[ChannelReach.port_id]")
+    restrictions = relationship("NavigationalRestriction", back_populates="port", cascade="all, delete-orphan", foreign_keys="[NavigationalRestriction.port_id]")
+    crosswalks = relationship("PortCrosswalk", back_populates="port", cascade="all, delete-orphan", foreign_keys="[PortCrosswalk.canonical_unlocode]")
+
     __table_args__ = (
         Index("idx_ports_lat_lon", "latitude", "longitude"),
         Index("idx_ports_region", "port_region"),
@@ -335,6 +341,246 @@ class PortAlias(Base):
 
     __table_args__ = (
         UniqueConstraint("port_unlocode", "alias_name", name="uq_port_alias_unlocode_name"),
+    )
+
+
+class RestrictionType:
+    """Standardized operational and hydrographic restriction categories."""
+    DRAFT_MAX = "DRAFT_MAX"
+    LOA_MAX = "LOA_MAX"
+    BEAM_MAX = "BEAM_MAX"
+    AIR_DRAFT_MAX = "AIR_DRAFT_MAX"
+    AIR_GAP_LIVE = "AIR_GAP_LIVE"
+    AIR_DRAFT_UNCONSTRAINED = "AIR_DRAFT_UNCONSTRAINED"
+    UKC_MIN = "UKC_MIN"
+    TIDAL_WINDOW = "TIDAL_WINDOW"
+    SPEED_MAX = "SPEED_MAX"
+    DAYLIGHT_ONLY = "DAYLIGHT_ONLY"
+
+
+class RestrictionScope:
+    """Scope of navigational applicability."""
+    PORT = "PORT"
+    TERMINAL = "TERMINAL"
+    BERTH = "BERTH"
+    CHANNEL_REACH = "CHANNEL_REACH"
+    BRIDGE = "BRIDGE"
+    CANAL_TRANSIT = "CANAL_TRANSIT"
+
+
+class FreshnessPolicy:
+    """Domain-specific validity and audit horizons."""
+    STATIC_INFRASTRUCTURE = "STATIC_INFRASTRUCTURE"      # e.g. wharf dimensions, deck elevation (1825 days / 5 years)
+    HYDROGRAPHIC_SURVEY = "HYDROGRAPHIC_SURVEY"          # e.g. certified berth pocket depth (365 days)
+    MAINTAINED_CHANNEL_PRISM = "MAINTAINED_CHANNEL_PRISM"# e.g. USACE authorized/maintained depths (365 days)
+    PILOTAGE_ADVISORY = "PILOTAGE_ADVISORY"              # e.g. bar pilots draft circular (90 days)
+    DAILY_FORECAST = "DAILY_FORECAST"                    # e.g. river draft forecast (30 days)
+    LIVE_SENSOR = "LIVE_SENSOR"                          # e.g. NOAA PORTS 6-min air gap (2 hours)
+
+
+class Terminal(Base):
+    """
+    Maritime terminal or navigation facility entity within a port.
+    Represents an industrial dock complex, marine terminal, or USACE navigation facility.
+    Traces to REQ-FR-CRI-012 and Stage F1.3.2.
+    """
+    __tablename__ = "terminals"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    port_id = Column(Integer, ForeignKey("ports.id", ondelete="CASCADE"), nullable=False, index=True)
+    port_unlocode = Column(String(5), ForeignKey("ports.unlocode", ondelete="CASCADE"), nullable=False, index=True)
+    terminal_code = Column(String(64), nullable=True, index=True)  # e.g. USACE NAV_UNIT_ID ('0YZ3', '0T84')
+    name = Column(String(256), nullable=False, index=True)
+    facility_type = Column(String(64), nullable=True)
+    operator_name = Column(String(256), nullable=True)
+    owner_name = Column(String(256), nullable=True)
+    waterway_name = Column(String(256), nullable=True)
+    river_mile = Column(Float, nullable=True)
+    bank = Column(String(16), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    primary_commodities = Column(Text, nullable=True)
+    handling_equipment = Column(Text, nullable=True)
+    rail_access = Column(String(128), nullable=True)
+    highway_access = Column(String(128), nullable=True)
+    source_system = Column(String(64), nullable=False)  # USACE_MASTER_DOCKS | PORT_AUTHORITY_GAZETTE | MANUAL_CURATED
+    source_record_id = Column(String(128), nullable=True)  # e.g. OBJECTID or LOC_DOCK
+    raw_attributes_json = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    port = relationship("Port", back_populates="terminals", foreign_keys=[port_id])
+    berths = relationship("Berth", back_populates="terminal", cascade="all, delete-orphan", foreign_keys="[Berth.terminal_id]")
+    restrictions = relationship("NavigationalRestriction", back_populates="terminal", foreign_keys="[NavigationalRestriction.terminal_id]")
+
+    __table_args__ = (
+        Index("idx_terminals_port_code", "port_unlocode", "terminal_code"),
+        Index("idx_terminals_name", "name"),
+    )
+
+
+class Berth(Base):
+    """
+    Individual berth or discrete berthing face within a terminal/facility.
+    Stores certified alongside depths, berthing length, and vessel dimensional limits.
+    Traces to Stage F1.3.2.
+    """
+    __tablename__ = "berths"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    terminal_id = Column(Integer, ForeignKey("terminals.id", ondelete="CASCADE"), nullable=False, index=True)
+    port_unlocode = Column(String(5), ForeignKey("ports.unlocode", ondelete="CASCADE"), nullable=False, index=True)
+    berth_code = Column(String(64), nullable=True, index=True)
+    berth_name = Column(String(256), nullable=False, index=True)
+    berthing_length_meters = Column(Float, nullable=True)
+    berthing_length_source_value = Column(Float, nullable=True)
+    alongside_depth_min_meters = Column(Float, nullable=True)
+    alongside_depth_max_meters = Column(Float, nullable=True)
+    depth_source_unit = Column(String(16), nullable=True)  # feet | meters
+    depth_source_value_min = Column(String(32), nullable=True)
+    depth_source_value_max = Column(String(32), nullable=True)
+    vertical_datum = Column(String(64), nullable=True)  # MLLW | MLG | MLT | LAT | CD
+    deck_height_min_meters = Column(Float, nullable=True)
+    deck_height_max_meters = Column(Float, nullable=True)
+    max_vessel_loa_meters = Column(Float, nullable=True)
+    max_vessel_beam_meters = Column(Float, nullable=True)
+    max_vessel_draft_meters = Column(Float, nullable=True)
+    source_record_id = Column(String(128), nullable=True)  # e.g. USACE Master Docks OBJECTID
+    survey_date = Column(DateTime(timezone=True), nullable=True)
+    is_conflicting = Column(Boolean, nullable=False, default=False)
+    conflict_details = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    terminal = relationship("Terminal", back_populates="berths", foreign_keys=[terminal_id])
+    restrictions = relationship("NavigationalRestriction", back_populates="berth", foreign_keys="[NavigationalRestriction.berth_id]")
+
+    __table_args__ = (
+        Index("idx_berths_terminal_name", "terminal_id", "berth_name"),
+        Index("idx_berths_unlocode", "port_unlocode"),
+    )
+
+
+class ChannelReach(Base):
+    """
+    Defined navigation reach, fairway segment, or channel prism in a port approach corridor.
+    Stores nominal maintained and authorized project depths with river mile markers.
+    Traces to USACE National Channel Framework and Stage F1.3.2.
+    """
+    __tablename__ = "channel_reaches"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    port_id = Column(Integer, ForeignKey("ports.id", ondelete="CASCADE"), nullable=False, index=True)
+    port_unlocode = Column(String(5), ForeignKey("ports.unlocode", ondelete="CASCADE"), nullable=False, index=True)
+    reach_code = Column(String(64), nullable=True, index=True)
+    reach_name = Column(String(256), nullable=False, index=True)
+    channel_name = Column(String(256), nullable=True)
+    depth_maintained_meters = Column(Float, nullable=True)
+    depth_authorized_meters = Column(Float, nullable=True)
+    depth_source_unit = Column(String(16), nullable=True)  # feet | meters
+    depth_maintained_source_value = Column(Float, nullable=True)
+    depth_authorized_source_value = Column(Float, nullable=True)
+    width_meters = Column(Float, nullable=True)
+    width_source_value = Column(Float, nullable=True)
+    mile_start = Column(Float, nullable=True)
+    mile_end = Column(Float, nullable=True)
+    vertical_datum = Column(String(64), nullable=True)
+    responsible_district = Column(String(64), nullable=True)  # CEMVN | CENWP | CESWG | CENWS
+    source_system = Column(String(64), nullable=False)  # USACE_NCF | PORT_AUTHORITY_GAZETTE
+    source_record_id = Column(String(128), nullable=True)  # OBJECTID in NCF
+    reach_category = Column(String(64), nullable=True)
+    reach_type = Column(String(64), nullable=True)
+    geometry_geojson = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    port = relationship("Port", back_populates="channel_reaches", foreign_keys=[port_id])
+    restrictions = relationship("NavigationalRestriction", back_populates="channel_reach", foreign_keys="[NavigationalRestriction.channel_reach_id]")
+
+    __table_args__ = (
+        Index("idx_channel_reaches_port_reach", "port_unlocode", "reach_name"),
+        Index("idx_channel_reaches_district", "responsible_district"),
+    )
+
+
+class NavigationalRestriction(Base):
+    """
+    Specific operational restriction, bridge clearance, air gap, tidal window, or draft rule.
+    Full provenance preservation: unit, datum, authority, validity, and freshness policy.
+    Traces to Stage F1.3.2 and REQ-NFR-DIP-001.
+    """
+    __tablename__ = "navigational_restrictions"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    port_id = Column(Integer, ForeignKey("ports.id", ondelete="CASCADE"), nullable=False, index=True)
+    port_unlocode = Column(String(5), ForeignKey("ports.unlocode", ondelete="CASCADE"), nullable=False, index=True)
+    terminal_id = Column(Integer, ForeignKey("terminals.id", ondelete="SET NULL"), nullable=True, index=True)
+    berth_id = Column(Integer, ForeignKey("berths.id", ondelete="SET NULL"), nullable=True, index=True)
+    channel_reach_id = Column(Integer, ForeignKey("channel_reaches.id", ondelete="SET NULL"), nullable=True, index=True)
+    restriction_type = Column(String(64), nullable=False, index=True)  # DRAFT_MAX | LOA_MAX | BEAM_MAX | AIR_DRAFT_MAX | AIR_GAP_LIVE | UKC_MIN | TIDAL_WINDOW
+    scope_type = Column(String(32), nullable=False)  # PORT | TERMINAL | BERTH | CHANNEL_REACH | BRIDGE
+    scope_name = Column(String(256), nullable=False)
+    numeric_limit = Column(Float, nullable=True)  # Normalized metric value (meters, knots, etc.)
+    source_value = Column(String(64), nullable=True)  # Original raw string or number
+    unit = Column(String(32), nullable=True)  # meters | feet | knots | percent | hours
+    vertical_datum = Column(String(64), nullable=True)  # MLLW | MLG | MLT | LAT | CD | MHW
+    water_density = Column(String(32), nullable=True)  # FRESH | BRACKISH | SALT | DOCK_WATER
+    operating_conditions = Column(Text, nullable=True)
+    is_conditional = Column(Boolean, nullable=False, default=False)
+    is_temporary = Column(Boolean, nullable=False, default=False)
+    valid_from = Column(DateTime(timezone=True), nullable=True)
+    valid_to = Column(DateTime(timezone=True), nullable=True)
+    freshness_policy = Column(String(64), nullable=False, default=FreshnessPolicy.STATIC_INFRASTRUCTURE)
+    survey_date = Column(DateTime(timezone=True), nullable=True)
+    source_publication_date = Column(DateTime(timezone=True), nullable=True)
+    is_conflicting = Column(Boolean, nullable=False, default=False)
+    conflict_details = Column(Text, nullable=True)
+    source_authority = Column(String(128), nullable=False)
+    source_url = Column(String(512), nullable=True)
+    source_publication_reference = Column(String(256), nullable=True)
+    provenance_id = Column(String(128), nullable=True)
+    verification_status = Column(String(32), nullable=False, default=VerificationStatus.DIRECTLY_VERIFIED)
+    retrieval_timestamp = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    observation_timestamp = Column(DateTime(timezone=True), nullable=True)
+    qc_flags = Column(String(64), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    port = relationship("Port", back_populates="restrictions", foreign_keys=[port_id])
+    terminal = relationship("Terminal", back_populates="restrictions", foreign_keys=[terminal_id])
+    berth = relationship("Berth", back_populates="restrictions", foreign_keys=[berth_id])
+    channel_reach = relationship("ChannelReach", back_populates="restrictions", foreign_keys=[channel_reach_id])
+
+    __table_args__ = (
+        Index("idx_nav_rest_port_type", "port_unlocode", "restriction_type"),
+        Index("idx_nav_rest_scope", "scope_type", "scope_name"),
+    )
+
+
+class PortCrosswalk(Base):
+    """
+    Deterministic crosswalk mapping between external source identifiers/names and Pelagos canonical ports.
+    Tracks match method and confidence score.
+    Traces to Stage F1.3.2.
+    """
+    __tablename__ = "port_crosswalks"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    source_system = Column(String(64), nullable=False, index=True)  # USACE_DOCKS | USACE_NCF | NOAA_PORTS | NGA_WPI
+    source_identifier = Column(String(128), nullable=False, index=True)  # e.g. 'KAM', 'TIW', 'GLS', 'LOG', '8762002'
+    source_port_name = Column(String(256), nullable=True)
+    canonical_unlocode = Column(String(5), ForeignKey("ports.unlocode", ondelete="CASCADE"), nullable=False, index=True)
+    match_method = Column(String(64), nullable=False)  # EXPLICIT_VERIFIED | EXACT_NAME | SPATIAL_BUFFER
+    confidence_score = Column(Float, nullable=False, default=1.0)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    port = relationship("Port", back_populates="crosswalks", foreign_keys=[canonical_unlocode])
+
+    __table_args__ = (
+        UniqueConstraint("source_system", "source_identifier", "canonical_unlocode", name="uq_port_crosswalk_src_id_unlocode"),
+        Index("idx_port_crosswalk_source", "source_system", "source_identifier"),
     )
 
 

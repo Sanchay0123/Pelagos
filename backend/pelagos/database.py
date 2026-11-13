@@ -164,6 +164,47 @@ def ensure_schema_compatibility(target_engine=None):
             import pelagos.models
             pelagos.models.BunkerPriceObservation.__table__.create(conn)
 
+        # Stage F1.3.2: Port, Terminal, Berth, Channel & Navigational Restriction Registry
+        if "terminals" not in table_names:
+            import pelagos.models
+            pelagos.models.Terminal.__table__.create(conn)
+
+        if "berths" not in table_names:
+            import pelagos.models
+            pelagos.models.Berth.__table__.create(conn)
+        else:
+            cols = {c["name"] for c in inspector.get_columns("berths")}
+            for col_name, col_type in [
+                ("source_record_id", "VARCHAR(128)"),
+                ("survey_date", "TIMESTAMP"),
+                ("is_conflicting", "BOOLEAN DEFAULT 0"),
+                ("conflict_details", "TEXT"),
+            ]:
+                if col_name not in cols:
+                    conn.execute(text(f"ALTER TABLE berths ADD COLUMN {col_name} {col_type}"))
+
+        if "channel_reaches" not in table_names:
+            import pelagos.models
+            pelagos.models.ChannelReach.__table__.create(conn)
+
+        if "navigational_restrictions" not in table_names:
+            import pelagos.models
+            pelagos.models.NavigationalRestriction.__table__.create(conn)
+        else:
+            cols = {c["name"] for c in inspector.get_columns("navigational_restrictions")}
+            for col_name, col_type in [
+                ("survey_date", "TIMESTAMP"),
+                ("source_publication_date", "TIMESTAMP"),
+                ("is_conflicting", "BOOLEAN DEFAULT 0"),
+                ("conflict_details", "TEXT"),
+            ]:
+                if col_name not in cols:
+                    conn.execute(text(f"ALTER TABLE navigational_restrictions ADD COLUMN {col_name} {col_type}"))
+
+        if "port_crosswalks" not in table_names:
+            import pelagos.models
+            pelagos.models.PortCrosswalk.__table__.create(conn)
+
         conn.commit()
 
 

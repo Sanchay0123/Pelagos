@@ -302,6 +302,13 @@ class PortConstraintEvaluation(BaseModel):
     )
     vessel_draft_meters: Optional[float] = None
     access_limitations: Optional[str] = None
+    channel_status: Optional[str] = Field(default=None, description="'SUITABLE', 'INSUITABLE', or 'UNVERIFIED'.")
+    berth_status: Optional[str] = Field(default=None, description="'SUITABLE', 'INSUITABLE', or 'UNVERIFIED'.")
+    air_draft_status: Optional[str] = Field(default=None, description="'SUITABLE', 'INSUITABLE', or 'UNVERIFIED'.")
+    channel_depth_meters: Optional[float] = None
+    berth_depth_meters: Optional[float] = None
+    air_gap_meters: Optional[float] = None
+    governing_restriction_type: Optional[str] = None
     reasons: List[str] = Field(default_factory=list)
     missing_requirements: List[str] = Field(default_factory=list)
 
@@ -375,6 +382,19 @@ class VesselCandidateMatch(BaseModel):
     is_physically_compatible: bool = Field(
         default=False,
         description="Physical compatibility based on LOA, beam, operational draft, and port/canal envelope.",
+    )
+    # Stage F1.3.2: Dimensional separation of port hydrography criteria
+    channel_compatibility_passed: Optional[bool] = Field(
+        default=None,
+        description="True if vessel clears certified channel reaches; False if exceeded; None if unverified.",
+    )
+    berth_compatibility_passed: Optional[bool] = Field(
+        default=None,
+        description="True if vessel clears certified berths; False if exceeded; None if unverified.",
+    )
+    air_draft_compatibility_passed: Optional[bool] = Field(
+        default=None,
+        description="True if vessel clears overhead bridge clearances; False if exceeded; None if unverified.",
     )
     cargo_capacity_passed: Optional[bool] = Field(
         default=None,
@@ -842,4 +862,3 @@ class CharterRecommendationResponse(BaseModel):
     )
     disclaimers: List[str] = Field(default_factory=lambda: list(SUITABILITY_COMMERCIAL_DISCLAIMERS))
     message: str = ""
-

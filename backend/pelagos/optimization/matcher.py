@@ -54,7 +54,8 @@ EARTH_RADIUS_NM: float = 3440.065
 # live draft/slot advisories from ACP are dynamic and NOT connected).
 TRADITIONAL_PANAMAX_MAX_BEAM_M: float = 32.31
 NEOPANAMAX_MAX_BEAM_M: float = 51.25
-NEOPANAMAX_MAX_LOA_M: float = 366.0
+NEOPANAMAX_HISTORICAL_MAX_LOA_M: float = 366.0  # ACP Notice to Shipping N-1-2016 baseline
+NEOPANAMAX_MAX_LOA_M: float = 370.33  # ACP Advisory to Shipping A-19-2021 & Notice to Shipping N-1-2024 operational maximum
 
 _PORT_DRAFT_METERS_RE = re.compile(r"(\d+(?:\.\d+)?)\s*m(?:eters?)?\s*draft\b", re.IGNORECASE)
 _PORT_DRAFT_FEET_RE = re.compile(
@@ -578,6 +579,8 @@ def evaluate_port_compatibility(
     explicit_max_draft_m: Optional[float] = None,
     explicit_max_loa_m: Optional[float] = None,
     explicit_max_beam_m: Optional[float] = None,
+    vessel_air_draft_m: Optional[float] = None,
+    port_registry: Optional[Any] = None,
 ) -> Optional[PortConstraintEvaluation]:
     """Evaluate vessel physical compatibility against a port's documented or verified limits."""
     if port is None:
@@ -587,6 +590,71 @@ def evaluate_port_compatibility(
     effective_draft_limit = explicit_max_draft_m if explicit_max_draft_m is not None else doc_draft_m
     reasons: List[str] = []
     missing_req: List[str] = []
+
+    channel_status: Optional[str] = None
+    berth_status: Optional[str] = None
+    air_draft_status: Optional[str] = None
+    channel_depth_meters: Optional[float] = None
+    berth_depth_meters: Optional[float] = None
+    air_gap_meters: Optional[float] = None
+    governing_restriction_type: Optional[str] = None
+
+    # Stage F1.3.2: Consult PortRegistry for certified channel, berth, and overhead restrictions
+    if port_registry is not None and port.port_id:
+        try:
+            canon_port = port_registry.resolve_canonical_port(port.port_id)
+            if canon_port:
+                comp = port_registry.evaluate_comprehensive_port_compatibility(
+                    port_unlocode=canon_port.unlocode,
+                    vessel_draft=vessel_draft_m or 0.0,
+                    vessel_loa=vessel_length_m,
+                    vessel_beam=vessel_width_m,
+                    vessel_air_draft=vessel_air_draft_m,
+                )
+                chan_res = comp["channel_compatibility"]
+                berth_res = comp["berth_compatibility"]
+                air_res = comp["air_draft_compatibility"]
+
+                channel_status = chan_res.get("status")
+                berth_status = berth_res.get("status")
+                air_draft_status = air_res.get("status")
+
+                channel_depth_meters = chan_res.get("governing_depth_meters")
+                if berth_res.get("berths_evaluated"):
+                    berth_depth_meters = berth_res["berths_evaluated"][0].get("alongside_depth_min_meters")
+                air_gap_meters = air_res.get("governing_air_draft_meters")
+
+                if comp["overall_status"] == "INSUITABLE":
+                    return PortConstraintEvaluation(
+                        port_id=port.port_id,
+                        port_name=port.name,
+                        role=role,
+                        status="incompatible",
+                        documented_draft_limit_meters=channel_depth_meters or effective_draft_limit,
+                        limit_source_note="certified_port_registry_restriction",
+                        vessel_draft_meters=vessel_draft_m,
+                        access_limitations=port.access_limitations or None,
+                        channel_status=channel_status,
+                        berth_status=berth_status,
+                        air_draft_status=air_draft_status,
+                        channel_depth_meters=channel_depth_meters,
+                        berth_depth_meters=berth_depth_meters,
+                        air_gap_meters=air_gap_meters,
+                        governing_restriction_type="PORT_RESTRICTION_EXCEEDED",
+                        reasons=comp["reasons"],
+                        missing_requirements=[],
+                    )
+                elif comp["overall_status"] == "UNVERIFIED":
+                    for r in comp["reasons"]:
+                        if r not in reasons:
+                            reasons.append(r)
+                    missing_req.append(f"{role}_certified_hydrography_unverified")
+                elif comp["overall_status"] == "SUITABLE":
+                    for r in comp["reasons"]:
+                        if r not in reasons:
+                            reasons.append(r)
+        except Exception as exc:
+            logger.debug("Port registry evaluation skipped: %s", exc)
 
     if effective_draft_limit is not None:
         if vessel_draft_m is None or vessel_draft_m <= 0:
@@ -604,6 +672,13 @@ def evaluate_port_compatibility(
                 limit_source_note=limit_clause or "explicit_verified_port_limit",
                 vessel_draft_meters=vessel_draft_m,
                 access_limitations=port.access_limitations or None,
+                channel_status=channel_status,
+                berth_status=berth_status,
+                air_draft_status=air_draft_status,
+                channel_depth_meters=channel_depth_meters,
+                berth_depth_meters=berth_depth_meters,
+                air_gap_meters=air_gap_meters,
+                governing_restriction_type=governing_restriction_type,
                 reasons=reasons,
                 missing_requirements=missing_req,
             )
@@ -621,6 +696,13 @@ def evaluate_port_compatibility(
                 limit_source_note=limit_clause or "explicit_verified_port_limit",
                 vessel_draft_meters=vessel_draft_m,
                 access_limitations=port.access_limitations or None,
+                channel_status=channel_status,
+                berth_status=berth_status,
+                air_draft_status=air_draft_status,
+                channel_depth_meters=channel_depth_meters,
+                berth_depth_meters=berth_depth_meters,
+                air_gap_meters=air_gap_meters,
+                governing_restriction_type=governing_restriction_type or "DOCUMENTED_DRAFT_EXCEEDED",
                 reasons=reasons,
                 missing_requirements=[],
             )
@@ -654,6 +736,13 @@ def evaluate_port_compatibility(
                     limit_source_note=limit_clause or "explicit_verified_port_limit",
                     vessel_draft_meters=vessel_draft_m,
                     access_limitations=port.access_limitations or None,
+                    channel_status=channel_status,
+                    berth_status=berth_status,
+                    air_draft_status=air_draft_status,
+                    channel_depth_meters=channel_depth_meters,
+                    berth_depth_meters=berth_depth_meters,
+                    air_gap_meters=air_gap_meters,
+                    governing_restriction_type=governing_restriction_type or f"{label}_EXCEEDED",
                     reasons=reasons,
                     missing_requirements=[],
                 )
@@ -672,6 +761,13 @@ def evaluate_port_compatibility(
         limit_source_note=limit_clause or ("explicit_verified_port_limit" if explicit_max_draft_m else None),
         vessel_draft_meters=vessel_draft_m,
         access_limitations=port.access_limitations or None,
+        channel_status=channel_status,
+        berth_status=berth_status,
+        air_draft_status=air_draft_status,
+        channel_depth_meters=channel_depth_meters,
+        berth_depth_meters=berth_depth_meters,
+        air_gap_meters=air_gap_meters,
+        governing_restriction_type=governing_restriction_type,
         reasons=reasons,
         missing_requirements=missing_req,
     )
@@ -685,6 +781,8 @@ def evaluate_route_compatibility(
     vessel_length_m: Optional[float],
     vessel_width_m: Optional[float],
     explicit_limits: Optional[Dict[str, Optional[float]]] = None,
+    vessel_air_draft_m: Optional[float] = None,
+    port_registry: Optional[Any] = None,
 ) -> RouteCompatibilityAssessment:
     """Evaluate vessel-to-route navigational, canal, and terminal compatibility."""
     limits = explicit_limits or {}
@@ -697,6 +795,8 @@ def evaluate_route_compatibility(
         explicit_max_draft_m=limits.get("origin_max_draft_meters"),
         explicit_max_loa_m=limits.get("origin_max_loa_meters"),
         explicit_max_beam_m=limits.get("origin_max_beam_meters"),
+        vessel_air_draft_m=vessel_air_draft_m,
+        port_registry=port_registry,
     )
     dest_eval = evaluate_port_compatibility(
         destination_port,
@@ -707,6 +807,8 @@ def evaluate_route_compatibility(
         explicit_max_draft_m=limits.get("destination_max_draft_meters"),
         explicit_max_loa_m=limits.get("destination_max_loa_meters"),
         explicit_max_beam_m=limits.get("destination_max_beam_meters"),
+        vessel_air_draft_m=vessel_air_draft_m,
+        port_registry=port_registry,
     )
 
     route_navigable = route_eval.get("route_navigable") if route_eval else None
@@ -747,8 +849,8 @@ def evaluate_route_compatibility(
             elif vessel_length_m is not None and vessel_length_m > NEOPANAMAX_MAX_LOA_M:
                 incompatible = True
                 msg = (
-                    f"Vessel LOA ({vessel_length_m:.1f}m) exceeds Panama Canal Neopanamax structural LOA envelope "
-                    f"({NEOPANAMAX_MAX_LOA_M:.1f}m)."
+                    f"Vessel LOA ({vessel_length_m:.1f}m) exceeds Panama Canal Neopanamax operational LOA envelope "
+                    f"({NEOPANAMAX_MAX_LOA_M:.2f}m under ACP Advisory A-19-2021 & Notice N-1-2024)."
                 )
                 canal_notes.append(msg)
                 reasons.append(msg)
@@ -886,6 +988,7 @@ def evaluate_vessel_suitability(
     commodity: str = "Agricultural Bulk Grain",
     hold_cleanliness_verified: Optional[bool] = None,
     explicit_limits: Optional[Dict[str, Optional[float]]] = None,
+    port_registry: Optional[Any] = None,
 ) -> VesselCandidateMatch:
     """Evaluate an individual genuine vessel observation for cargo and route suitability."""
     if now_utc is None:
@@ -900,6 +1003,9 @@ def evaluate_vessel_suitability(
     )
     eff_draft = vessel.draft_meters if (vessel.draft_meters and vessel.draft_meters > 0) else (
         registry_vessel.draft_max_meters if (registry_vessel and registry_vessel.draft_max_meters and registry_vessel.draft_max_meters > 0) else None
+    )
+    eff_air_draft = getattr(vessel, "air_draft_meters", None) if (getattr(vessel, "air_draft_meters", None) and getattr(vessel, "air_draft_meters", None) > 0) else (
+        registry_vessel.air_draft_meters if (registry_vessel and getattr(registry_vessel, "air_draft_meters", None) and registry_vessel.air_draft_meters > 0) else None
     )
     verified_dwt = None
     cap_status = "UNVERIFIED"
@@ -1029,7 +1135,17 @@ def evaluate_vessel_suitability(
         vessel_length_m=eff_length,
         vessel_width_m=eff_width,
         explicit_limits=explicit_limits,
+        vessel_air_draft_m=eff_air_draft,
+        port_registry=port_registry,
     )
+
+    chan_statuses = [pe.channel_status for pe in (route_compat.origin_port, route_compat.destination_port) if pe and pe.channel_status]
+    berth_statuses = [pe.berth_status for pe in (route_compat.origin_port, route_compat.destination_port) if pe and pe.berth_status]
+    air_statuses = [pe.air_draft_status for pe in (route_compat.origin_port, route_compat.destination_port) if pe and pe.air_draft_status]
+
+    chan_passed = False if "INSUITABLE" in chan_statuses else (True if "SUITABLE" in chan_statuses else None)
+    berth_passed = False if "INSUITABLE" in berth_statuses else (True if "SUITABLE" in berth_statuses else None)
+    air_passed = False if "INSUITABLE" in air_statuses else (True if "SUITABLE" in air_statuses else None)
 
     # 3. Vessel Type Check
     type_compatible, type_reason = is_dry_bulk_compatible_type(
@@ -1057,7 +1173,14 @@ def evaluate_vessel_suitability(
         overall_suitability_passed: bool = False,
         overall_suitability: SuitabilityStatus = SuitabilityStatus.UNVERIFIED,
         overall_suitability_status: str = "insufficient_data",
+        channel_compatibility_passed: Optional[bool] = None,
+        berth_compatibility_passed: Optional[bool] = None,
+        air_draft_compatibility_passed: Optional[bool] = None,
     ) -> VesselCandidateMatch:
+        eff_chan = channel_compatibility_passed if channel_compatibility_passed is not None else chan_passed
+        eff_berth = berth_compatibility_passed if berth_compatibility_passed is not None else berth_passed
+        eff_air = air_draft_compatibility_passed if air_draft_compatibility_passed is not None else air_passed
+
         return VesselCandidateMatch(
             mmsi=str(vessel.mmsi),
             imo=str(vessel.imo) if vessel.imo else None,
@@ -1079,6 +1202,9 @@ def evaluate_vessel_suitability(
             verified_cargo_capacity_dwt=round(verified_dwt, 1) if verified_dwt is not None else None,
             cargo_capacity_status=cap_status,
             is_physically_compatible=is_physically_compatible,
+            channel_compatibility_passed=eff_chan,
+            berth_compatibility_passed=eff_berth,
+            air_draft_compatibility_passed=eff_air,
             cargo_capacity_passed=cargo_capacity_passed,
             overall_suitability_passed=overall_suitability_passed,
             overall_suitability=overall_suitability,
@@ -1403,6 +1529,9 @@ def match_suitable_vessels(
     candidates: List[VesselCandidateMatch] = []
     potentially_suitable_count = 0
 
+    from pelagos.registry.port_registry import PortRegistry
+    port_reg = PortRegistry(db)
+
     for v in distinct_vessels:
         reg_v = registry_by_mmsi.get(str(v.mmsi).strip())
         match = evaluate_vessel_suitability(
@@ -1415,6 +1544,7 @@ def match_suitable_vessels(
             destination_port=dest_port,
             route_eval=route_eval,
             commodity=req.commodity,
+            port_registry=port_reg,
         )
         if match.suitability_status == SuitabilityStatus.POTENTIALLY_SUITABLE:
             potentially_suitable_count += 1
