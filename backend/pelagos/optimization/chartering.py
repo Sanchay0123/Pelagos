@@ -584,7 +584,11 @@ def recommend_charter_strategy(
     except Exception:
         env_summary = None
 
-    bunker_summary = resolve_corridor_bunker_fuel_references(corridor_code=route_code, db=db)
+    bunker_summary = resolve_corridor_bunker_fuel_references(
+        corridor_code=route_code,
+        db=db,
+        operational_mode=True,
+    )
 
     suitability_res = match_suitable_vessels(
         db=db,

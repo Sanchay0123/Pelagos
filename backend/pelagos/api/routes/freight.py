@@ -605,6 +605,7 @@ def _build_route_intelligence(
             corridor_code=corridor_code,
             db=db,
             as_of=as_of,
+            operational_mode=True,
         )
     except Exception as exc:
         logger.warning("Could not resolve bunker fuel references for corridor '%s': %s", corridor_code, exc)

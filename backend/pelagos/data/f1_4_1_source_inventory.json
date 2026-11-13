@@ -1,0 +1,545 @@
+{
+  "$schema": "pelagos-source-inventory-v1",
+  "version": "1.0.0",
+  "stage": "F1.4.1",
+  "title": "Pelagos Global Bunker & Voyage Economics Source Discovery Inventory",
+  "created_at": "2026-11-13T08:20:00Z",
+  "author": "Pelagos Core Intelligence & Optimization Team",
+  "baseline_commit": "0ebad18e3b357536dc4eb785b962bf23be68f891",
+  "sources_count": 18,
+  "sources": [
+    {
+      "source_id": "SRC-BUNKER-BFP-001",
+      "domain": "BUNKER_PRICES",
+      "operator": "Bunker Fuel Prices (bunkerfuelprices.com)",
+      "dataset_name": "Bunker Fuel Prices Public REST API (v1)",
+      "url": "https://bunkerfuelprices.com/api/v1/prices",
+      "fields_observed": [
+        "locode",
+        "port",
+        "country",
+        "grade",
+        "usdPerMt",
+        "kind",
+        "basis",
+        "source",
+        "observedAt",
+        "provenance"
+      ],
+      "geographic_coverage": "22 active ports in public response (includes USHOU, SGSIN, NLRTM, AEFJR, KRPUS, CNSGH, CNZOS, GIGIB, MTMLA, DKSKA, ARBUE, USNYC, USLAX). Excludes USSEA, USPDX, USMSY, JPYOK.",
+      "historical_coverage": "Current spot indications only; no public historical endpoint provided. 155 of 209 records withheld.",
+      "update_frequency": "Intraday / daily indications",
+      "units_and_currency": "Nominally USD/MT. Critical data integrity finding: Chinese ports (CNSGH, CNZOS) pass through upstream CNY figures (e.g. 5473 CNY, 6028 CNY) mislabeled as usdPerMt.",
+      "access_method": "Public REST API (JSON over HTTPS)",
+      "authentication_required": false,
+      "rate_limits": "Unspecified; automated bulk extraction prohibited by terms of service",
+      "licence_status": "Terms of Service Section 05 explicitly prohibits extracting data in bulk for competing services. Upstream feed from OilPriceAPI (licensed:oilpriceapi).",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "UNAVAILABLE",
+        "USG-JPN-BULK": "PARTIAL (Houston USHOU covered; New Orleans USMSY and Yokohama JPYOK unavailable)"
+      },
+      "limitations_and_gaps": "Severe currency mismatch on Chinese ports; 74% of records withheld; lacks PNW (Seattle/Portland), Mississippi River (New Orleans), and Japan (Yokohama); terms restrict automated commercial redistribution."
+    },
+    {
+      "source_id": "SRC-BUNKER-USDA-002",
+      "domain": "BUNKER_PRICES",
+      "operator": "U.S. Department of Agriculture (USDA) Agricultural Marketing Service (AMS)",
+      "dataset_name": "Daily Bunker Fuel Prices (Socrata Dataset 4v3x-mj86)",
+      "url": "https://agtransport.usda.gov/Fuel/Daily-Bunker-Fuel-Prices/4v3x-mj86",
+      "endpoint": "https://agtransport.usda.gov/resource/4v3x-mj86.json",
+      "fields_observed": [
+        "day",
+        "month",
+        "year",
+        "marine_gas_oil",
+        "intermdiate_fuel_oil_180cst",
+        "intermdiate_fuel_oil_380cst",
+        "vlsfo_fuel_oil_imo_2020_grade_0_5"
+      ],
+      "geographic_coverage": "Global 20-Port Average composite index (Busan, Colombo, Durban, Fujairah, Gibraltar, Hong Kong, Houston, Istanbul, LA/Long Beach, Las Palmas, Mumbai, New York, Panama, Piraeus, Rotterdam, Santos, Shanghai, Singapore, St Petersburg, Tokyo). Individual port breakdowns not provided.",
+      "historical_coverage": "2019-01-29 to 2022-11-29 (stale/discontinued after late 2022)",
+      "update_frequency": "Originally daily; currently discontinued/static historical archive",
+      "units_and_currency": "USD per metric ton ($/metric ton)",
+      "access_method": "Socrata Open Data API (SODA REST JSON, CSV, OData)",
+      "authentication_required": false,
+      "rate_limits": "Standard Socrata public API limits (app token recommended for high volume)",
+      "licence_status": "U.S. Government Open Data / Public Domain. Attribution: Ship & Bunker.",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "UNAVAILABLE (global composite only; no port-specific PNW or Japan quote)",
+        "USG-JPN-BULK": "UNAVAILABLE (global composite only; no port-specific USG quote)"
+      },
+      "limitations_and_gaps": "Composite average across 20 ports cannot be substituted for actual delivered port quotes; data series discontinued after November 2022."
+    },
+    {
+      "source_id": "SRC-BUNKER-SB-003",
+      "domain": "BUNKER_PRICES",
+      "operator": "Ship & Bunker (Bigport Media LLC)",
+      "dataset_name": "Ship & Bunker Global Port Price Intelligence & Spot Indices",
+      "url": "https://shipandbunker.com/prices",
+      "fields_observed": [
+        "Port Name",
+        "Country",
+        "Grade (VLSFO, MGO, IFO380, ULSFO, Bio-Bunkers B24/B30, LNG)",
+        "Price USD/MT",
+        "Change USD",
+        "Assessment Date",
+        "Historical 30-day / 1-year Price Trend"
+      ],
+      "geographic_coverage": "Over 150 ports globally, including Houston (USHOU), New York, Los Angeles, Singapore (SGSIN), Rotterdam (NLRTM), Fujairah (AEFJR), Tokyo/Yokohama (JPYOK), and Panama (PAPAC Balboa/Cristobal). Seattle and Portland have limited/intermittent secondary indications.",
+      "historical_coverage": "2012 to present (full historical archive available via commercial data suite)",
+      "update_frequency": "Daily assessed spot close",
+      "units_and_currency": "USD per metric tonne ($/MT)",
+      "access_method": "Public web portal (HTML view); commercial REST API & CSV download via Ship & Bunker Data Suite",
+      "authentication_required": "Free web access for current daily indications; subscription required for API / bulk historical access",
+      "rate_limits": "Commercial API subject to contracted tier",
+      "licence_status": "LICENSE_RESTRICTED (proprietary assessed data; terms prohibit automated scraping or redistribution without data license)",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "PARTIAL (Yokohama JPYOK available daily; Seattle/Portland covered sporadically or via US West Coast index)",
+        "USG-JPN-BULK": "VERIFIED (Houston USHOU, Panama PAPAC, and Yokohama JPYOK directly covered)"
+      },
+      "limitations_and_gaps": "Delivered physical prices are assessments, not confirmed supplier sales stems; programmatic ingestion requires commercial data license."
+    },
+    {
+      "source_id": "SRC-BUNKER-OILPRICE-004",
+      "domain": "BUNKER_PRICES",
+      "operator": "OilPriceAPI (oilpriceapi.com)",
+      "dataset_name": "OilPriceAPI Marine Bunker Fuels API Endpoint",
+      "url": "https://www.oilpriceapi.com/",
+      "endpoint": "https://api.oilpriceapi.com/v1/bunker-fuels",
+      "fields_observed": [
+        "code",
+        "name",
+        "price",
+        "currency",
+        "unit",
+        "port",
+        "grade",
+        "created_at"
+      ],
+      "geographic_coverage": "Global major hubs (Singapore, Rotterdam, Fujairah, Houston, Gibraltar, Hong Kong, Shanghai, Zhoushan, Buenos Aires). Pacific Northwest (Seattle/Portland) largely absent.",
+      "historical_coverage": "Historical daily time-series available to paid subscribers",
+      "update_frequency": "Near real-time / daily indications",
+      "units_and_currency": "Nominally USD/MT, but currency metadata inconsistencies observed on Chinese ports where CNY values are labeled as USD",
+      "access_method": "REST API (JSON over HTTPS)",
+      "authentication_required": "API Key required (Authorization: Bearer <TOKEN>)",
+      "rate_limits": "100 requests/month on free tier; paid tiers from $29 to $299/month for higher limits",
+      "licence_status": "Commercial API terms; redistribution governed by license tier",
+      "evidence_classification": "SOURCE_REPORTED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "UNAVAILABLE",
+        "USG-JPN-BULK": "PARTIAL (Houston USHOU covered; New Orleans USMSY and Yokohama JPYOK unverified/absent)"
+      },
+      "limitations_and_gaps": "Requires paid API key; upstream feed responsible for the currency label anomaly identified in bunkerfuelprices.com; lacks PNW coverage."
+    },
+    {
+      "source_id": "SRC-BUNKER-MPA-005",
+      "domain": "BUNKER_PRICES",
+      "operator": "Maritime and Port Authority of Singapore (MPA)",
+      "dataset_name": "MPA Monthly Bunker Sales Statistics & Licensed Bunker Suppliers Register",
+      "url": "https://www.mpa.gov.sg/port-marine-ops/marine-services/bunkering",
+      "fields_observed": [
+        "Year",
+        "Month",
+        "Bunker Sales Volume by Fuel Type (Metric Tonnes)",
+        "Bunker Grade Categories (LSFO, HSFO, MGO, Biofuels, LNG)",
+        "Licensed Bunker Supplier Names & Contact",
+        "Licensed Bunker Craft Operator Registers"
+      ],
+      "geographic_coverage": "Port of Singapore (SGSIN)",
+      "historical_coverage": "1995 to present (monthly time series)",
+      "update_frequency": "Monthly statistical release",
+      "units_and_currency": "Sales volume in Metric Tonnes (MT). Commercial transaction prices are NOT published.",
+      "access_method": "Web download (CSV / Excel via data.gov.sg and MPA web portal)",
+      "authentication_required": false,
+      "rate_limits": "None",
+      "licence_status": "Singapore Open Data Licence",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "UNAVAILABLE (volume only, wrong geography)",
+        "USG-JPN-BULK": "UNAVAILABLE (volume only, wrong geography)"
+      },
+      "limitations_and_gaps": "Does not publish bunker prices; confirms that statutory port authorities regulate standards (SS 648 / TR 48) and track volume, but leave fuel pricing to private commercial markets."
+    },
+    {
+      "source_id": "SRC-CONSUMPTION-EU-MRV-006",
+      "domain": "VESSEL_CONSUMPTION",
+      "operator": "European Commission / European Maritime Safety Agency (EMSA)",
+      "dataset_name": "THETIS-MRV Public Emissions & Fuel Consumption Dataset (Regulation (EU) 2015/757 & 2023/1805)",
+      "url": "https://mrv.emsa.europa.eu/#public/emission-report",
+      "fields_observed": [
+        "IMO Number",
+        "Ship Name",
+        "Ship Type",
+        "Technical Efficiency (EEDI / EIV in gCO2/t-nm)",
+        "Total Fuel Consumption by Grade (HFO, LFO, MGO, LNG in metric tonnes)",
+        "Total CO2 Emissions (metric tonnes)",
+        "Distance Travelled (nautical miles)",
+        "Time Spent at Sea (hours)",
+        "Annual Average Fuel Consumption per Distance (kg/nm)",
+        "Annual Average Fuel Consumption per Transport Work (g/t-nm)",
+        "Company Name and Verifier Details"
+      ],
+      "geographic_coverage": "Global commercial fleet calling European Economic Area (EEA) ports (12,000+ vessels annually)",
+      "historical_coverage": "2018 to present (annual reporting periods released by June 30 each year)",
+      "update_frequency": "Annual official publication",
+      "units_and_currency": "Metric tonnes of fuel, metric tonnes of CO2, nautical miles, hours, gCO2/t-nm",
+      "access_method": "Direct public bulk download (XLSX / CSV) and web interface; no login required",
+      "authentication_required": false,
+      "rate_limits": "None for public bulk download",
+      "licence_status": "Public sector data / European Union Open Access",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "PARTIAL (covers bulk carriers that have called EEA ports; provides annual baseline verification)",
+        "USG-JPN-BULK": "PARTIAL (covers bulk carriers that have called EEA ports; provides annual baseline verification)"
+      },
+      "limitations_and_gaps": "Reports vessel-reported annual aggregated consumption (Category 2), NOT per-voyage or operational speed-consumption curves (e.g. 12 knots ballast vs 14 knots laden); restricted to vessels with at least one EEA port call during the reporting year."
+    },
+    {
+      "source_id": "SRC-CONSUMPTION-MAN-CEAS-007",
+      "domain": "VESSEL_CONSUMPTION",
+      "operator": "MAN Energy Solutions SE",
+      "dataset_name": "MAN CEAS Engine Calculation & Application System",
+      "url": "https://www.man-es.com/marine/products/planning-tools-and-downloads/ceas-engine-calculations",
+      "fields_observed": [
+        "Engine Model (e.g. 6S50ME-C, 6S60ME-C, 6S70ME-C)",
+        "Specified Maximum Continuous Rating (SMCR kW and RPM)",
+        "Specific Fuel Oil Consumption (SFOC in g/kWh)",
+        "Engine Load Percentages (50%, 75%, 85%, 100% MCR)",
+        "Daily Fuel Consumption by Load (metric tonnes/day)",
+        "ISO Reference Conditions (42,700 kJ/kg LCV, 1000 mbar, 25C)",
+        "Auxiliary Blower Operation & Dual-Fuel (ME-GI / ME-LGI) Gas Heat Rates"
+      ],
+      "geographic_coverage": "Global (applicable to all MAN B&W low-speed 2-stroke diesel engines)",
+      "historical_coverage": "Current engine technical specifications and historical catalog across engine generations",
+      "update_frequency": "Updated periodically with engine design releases",
+      "units_and_currency": "kW, RPM, g/kWh, MT/day",
+      "access_method": "Web application and downloadable calculation software",
+      "authentication_required": "Free web access with registration",
+      "rate_limits": "None for interactive usage",
+      "licence_status": "Proprietary technical tool; technical specifications intended for maritime project planning",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "VERIFIED (applies to MAN B&W powered Panamax/Kamsarmax/Capesize bulkers)",
+        "USG-JPN-BULK": "VERIFIED (applies to MAN B&W powered Panamax/Kamsarmax/Capesize bulkers)"
+      },
+      "limitations_and_gaps": "Engine manufacturer theoretical testbed curves (Category 4); requires naval architectural hull resistance and propulsion power curves to translate vessel speed (knots) to engine load (kW) in laden and ballast conditions; does not reflect hull fouling or weather margins."
+    },
+    {
+      "source_id": "SRC-CONSUMPTION-WINGD-008",
+      "domain": "VESSEL_CONSUMPTION",
+      "operator": "WinGD (Winterthur Gas & Diesel Ltd)",
+      "dataset_name": "WinGD General Technical Data (GTD) & Engine Project Guides",
+      "url": "https://www.wingd.com/en/products/planning-tools/gtd/",
+      "fields_observed": [
+        "Engine Series (X52, X62, X72, RT-flex)",
+        "SMCR Power (kW) and Speed (RPM)",
+        "SFOC Curves across Load Spectrum (g/kWh)",
+        "Daily Fuel Oil Consumption at Sea (MT/day)",
+        "Exhaust Gas Flow and Heat Recovery Data"
+      ],
+      "geographic_coverage": "Global (applicable to WinGD / Wärtsilä 2-stroke low-speed engines)",
+      "historical_coverage": "Current and historical engine documentation",
+      "update_frequency": "Continuous / per technical revision",
+      "units_and_currency": "kW, RPM, g/kWh, MT/day",
+      "access_method": "Online web application and PDF Project Guides",
+      "authentication_required": "Free registration required",
+      "rate_limits": "None",
+      "licence_status": "Proprietary technical documentation for marine engineering",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "VERIFIED (applies to WinGD-powered bulk carriers)",
+        "USG-JPN-BULK": "VERIFIED (applies to WinGD-powered bulk carriers)"
+      },
+      "limitations_and_gaps": "Theoretical engine performance (Category 4); requires external propulsion power estimation to link vessel sea speed to engine output."
+    },
+    {
+      "source_id": "SRC-CONSUMPTION-IMO-GHG4-009",
+      "domain": "VESSEL_CONSUMPTION",
+      "operator": "International Maritime Organization (IMO) / Consortium led by CE Delft",
+      "dataset_name": "Fourth IMO GHG Study 2020 Final Report & Bottom-Up Annexes",
+      "url": "https://www.imo.org/en/OurWork/Environment/Pages/Fourth-IMO-Greenhouse-Gas-Study-2020.aspx",
+      "fields_observed": [
+        "Ship Type (Bulk Carrier, Container, Tanker, General Cargo)",
+        "Size Bins (Bulk Carrier 0-9,999; 10,000-34,999; 35,000-59,999; 60,000-99,999; 100,000-199,999; 200,000+ DWT)",
+        "Design Speed vs Operational Speed Distribution (knots)",
+        "Main Engine Power (kW) and Auxiliary Engine Power (kW)",
+        "Specific Fuel Consumption (g/kWh by engine age and tier)",
+        "Daily Fuel Consumption by Operational Phase (Sea, Manoeuvring, Berth/Port)",
+        "DWT-Specific Baseline Consumption Curves"
+      ],
+      "geographic_coverage": "Global international maritime fleet",
+      "historical_coverage": "Empirical baseline period 2012–2018",
+      "update_frequency": "Periodic (approx every 5–6 years; Fourth Study published 2020)",
+      "units_and_currency": "DWT, knots, kW, g/kWh, MT/day, tonnes CO2",
+      "access_method": "Public download (Full Study PDF and Supplementary Data Tables)",
+      "authentication_required": false,
+      "rate_limits": "None",
+      "licence_status": "IMO Copyright / Public Document for International Maritime Policy",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "VERIFIED (provides empirical class-level baseline for Panamax 60-99k DWT and Capesize 100-199k DWT)",
+        "USG-JPN-BULK": "VERIFIED (provides empirical class-level baseline for Panamax 60-99k DWT and Capesize 100-199k DWT)"
+      },
+      "limitations_and_gaps": "Generic vessel-class statistical averages (Category 5); cannot represent vessel-specific mechanical condition, eco-electronic engine tuning, or hull coating quality."
+    },
+    {
+      "source_id": "SRC-EXPENSE-PORT-SEATTLE-010",
+      "domain": "PORT_EXPENSES",
+      "operator": "Port of Seattle & The Northwest Seaport Alliance (NWSA)",
+      "dataset_name": "Port of Seattle Terminals Tariff No. 5 & NWSA Tariff No. 300",
+      "url": "https://www.portseattle.org/maritime/tariffs",
+      "fields_observed": [
+        "Item 7000: Dockage Rate Schedule by LOA (Length Overall in feet/meters)",
+        "Dockage Assessment Basis: 24-hour periods or fraction thereof",
+        "Wharfage Rates by Commodity (Bulk grain, general cargo $/MT)",
+        "Service and Facility Charges",
+        "Harbor Security Fee ($/call or percentage)",
+        "Water Quality & Environmental Compliance Rules"
+      ],
+      "geographic_coverage": "Port of Seattle, Puget Sound, Washington, USA (USSEA)",
+      "historical_coverage": "Annual tariff revisions (effective January 1 of each calendar year)",
+      "update_frequency": "Annual / periodic amendments",
+      "units_and_currency": "USD ($) per 24 hours (dockage based on LOA), USD per metric ton (wharfage)",
+      "access_method": "Public PDF tariff publication",
+      "authentication_required": false,
+      "rate_limits": "None",
+      "licence_status": "Public regulatory tariff",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "VERIFIED (authoritative departure port tariff for Seattle)",
+        "USG-JPN-BULK": "UNAVAILABLE (outside corridor scope)"
+      },
+      "limitations_and_gaps": "Official statutory tariff does not include pilotage (separate Puget Sound Pilots tariff), tug assists (commercial tug company contracts), line handling, or customs agency fees."
+    },
+    {
+      "source_id": "SRC-EXPENSE-PORT-PORTLAND-011",
+      "domain": "PORT_EXPENSES",
+      "operator": "Port of Portland, Oregon",
+      "dataset_name": "Port of Portland Marine Terminals Tariff No. 500",
+      "url": "https://www.portofportland.com/tariffs",
+      "fields_observed": [
+        "Section 700: Dockage Rates based on LOA (Length Overall in meters)",
+        "Berthage and Lay Status Discounts",
+        "Wharfage Charges by Commodity (Grain, mineral bulk)",
+        "Freshwater Delivery Charges ($/1000 gallons)",
+        "Terminal Security Fees ($/vessel/day)"
+      ],
+      "geographic_coverage": "Port of Portland, Columbia River, Oregon, USA (USPDX)",
+      "historical_coverage": "Annual tariff revisions",
+      "update_frequency": "Annual",
+      "units_and_currency": "USD ($)",
+      "access_method": "Public PDF tariff publication",
+      "authentication_required": false,
+      "rate_limits": "None",
+      "licence_status": "Public regulatory tariff",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "VERIFIED (authoritative departure port tariff for Portland)",
+        "USG-JPN-BULK": "UNAVAILABLE (outside corridor scope)"
+      },
+      "limitations_and_gaps": "Does not include dual pilotage fees for Columbia River Bar Pilots (Sea-Astoria) and Columbia River Pilots (Astoria-Portland)."
+    },
+    {
+      "source_id": "SRC-EXPENSE-PORT-HOUSTON-012",
+      "domain": "PORT_EXPENSES",
+      "operator": "Port of Houston Authority (Port Houston)",
+      "dataset_name": "Port of Houston Authority Tariff No. 8",
+      "url": "https://porthouston.com/tariffs/",
+      "fields_observed": [
+        "Subrule 073: Dockage Rates based on LOA (Length Overall in feet/meters)",
+        "Dockage Assessment per 24 hours",
+        "Sheddage and Marginal Track Use Charges",
+        "Wharfage Rates on Dry Bulk Cargo",
+        "Harbor Safety & Security Assessment Fee",
+        "Water & Utility Charges"
+      ],
+      "geographic_coverage": "Port of Houston, Texas, USA (USHOU)",
+      "historical_coverage": "Annual revisions (current 2024–2026 schedules published)",
+      "update_frequency": "Annual / periodic adjustments",
+      "units_and_currency": "USD ($)",
+      "access_method": "Public PDF and web tariff publication",
+      "authentication_required": false,
+      "rate_limits": "None",
+      "licence_status": "Public regulatory tariff",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "UNAVAILABLE (outside corridor scope)",
+        "USG-JPN-BULK": "VERIFIED (authoritative departure port tariff for Houston)"
+      },
+      "limitations_and_gaps": "Excludes Houston Pilots Association fees (draft + unit charge), commercial assist tugs, and line handling."
+    },
+    {
+      "source_id": "SRC-EXPENSE-PORT-NOLA-013",
+      "domain": "PORT_EXPENSES",
+      "operator": "Board of Commissioners of the Port of New Orleans",
+      "dataset_name": "Port of New Orleans Dock Department Tariff No. 2",
+      "url": "https://portnola.com/tariffs",
+      "fields_observed": [
+        "Item 100-150: Dockage Charges based on LOA and Gross Registered Tonnage (GRT)",
+        "Harbor Fee Assessments based on DWT/GRT categories",
+        "Wharfage Charges per Short Ton / Metric Ton",
+        "Security Surcharge Fee",
+        "Fresh Water Supply Charges"
+      ],
+      "geographic_coverage": "Port of New Orleans, Louisiana, USA (USMSY)",
+      "historical_coverage": "Annual tariff revisions",
+      "update_frequency": "Annual",
+      "units_and_currency": "USD ($)",
+      "access_method": "Public PDF tariff publication",
+      "authentication_required": false,
+      "rate_limits": "None",
+      "licence_status": "Public regulatory tariff",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "UNAVAILABLE (outside corridor scope)",
+        "USG-JPN-BULK": "VERIFIED (authoritative departure port tariff for New Orleans)"
+      },
+      "limitations_and_gaps": "Excludes Associated Branch Pilots (Bar) and Crescent River Port Pilots (River) tariffs, and mid-stream grain elevator buoy/barge fleeting charges."
+    },
+    {
+      "source_id": "SRC-EXPENSE-PORT-YOKOHAMA-014",
+      "domain": "PORT_EXPENSES",
+      "operator": "City of Yokohama Port & Harbor Bureau / Port of Yokohama",
+      "dataset_name": "Port of Yokohama Port Regulations, Port Dues & Berthage Tariff",
+      "url": "https://www.city.yokohama.lg.jp/city-info/yokohamashi/org/koan/",
+      "fields_observed": [
+        "Port Entry Dues (JPY per Gross Ton / GT)",
+        "Berthage Charges (JPY per GT per 24-hour period)",
+        "Wharf Facility Usage Charges",
+        "Tugboat Assistance Tariff Guidelines",
+        "Garbage Disposal & Water Supply Fees"
+      ],
+      "geographic_coverage": "Port of Yokohama, Tokyo Bay, Japan (JPYOK)",
+      "historical_coverage": "Municipal gazette revisions",
+      "update_frequency": "Periodic statutory updates",
+      "units_and_currency": "Japanese Yen (JPY)",
+      "access_method": "Public municipal portal (Japanese and English summary guides)",
+      "authentication_required": false,
+      "rate_limits": "None",
+      "licence_status": "Japanese Municipal Public Information",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "VERIFIED (authoritative destination port tariff for Yokohama)",
+        "USG-JPN-BULK": "VERIFIED (authoritative destination port tariff for Yokohama)"
+      },
+      "limitations_and_gaps": "Excludes Tokyo Bay Pilots Association mandatory pilotage fees (calculated by JPY baseline + GT and draft tiers) and commercial tug line fees; requires USD/JPY exchange rate conversion."
+    },
+    {
+      "source_id": "SRC-EXPENSE-CANAL-PANAMA-015",
+      "domain": "CANAL_EXPENSES",
+      "operator": "Panama Canal Authority (ACP — Autoridad del Canal de Panamá)",
+      "dataset_name": "Panama Canal Maritime Regulations & Official Toll Tariff Schedules",
+      "url": "https://pancanal.com/en/tolls/",
+      "fields_observed": [
+        "Dry Bulk Toll Rate Schedule (Laden rate and Ballast rate per PC/UMS Net Ton)",
+        "Fixed Transit Reservation / Booking Fee by Vessel Category (Regular, Super, Neopanamax)",
+        "Freshwater Surcharge (FWS): $10,000 fixed fee + variable percentage (1% to 10%) based on daily Gatun Lake water stage",
+        "Tugboat Assistance Charges per Lockage (number of tugs determined by beam/LOA)",
+        "Linehandler and Locomotive / Mules Charges",
+        "Security and Transit Inspection Fees",
+        "Disruptive Vessel Transit Surcharges"
+      ],
+      "geographic_coverage": "Panama Canal Interoceanic Waterway (Balboa PAPAC / Cristobal)",
+      "historical_coverage": "Official tariff circulars (Advisories to Shipping No. A-42-2022, A-34-2023, Notice to Shipping N-1-2024 to 2026)",
+      "update_frequency": "Published statutory circulars and daily Gatun Lake hydrological updates",
+      "units_and_currency": "USD ($)",
+      "access_method": "Public web portal, official circular PDFs, and ACP Online Toll Calculator",
+      "authentication_required": false,
+      "rate_limits": "None for static tariff publications",
+      "licence_status": "Official Panama Canal Authority statutory regulations",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "UNAVAILABLE (transpacific route does not transit Panama Canal)",
+        "USG-JPN-BULK": "VERIFIED (governing canal expense for US Gulf to Japan route)"
+      },
+      "limitations_and_gaps": "Auction slot fees (which surge during drought restrictions) are dynamic market auctions and cannot be predicted from baseline tariff schedules alone."
+    },
+    {
+      "source_id": "SRC-EXPENSE-CANAL-SUEZ-016",
+      "domain": "CANAL_EXPENSES",
+      "operator": "Suez Canal Authority (SCA)",
+      "dataset_name": "Suez Canal Navigation Circulars & Toll Tariff Regulations",
+      "url": "https://www.suezcanal.gov.eg/",
+      "fields_observed": [
+        "Suez Canal Net Tonnage (SCNet) Toll Rates by Ship Category",
+        "Dry Bulk Carrier Laden vs Ballast Tariffs",
+        "Special Drawing Rights (SDR) Exchange Valuation",
+        "Tiered Deck Cargo Surcharges",
+        "Mandatory Escort Tug and Mooring Boat Fees",
+        "Canal Pilotage Fees"
+      ],
+      "geographic_coverage": "Suez Canal, Egypt (Port Said / Suez)",
+      "historical_coverage": "Annual SCA circular revisions",
+      "update_frequency": "Annual / periodic circular announcements",
+      "units_and_currency": "Special Drawing Rights (SDR), converted to USD at daily IMF exchange rate",
+      "access_method": "Public website and official PDF circulars",
+      "authentication_required": false,
+      "rate_limits": "None",
+      "licence_status": "Official Suez Canal Authority regulatory circulars",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "UNAVAILABLE (outside corridor scope)",
+        "USG-JPN-BULK": "PARTIAL (alternative route if Panama Canal is blocked or Cape of Good Hope / Suez routing is selected)"
+      },
+      "limitations_and_gaps": "SDR conversion requires daily IMF exchange rate lookup; geopolitical security surcharges in Red Sea approach are separate commercial war-risk insurance premiums."
+    },
+    {
+      "source_id": "SRC-EXPENSE-EMISSIONS-EUETS-017",
+      "domain": "EMISSIONS_EXPENSES",
+      "operator": "European Union / European Commission (DG CLIMA)",
+      "dataset_name": "EU Emissions Trading System (EU ETS) Maritime Directive (EU) 2023/959",
+      "url": "https://climate.ec.europa.eu/eu-action/eu-emissions-trading-system-eu-ets/reducing-emissions-shipping-sector_en",
+      "fields_observed": [
+        "Scope: Commercial vessels >= 5,000 GT entering/leaving EU/EEA ports",
+        "Surrender Obligations: 40% (2024), 70% (2025), 100% (2026) of verified CO2 emissions",
+        "Geographic Multiplier: 100% between EU ports; 50% for inbound/outbound international voyages",
+        "Eligible Allowances: European Union Allowances (EUA) in EUR per tonne of CO2",
+        "Approved Fuel Emission Factors (tCO2/tFuel: HFO=3.114, LFO=3.151, MGO=3.206, LNG=2.750)"
+      ],
+      "geographic_coverage": "European Economic Area voyages and international voyages connecting to EEA ports",
+      "historical_coverage": "Statutory inception January 1, 2024 to present",
+      "update_frequency": "Statutory annual compliance cycle; daily EUA carbon price market",
+      "units_and_currency": "EUR (€) per EUA / metric tonne CO2",
+      "access_method": "Public European Commission legislation and EEX / ICE carbon market spot feeds",
+      "authentication_required": false,
+      "rate_limits": "None for regulatory directives",
+      "licence_status": "European Union Legislation / Public Law",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "UNAVAILABLE (transpacific trade does not touch EU jurisdiction)",
+        "USG-JPN-BULK": "UNAVAILABLE (US Gulf to Japan trade does not touch EU jurisdiction; relevant only for benchmarking global carbon liabilities)"
+      },
+      "limitations_and_gaps": "Requires live EUA carbon spot price feed; not legally applicable to PNW-JPN or USG-JPN corridors unless intermediate port calls in EU territories occur."
+    },
+    {
+      "source_id": "SRC-EXPENSE-EMISSIONS-FUELEU-018",
+      "domain": "EMISSIONS_EXPENSES",
+      "operator": "European Union / European Parliament & Council",
+      "dataset_name": "FuelEU Maritime Regulation (EU) 2023/1805",
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32023R1805",
+      "fields_observed": [
+        "Well-to-Wake (WtW) GHG Intensity Target (gCO2eq/MJ of energy used)",
+        "Compliance Reduction Targets: -2% (2025), -6% (2030), -14.5% (2035), -80% (2050)",
+        "Financial Penalty per Energy Deficit: EUR 2,400 per tonne VLSFO equivalent deficit",
+        "Mandatory Onshore Power Supply (OPS) at berth for passenger and container vessels"
+      ],
+      "geographic_coverage": "Vessels calling EU/EEA ports",
+      "historical_coverage": "Effective January 1, 2025 onwards",
+      "update_frequency": "Statutory 5-year reduction step-downs",
+      "units_and_currency": "gCO2eq/MJ and EUR (€) compliance penalty",
+      "access_method": "Public European Union statutory regulation",
+      "authentication_required": false,
+      "rate_limits": "None",
+      "licence_status": "European Union Legislation / Public Law",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "corridor_relevance": {
+        "PNW-JPN-BULK": "UNAVAILABLE (outside EU jurisdiction)",
+        "USG-JPN-BULK": "UNAVAILABLE (outside EU jurisdiction)"
+      },
+      "limitations_and_gaps": "Does not apply to Pacific bulk trade corridors; establishes emerging regulatory framework for lifecycle alternative bunker economics."
+    }
+  ]
+}

@@ -79,6 +79,10 @@ class BunkerFuelSummary(BaseModel):
     latest_quotes: List[BunkerPriceQuote] = Field(default_factory=list)
     regional_benchmarks: List[BunkerPriceQuote] = Field(default_factory=list)
     notes: Optional[str] = None
+    licensing_status: str = "PENDING_PROVIDER_PERMISSION"
+    operational_availability: str = "UNAVAILABLE"
+    operational_use_permitted: bool = False
+    data_governance_role: str = "HISTORICAL_AUDIT_EVIDENCE"
     disclaimer: str = (
         "Indicative prices only. Not an offer to sell and not a substitute for a firm quote. "
         "Commercial spot bunker prices require supplier confirmation for stem size, delivery window, and specification."
@@ -143,21 +147,26 @@ STANDARD_BENCHMARK_GRADES = [
 
 
 def evaluate_bunker_freshness(
-    obs_time: datetime.datetime,
-    ref_time: datetime.datetime,
+    obs_time: Optional[datetime.datetime],
+    ref_time: Optional[datetime.datetime] = None,
 ) -> Tuple[str, float]:
     """Evaluate bunker price observation freshness relative to reference timestamp.
 
     - <= 24.0 hours: fresh (active trading session)
     - <= 168.0 hours (7 days): recent (standard weekly indication)
     - > 168.0 hours: stale
+    - obs_time is None: unknown
     """
+    if obs_time is None:
+        return "unknown", -1.0
+
+    ref = ref_time or datetime.datetime.now(datetime.timezone.utc)
     if obs_time.tzinfo is None:
         obs_time = obs_time.replace(tzinfo=datetime.timezone.utc)
-    if ref_time.tzinfo is None:
-        ref_time = ref_time.replace(tzinfo=datetime.timezone.utc)
+    if ref.tzinfo is None:
+        ref = ref.replace(tzinfo=datetime.timezone.utc)
 
-    diff = (ref_time - obs_time).total_seconds()
+    diff = (ref - obs_time).total_seconds()
     age_hours = round(max(0.0, diff / 3600.0), 2)
 
     if age_hours <= 24.0:
@@ -172,6 +181,7 @@ def resolve_corridor_bunker_fuel_references(
     corridor_code: str,
     db: Optional[Session] = None,
     as_of: Optional[str] = None,
+    operational_mode: bool = False,
 ) -> BunkerFuelSummary:
     """Resolve bunker fuel reference data and genuine market quotes for a freight corridor.
 
@@ -179,10 +189,14 @@ def resolve_corridor_bunker_fuel_references(
     If quotes are unavailable or withheld by the provider for corridor hubs, returns
     explicit 'unavailable' status per hub and for the corridor without synthetic substitution.
 
+    When operational_mode=True, restricted provider-derived observations with
+    PENDING_PROVIDER_PERMISSION are barred from entering operational calculations.
+
     Args:
         corridor_code: Monitored trade corridor code (e.g. PNW-JPN-BULK, USG-JPN-BULK).
         db: Optional active SQLAlchemy session.
         as_of: Optional ISO 8601 evaluation timestamp for deterministic freshness.
+        operational_mode: If True, enforces strict operational gating excluding restricted audit evidence.
 
     Returns:
         BunkerFuelSummary with hub-by-hub availability, genuine quotes, and licensing context.
@@ -231,6 +245,54 @@ def resolve_corridor_bunker_fuel_references(
     corridor_port_ids = {h.port_id for h in hubs if h.port_id}
     all_corridor_quotes: List[BunkerPriceQuote] = []
     regional_benchmarks: List[BunkerPriceQuote] = []
+
+    if operational_mode:
+        # In operational mode, provider-derived observations with PENDING_PROVIDER_PERMISSION
+        # cannot enter operational calculations.
+        for hub in hubs:
+            hub.status = "unavailable"
+            hub.availability_reason = (
+                f"Direct commercial bunker spot price benchmarks (e.g. S&P Global Platts, Argus Media, Ship & Bunker) "
+                f"are not licensed or integrated for these specific hubs. Bunker Fuel Prices ({PROVIDER_NAME}) "
+                f"observations are restricted historical audit evidence pending provider permission and barred "
+                f"from operational calculations. Pelagos strictly prohibits fabricating synthetic bunker prices "
+                f"or substituting crude oil/agricultural proxies."
+            )
+            hub.quotes = []
+
+        overall_status = "unavailable"
+        reason = (
+            f"Direct commercial bunker spot price benchmarks are not licensed or integrated for these specific hubs. "
+            f"Bunker Fuel Prices ({PROVIDER_NAME}) observations are restricted historical audit evidence pending "
+            f"provider permission and barred from operational calculations. Pelagos strictly prohibits fabricating "
+            f"synthetic bunker prices or substituting crude oil/agricultural proxies."
+        )
+
+        return BunkerFuelSummary(
+            provider=PROVIDER_NAME,
+            provider_url=PROVIDER_URL,
+            status=overall_status,
+            reason=reason,
+            required_source=(
+                f"Commercial spot bunker price assessment from {PROVIDER_NAME} or equivalent licensed benchmark "
+                f"providing delivered market prices for VLSFO (0.5% S), LSMGO (0.1% S), and HSFO at corridor bunkering ports in USD/MT."
+            ),
+            bunkering_hubs_in_scope=hubs,
+            benchmark_fuel_grades=STANDARD_BENCHMARK_GRADES,
+            unit="USD/MT",
+            currency="USD",
+            hubs_with_prices_count=0,
+            latest_quotes=[],
+            regional_benchmarks=[],
+            licensing_status="PENDING_PROVIDER_PERMISSION",
+            operational_availability="UNAVAILABLE",
+            operational_use_permitted=False,
+            data_governance_role="RESTRICTED_HISTORICAL_AUDIT_ONLY",
+            notes=(
+                "Restricted provider-derived observations are barred from operational calculations. "
+                "Stored observations are preserved solely as historical audit evidence."
+            ),
+        )
 
     if db is not None:
         try:
@@ -370,5 +432,9 @@ def resolve_corridor_bunker_fuel_references(
         hubs_with_prices_count=hubs_with_prices,
         latest_quotes=all_corridor_quotes,
         regional_benchmarks=regional_benchmarks,
+        licensing_status="PENDING_PROVIDER_PERMISSION",
+        operational_availability="RESTRICTED_HISTORICAL_AUDIT_ONLY",
+        operational_use_permitted=False,
+        data_governance_role="HISTORICAL_AUDIT_EVIDENCE",
         notes=notes,
     )

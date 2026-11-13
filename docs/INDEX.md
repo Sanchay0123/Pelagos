@@ -3,9 +3,9 @@ title: Pelagos Documentation Index
 document_id: DOC-003
 type: documentation_index
 status: approved
-version: 1.0.28
+version: 1.0.29
 created: 2026-10-10
-updated: 2026-11-12
+updated: 2026-11-13
 tags:
   - index
   - navigation
@@ -60,6 +60,7 @@ N/A
 * [Coordinated GUI Maritime Routing Integration (ROUT-005)](./routing/D9.4-increment-3-gui-integration.md) (v1.0.0, Status: Accepted)
 * [Commercial Freight Route Intelligence Specification (ROUT-006)](./routing/D9.5-commercial-freight-route-intelligence.md) (v1.0.1, Status: Accepted)
 * [Forecast Cadence Reconciliation Decision Record (OD-ROUT-06-01)](./routing/od-rout-06-01-forecasting-horizons-amendment-proposal.md) (v1.0.0, Status: Approved)
+* [Marine Bunker Fuel Intelligence & Data Quality Specification (SPEC-BUNKER-001)](./BUNKER_INTELLIGENCE.md) (v1.0.0, Status: Approved)
 
 ### Engineering and Operations
 * [Stage E1 Platform Data Overview & Detailed Data Explorer Specification (API-001)](./architecture/platform-data-explorer.md) (v1.0.2, Status: Under Review)
