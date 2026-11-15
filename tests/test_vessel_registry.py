@@ -419,10 +419,11 @@ def test_seed_ingestion_idempotency(mem_db: Session):
     assert res1["total_candidates"] == 6
     assert res1["created_count"] == 6
     assert res1["updated_count"] == 0
-    assert res1["provenance_records_recorded"] == 66
+    # 66 base statutory attributes + 42 verified/reported machinery & cargo gear attributes across 6 vessels = 108
+    assert res1["provenance_records_recorded"] == 108
 
     assert mem_db.query(Vessel).count() == 6
-    assert mem_db.query(VesselAttributeProvenance).count() == 66
+    assert mem_db.query(VesselAttributeProvenance).count() == 108
     assert mem_db.query(VesselMmsiHistory).count() == 6
 
     # Run 2: repeated ingestion
@@ -430,11 +431,11 @@ def test_seed_ingestion_idempotency(mem_db: Session):
     assert res2["total_candidates"] == 6
     assert res2["created_count"] == 0
     assert res2["updated_count"] == 6
-    assert res2["provenance_records_recorded"] == 66
+    assert res2["provenance_records_recorded"] == 108
 
     # Assert no duplicate vessels or provenance records
     assert mem_db.query(Vessel).count() == 6
-    assert mem_db.query(VesselAttributeProvenance).count() == 66
+    assert mem_db.query(VesselAttributeProvenance).count() == 108
     assert mem_db.query(VesselMmsiHistory).count() == 6
 
 

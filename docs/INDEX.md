@@ -3,9 +3,9 @@ title: Pelagos Documentation Index
 document_id: DOC-003
 type: documentation_index
 status: approved
-version: 1.0.29
+version: 1.0.30
 created: 2026-10-10
-updated: 2026-11-13
+updated: 2026-11-15
 tags:
   - index
   - navigation
@@ -61,6 +61,10 @@ N/A
 * [Commercial Freight Route Intelligence Specification (ROUT-006)](./routing/D9.5-commercial-freight-route-intelligence.md) (v1.0.1, Status: Accepted)
 * [Forecast Cadence Reconciliation Decision Record (OD-ROUT-06-01)](./routing/od-rout-06-01-forecasting-horizons-amendment-proposal.md) (v1.0.0, Status: Approved)
 * [Marine Bunker Fuel Intelligence & Data Quality Specification (SPEC-BUNKER-001)](./BUNKER_INTELLIGENCE.md) (v1.0.0, Status: Approved)
+* [Global Bunker & Voyage Economics Source Discovery (DISC-F141-001)](./F1_4_1_BUNKER_VOYAGE_ECONOMICS_SOURCE_DISCOVERY.md) (v1.0.0, Status: Completed)
+* [Vessel Fuel Consumption Intelligence Discovery & Machinery Registry (DISC-F1422-001-ADDENDUM)](./F1_4_2_2_FUEL_CONSUMPTION_INTELLIGENCE_DISCOVERY.md) (v1.2.0, Status: Completed — Stage F1.4.2.2a Implemented)
+* [Engine SFOC Library & Load-Curve Parameterization Specification (SPEC-F1422B-001)](./F1_4_2_2B_ENGINE_SFOC_LIBRARY.md) (v1.0.0, Status: Completed & Verified — Stage F1.4.2.2b Implemented)
+* [Vessel Fuel Consumption Intelligence Specification (DOC-F1422C-001-REV3)](./F1_4_2_2C_VESSEL_FUEL_INTELLIGENCE.md) (v1.3.0, Status: Approved Statutory Evidence & Technical Consistency Standard — Stage F1.4.2.2c, F1.4.2.2c.1, F1.4.2.2c.2 & F1.4.2.2c.3 Implemented)
 
 ### Engineering and Operations
 * [Stage E1 Platform Data Overview & Detailed Data Explorer Specification (API-001)](./architecture/platform-data-explorer.md) (v1.0.2, Status: Under Review)
@@ -134,3 +138,5 @@ Links to established, governed documentation within the repository, and maps pla
 | 1.0.26 | 2026-11-11 | Implementation Agent | Registered Stage E1 Platform Data Overview & Detailed Data Explorer Specification (`API-001`, v1.0.0); synchronized Project Overview (v1.0.5) and System Architecture Specification (v1.0.3). Status: approved. |
 | 1.0.27 | 2026-11-12 | Implementation Agent | Synchronized `API-001` reference (`v1.0.1`, updated `2026-11-12`) after Stage E1 documentation-code alignment pass. Status: approved. |
 | 1.0.28 | 2026-11-12 | Implementation Agent | Synchronized `API-001` reference (`v1.0.2`, updated `2026-11-12`) following C3.2/C3.3 experimental benchmark visibility integration inside `#/explorer/datasets`. Status: approved. |
+| 1.0.29 | 2026-11-15 | Implementation Agent | Registered Stage F1.4.2.2c.2 Vessel Fuel Consumption Intelligence Specification (`DOC-F1422C-001-REV2`, v1.2.0) with statutory evidence distinction, CSR brake power governance, unverified 15% sea margin, and continuous rated-power boundary overload semantics. Status: approved. |
+| 1.0.30 | 2026-11-15 | Implementation Agent | Registered Stage F1.4.2.2c.3 Vessel Fuel Consumption Intelligence Specification (`DOC-F1422C-001-REV3`, v1.3.0) with CSR 85% MCR derivation investigation, flywheel brake power physical consistency, and qualified overload boundary semantics. Status: approved. |

@@ -128,6 +128,18 @@ def ensure_schema_compatibility(target_engine=None):
                 ("grain_cubic_meters", "FLOAT"),
                 ("holds_count", "INTEGER"),
                 ("hatches_count", "INTEGER"),
+                ("engine_manufacturer", "VARCHAR(128)"),
+                ("engine_model", "VARCHAR(128)"),
+                ("engine_variant", "VARCHAR(128)"),
+                ("engine_builder", "VARCHAR(128)"),
+                ("cylinder_count", "INTEGER"),
+                ("bore_mm", "FLOAT"),
+                ("stroke_mm", "FLOAT"),
+                ("rated_power_kw", "FLOAT"),
+                ("rated_rpm", "FLOAT"),
+                ("is_geared", "BOOLEAN"),
+                ("crane_count", "INTEGER"),
+                ("crane_swl_tonnes", "FLOAT"),
             ]:
                 if col_name not in cols:
                     conn.execute(text(f"ALTER TABLE vessels ADD COLUMN {col_name} {col_type}"))
@@ -204,6 +216,52 @@ def ensure_schema_compatibility(target_engine=None):
         if "port_crosswalks" not in table_names:
             import pelagos.models
             pelagos.models.PortCrosswalk.__table__.create(conn)
+
+        # Stage F1.4.2.2b: Engine SFOC Library & Load-Curve Parameterization
+        if "engine_sfoc_curves" not in table_names:
+            import pelagos.models
+            pelagos.models.EngineSfocCurve.__table__.create(conn)
+        else:
+            cols = {c["name"] for c in inspector.get_columns("engine_sfoc_curves")}
+            if "authenticity_status" not in cols:
+                conn.execute(text("ALTER TABLE engine_sfoc_curves ADD COLUMN authenticity_status VARCHAR(32) DEFAULT 'DIRECTLY_VERIFIED'"))
+            if "permitted_use" not in cols:
+                conn.execute(text("ALTER TABLE engine_sfoc_curves ADD COLUMN permitted_use VARCHAR(64) DEFAULT 'RESEARCH_ONLY'"))
+            if "source_citation_details" not in cols:
+                conn.execute(text("ALTER TABLE engine_sfoc_curves ADD COLUMN source_citation_details VARCHAR(256)"))
+            if "is_aggregate_research" not in cols:
+                conn.execute(text("ALTER TABLE engine_sfoc_curves ADD COLUMN is_aggregate_research BOOLEAN DEFAULT 0"))
+
+        if "engine_sfoc_load_points" not in table_names:
+            import pelagos.models
+            pelagos.models.EngineSfocLoadPoint.__table__.create(conn)
+
+        # Stage F1.4.2.2c: Vessel Hydrostatics & Benchmark Hydrodynamics
+        if "vessel_hydrostatics" not in table_names:
+            import pelagos.models
+            pelagos.models.VesselHydrostatics.__table__.create(conn)
+        else:
+            cols = {c["name"] for c in inspector.get_columns("vessel_hydrostatics")}
+            for col_name, col_type in [
+                ("lightweight_tonnage_mt", "FLOAT"),
+                ("laden_displacement_mt", "FLOAT"),
+                ("ballast_displacement_mt", "FLOAT"),
+                ("design_speed_knots", "FLOAT"),
+                ("design_draft_meters", "FLOAT"),
+                ("design_power_kw", "FLOAT"),
+                ("design_power_definition", "VARCHAR(32)"),
+                ("calibrated_admiralty_coefficient", "FLOAT"),
+                ("ballast_admiralty_coefficient", "FLOAT"),
+                ("source_name", "VARCHAR(128)"),
+                ("source_record_id", "VARCHAR(64)"),
+                ("source_url", "VARCHAR(512)"),
+                ("retrieval_date", "VARCHAR(32)"),
+                ("verification_status", "VARCHAR(32)"),
+                ("permitted_use", "VARCHAR(32)"),
+                ("notes", "TEXT"),
+            ]:
+                if col_name not in cols:
+                    conn.execute(text(f"ALTER TABLE vessel_hydrostatics ADD COLUMN {col_name} {col_type}"))
 
         conn.commit()
 

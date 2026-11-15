@@ -45,6 +45,18 @@ DOMAIN_SOURCE_PREFERENCES: Dict[str, Set[str]] = {
     "length_meters": {"uscg_psix", "classnk", "dnv", "lloyds_register", "class survey"},
     "width_meters": {"uscg_psix", "classnk", "dnv", "lloyds_register", "class survey"},
     "draft_max_meters": {"classnk", "dnv", "lloyds_register", "class survey"},
+    "engine_manufacturer": {"classnk", "dnv", "lloyds_register", "bureau_veritas", "class survey"},
+    "engine_model": {"classnk", "dnv", "lloyds_register", "bureau_veritas", "class survey"},
+    "engine_variant": {"classnk", "dnv", "lloyds_register", "bureau_veritas", "class survey"},
+    "engine_builder": {"classnk", "dnv", "lloyds_register", "bureau_veritas", "class survey"},
+    "cylinder_count": {"classnk", "dnv", "lloyds_register", "bureau_veritas", "class survey"},
+    "bore_mm": {"classnk", "dnv", "lloyds_register", "bureau_veritas", "class survey"},
+    "stroke_mm": {"classnk", "dnv", "lloyds_register", "bureau_veritas", "class survey"},
+    "rated_power_kw": {"classnk", "dnv", "lloyds_register", "bureau_veritas", "class survey"},
+    "rated_rpm": {"classnk", "dnv", "lloyds_register", "bureau_veritas", "class survey"},
+    "is_geared": {"classnk", "dnv", "lloyds_register", "bureau_veritas", "uscg_psix", "class survey"},
+    "crane_count": {"classnk", "dnv", "lloyds_register", "bureau_veritas", "uscg_psix", "class survey"},
+    "crane_swl_tonnes": {"classnk", "dnv", "lloyds_register", "bureau_veritas", "class survey"},
 }
 
 
@@ -174,8 +186,223 @@ def classify_attribute_difference(
             return False, "measurement_definition_difference", f"Bulk subtype classification variance ('{s1}' vs '{s2}')."
         return True, "genuine_conflict", f"Contradictory vessel type classification ('{s1}' vs '{s2}')."
 
+    # Stage F1.4.2.2a: Machinery & Cargo Gear Particulars Difference Classification
+    if attr in {"bore_mm", "stroke_mm"}:
+        try:
+            n1 = float(val1)
+            n2 = float(val2)
+        except (ValueError, TypeError):
+            return True, "genuine_conflict", f"Unparseable numeric comparison for {attribute_name}: '{val1}' vs '{val2}'"
+        diff = abs(n1 - n2)
+        max_val = max(abs(n1), abs(n2), 1e-6)
+        rel_diff = diff / max_val
+        if rel_diff <= 0.005:  # <= 0.5% (e.g. 600mm vs 600.0mm or metric rounding)
+            return False, "rounding_difference", f"{attribute_name} diff ({diff:.1f} mm) within rounding tolerance."
+        return True, "genuine_conflict", f"{attribute_name} divergence ({diff:.1f} mm) exceeds 0.5% tolerance."
+
+    if attr == "rated_power_kw":
+        try:
+            n1 = float(val1)
+            n2 = float(val2)
+        except (ValueError, TypeError):
+            return True, "genuine_conflict", f"Unparseable power comparison: '{val1}' vs '{val2}'"
+        diff = abs(n1 - n2)
+        max_val = max(abs(n1), abs(n2), 1e-6)
+        rel_diff = diff / max_val
+        if rel_diff <= 0.01:  # <= 1% rounding
+            return False, "rounding_difference", f"Rated power diff ({diff:.1f} kW, {rel_diff*100:.2f}%) within rounding/PS conversion tolerance."
+        # MCR vs CSR (typically CSR is 80-90% of MCR, so rel_diff 5% - 25%)
+        if 0.05 <= rel_diff <= 0.25:
+            return False, "measurement_definition_difference", f"Power diff ({diff:.1f} kW, {rel_diff*100:.1f}%) aligns with Continuous Service Rating (CSR) vs Maximum Continuous Rating (MCR) definition."
+        return True, "genuine_conflict", f"Power divergence ({diff:.1f} kW, {rel_diff*100:.1f}%) exceeds MCR/CSR envelope."
+
+    if attr == "rated_rpm":
+        try:
+            n1 = float(val1)
+            n2 = float(val2)
+        except (ValueError, TypeError):
+            return True, "genuine_conflict", f"Unparseable RPM comparison: '{val1}' vs '{val2}'"
+        diff = abs(n1 - n2)
+        if diff <= 1.0:
+            return False, "rounding_difference", f"RPM diff ({diff:.1f} rpm) within rounding tolerance."
+        # MCR vs CSR rpm (typically ~5-15% lower rpm)
+        rel_diff = diff / max(abs(n1), abs(n2), 1e-6)
+        if rel_diff <= 0.15:
+            return False, "measurement_definition_difference", f"RPM diff ({diff:.1f} rpm) aligns with CSR vs MCR rpm operating point."
+        return True, "genuine_conflict", f"RPM divergence ({diff:.1f} rpm) exceeds operating envelope."
+
+    if attr in {"cylinder_count", "cylinders_count", "crane_count", "cranes_count"}:
+        try:
+            i1 = int(val1)
+            i2 = int(val2)
+            if i1 == i2:
+                return False, None, None
+            return True, "genuine_conflict", f"Contradictory {attribute_name} count: {i1} vs {i2}"
+        except (ValueError, TypeError):
+            return True, "genuine_conflict", f"Unparseable integer count for {attribute_name}: '{val1}' vs '{val2}'"
+
+    if attr == "crane_swl_tonnes":
+        try:
+            n1 = float(val1)
+            n2 = float(val2)
+        except (ValueError, TypeError):
+            return True, "genuine_conflict", f"Unparseable crane SWL comparison: '{val1}' vs '{val2}'"
+        diff = abs(n1 - n2)
+        if diff <= 0.5:
+            return False, "rounding_difference", f"Crane SWL diff ({diff:.1f} MT) within rounding tolerance."
+        return True, "genuine_conflict", f"Crane SWL divergence ({diff:.1f} MT) exceeds 0.5 MT."
+
+    if attr == "is_geared":
+        b1 = str(val1).lower() in {"true", "1", "yes", "geared"}
+        b2 = str(val2).lower() in {"true", "1", "yes", "geared"}
+        if b1 == b2:
+            return False, None, None
+        return True, "genuine_conflict", f"Contradictory cargo gear status: {b1} vs {b2}"
+
+    if attr in {"engine_manufacturer", "engine_builder"}:
+        s1_clean = " ".join(s1.lower().replace(",", "").replace(".", "").split())
+        s2_clean = " ".join(s2.lower().replace(",", "").replace(".", "").split())
+        if s1_clean == s2_clean:
+            return False, None, None
+        # Common licensee or subsidiary representations
+        common_pairs = [
+            ("kawasaki", "kawasaki heavy industries"),
+            ("mitsui", "mitsui e&s"),
+            ("mitsui", "mitsui e&s machinery"),
+            ("man", "man energy solutions"),
+            ("man b&w", "man energy solutions"),
+            ("wingd", "winterthur gas & diesel"),
+            ("wingd", "wartsila"),
+            ("cmd", "cssc-mes diesel"),
+            ("dmd", "dalian marine diesel"),
+        ]
+        for a, b in common_pairs:
+            if (a in s1_clean and b in s2_clean) or (b in s1_clean and a in s2_clean):
+                return False, "measurement_definition_difference", f"Manufacturer/builder naming variance ('{s1}' vs '{s2}')."
+        return True, "genuine_conflict", f"Contradictory engine maker/builder: '{s1}' vs '{s2}'"
+
+    if attr in {"engine_model", "engine_variant"}:
+        s1_clean = s1.upper().replace(" ", "").replace("-", "")
+        s2_clean = s2.upper().replace(" ", "").replace("-", "")
+        if s1_clean == s2_clean:
+            return False, None, None
+        # Model family match (e.g. 6S60MEC vs 6S60MEC8 or 6S60MEC8.2)
+        if s1_clean in s2_clean or s2_clean in s1_clean:
+            return False, "measurement_definition_difference", f"Engine model generation/variant variance ('{s1}' vs '{s2}')."
+        return True, "genuine_conflict", f"Contradictory engine model: '{s1}' vs '{s2}'"
+
     # Default fallback
     return True, "genuine_conflict", f"Contradictory attribute value for {attribute_name}: '{s1}' vs '{s2}'"
+
+
+def validate_cargo_gear_evidence(
+    attribute_name: str,
+    value: Any,
+    verification_status: str,
+    source_rationale: Optional[str] = None,
+) -> Tuple[bool, Optional[str]]:
+    """Validate that cargo gear evidence classifications conform to maritime provenance standards.
+
+    Rules:
+    1. A missing source field must never be interpreted as a verified zero.
+    2. crane_count = 0 is DIRECTLY_VERIFIED only where the source explicitly establishes
+       that the vessel has no cranes or cargo-handling equipment.
+    3. crane_swl_tonnes = None must not be classified as DIRECTLY_VERIFIED merely because
+       the source does not report a value. Use UNAVAILABLE.
+    4. is_geared = False must not be inferred solely from the absence of cargo-handling
+       machinery in a class register.
+    5. Preserve existing source-reported evidence without upgrading its status.
+
+    Returns:
+        (is_valid, error_or_warning_message)
+    """
+    attr = attribute_name.lower().strip()
+    status = str(verification_status).strip().upper()
+    rationale = (source_rationale or "").strip().lower()
+
+    if attr == "crane_swl_tonnes":
+        if (value is None or str(value).strip().lower() in {"none", "null", ""}) and status == VerificationStatus.DIRECTLY_VERIFIED:
+            return False, "crane_swl_tonnes = None cannot be DIRECTLY_VERIFIED; absent value must be classified as UNAVAILABLE."
+
+    if attr == "crane_count":
+        if value == 0 and status == VerificationStatus.DIRECTLY_VERIFIED:
+            explicit_tokens = {"explicit", "certified zero", "none registered", "no cranes", "statutory certificate", "zero cranes"}
+            if not any(token in rationale for token in explicit_tokens) and any(neg in rationale for neg in {"absence", "no cargo handling deck machinery registered"}):
+                return False, "crane_count = 0 cannot be DIRECTLY_VERIFIED solely from absence in a register; requires explicit source certification."
+
+    if attr == "is_geared":
+        if value is False and status == VerificationStatus.DIRECTLY_VERIFIED:
+            if any(neg in rationale for neg in {"absence", "no cargo handling deck machinery registered"}):
+                return False, "is_geared = False cannot be DIRECTLY_VERIFIED solely from the absence of cargo-handling machinery in a register."
+
+    return True, None
+
+
+def validate_machinery_power_consistency(
+    cylinder_count: Optional[int],
+    rated_power_kw: Optional[float],
+    power_per_cylinder_kw: Optional[float] = None,
+    power_definition: Optional[str] = None,
+    power_per_cylinder_definition: Optional[str] = None,
+) -> Tuple[bool, Optional[str]]:
+    """Validate consistency between total rated power and cylinder count * power per cylinder.
+
+    Guarantees:
+    - Distinguishes total rated power from per-cylinder power (detects per-cylinder confusion).
+    - Preserves distinction between MCR, CSR, SMCR, NCR, etc.
+    - Compares values only when power definitions are compatible.
+    - Missing or incompatible inputs return an unverified/skipped result rather than a false conflict.
+    - Validates mathematical equality: P_total = n_cyl * P_cyl (+-5% tolerance).
+
+    Returns:
+        (is_consistent, message)
+    """
+    if cylinder_count is None or rated_power_kw is None:
+        return True, None
+    if cylinder_count <= 0 or rated_power_kw <= 0:
+        return False, f"Non-positive cylinder count ({cylinder_count}) or rated power ({rated_power_kw} kW)"
+
+    # Detect if total rated power was accidentally provided as per-cylinder power
+    if cylinder_count > 1 and power_per_cylinder_kw is not None and power_per_cylinder_kw > 0:
+        rel_to_cyl = abs(rated_power_kw - power_per_cylinder_kw) / power_per_cylinder_kw
+        if rel_to_cyl <= 0.10 and cylinder_count >= 3:
+            return False, (
+                f"Rated power ({rated_power_kw:.1f} kW) appears to be per-cylinder power rather than "
+                f"total rated power for {cylinder_count} cylinders (expected ~{cylinder_count * power_per_cylinder_kw:.1f} kW)."
+            )
+
+    if power_per_cylinder_kw is None or power_per_cylinder_kw <= 0:
+        return True, None
+
+    # Rating definition compatibility check
+    def_p = (power_definition or "").strip().upper()
+    def_cyl = (power_per_cylinder_definition or "").strip().upper()
+
+    # If both definitions are provided and differ incompatibly (e.g. MCR vs CSR)
+    if def_p and def_cyl and def_p != def_cyl:
+        compatible_pairs = {
+            ("MCR", "SMCR"),
+            ("SMCR", "MCR"),
+            ("CSR", "NCR"),
+            ("NCR", "CSR"),
+        }
+        if (def_p, def_cyl) not in compatible_pairs:
+            # Incompatible power definitions: do not produce a false conflict
+            return True, (
+                f"Power consistency check skipped: incompatible rating definitions "
+                f"('{def_p}' vs '{def_cyl}'). Continuous rating cannot be directly equated with maximum rating."
+            )
+
+    expected_total = cylinder_count * power_per_cylinder_kw
+    diff = abs(expected_total - rated_power_kw)
+    rel_diff = diff / max(expected_total, rated_power_kw)
+    if rel_diff > 0.05:  # > 5% discrepancy
+        return False, (
+            f"Power inconsistency: {cylinder_count} cyl * {power_per_cylinder_kw:.1f} kW/cyl = "
+            f"{expected_total:.1f} kW, but reported rated power is {rated_power_kw:.1f} kW "
+            f"(discrepancy: {diff:.1f} kW, {rel_diff*100:.1f}%)"
+        )
+    return True, None
 
 
 class VesselRegistryError(Exception):
@@ -476,7 +703,46 @@ class VesselRegistry:
             except (ValueError, TypeError):
                 return raw_str, None, "int_parse_failed"
 
-        if attr in {"vessel_name", "vessel_type", "vessel_class", "flag_country", "flag_code"}:
+        # Stage F1.4.2.2a: Machinery & Cargo Gear normalization
+        if attr in {"cylinder_count", "cylinders_count", "crane_count", "cranes_count"}:
+            try:
+                num_int = int(value)
+                if num_int < 0:
+                    return raw_str, None, "int_negative_invalid"
+                return raw_str, num_int, "numeric_int"
+            except (ValueError, TypeError):
+                return raw_str, None, "int_parse_failed"
+
+        if attr in {"bore_mm", "stroke_mm", "rated_power_kw", "rated_rpm", "crane_swl_tonnes"}:
+            try:
+                num = float(value)
+                if not math.isfinite(num) or num < 0:
+                    return raw_str, None, "numeric_invalid_finite"
+                return raw_str, round(num, 2), "numeric_float"
+            except (ValueError, TypeError):
+                return raw_str, None, "numeric_parse_failed"
+
+        if attr == "is_geared":
+            if isinstance(value, bool):
+                return raw_str, value, "boolean_direct"
+            val_s = str(value).strip().lower()
+            if val_s in {"true", "1", "yes", "geared"}:
+                return raw_str, True, "boolean_parsed"
+            if val_s in {"false", "0", "no", "gearless"}:
+                return raw_str, False, "boolean_parsed"
+            return raw_str, None, "boolean_parse_failed"
+
+        if attr in {
+            "vessel_name",
+            "vessel_type",
+            "vessel_class",
+            "flag_country",
+            "flag_code",
+            "engine_manufacturer",
+            "engine_model",
+            "engine_variant",
+            "engine_builder",
+        }:
             s = str(value).strip()
             return raw_str, s, "string_strip"
 
@@ -697,12 +963,22 @@ class VesselRegistry:
         if not clean_imo and not clean_mmsi:
             raise MalformedVesselRecordError("Vessel record must possess at least one of valid IMO or MMSI.")
 
+        # Map plural/singular attribute aliases
+        if "cylinders_count" in vessel_data and "cylinder_count" not in vessel_data:
+            vessel_data["cylinder_count"] = vessel_data["cylinders_count"]
+        if "cranes_count" in vessel_data and "crane_count" not in vessel_data:
+            vessel_data["crane_count"] = vessel_data["cranes_count"]
+
         # 2. Canonical entity resolution
         vessel = self.resolve_canonical_vessel(imo=clean_imo, mmsi=clean_mmsi)
         created = False
         now_utc = datetime.now(timezone.utc)
 
         fields_prov_cfg = vessel_data.get("fields_provenance", {})
+        if "cylinders_count" in fields_prov_cfg and "cylinder_count" not in fields_prov_cfg:
+            fields_prov_cfg["cylinder_count"] = fields_prov_cfg["cylinders_count"]
+        if "cranes_count" in fields_prov_cfg and "crane_count" not in fields_prov_cfg:
+            fields_prov_cfg["crane_count"] = fields_prov_cfg["cranes_count"]
 
         if not vessel:
             # Create new canonical entity
@@ -728,6 +1004,18 @@ class VesselRegistry:
                 flag_code=vessel_data.get("flag_code"),
                 source_name=vessel_data.get("source_name") or default_source_name,
                 commercial_status=vessel_data.get("commercial_status") or "unknown",
+                engine_manufacturer=vessel_data.get("engine_manufacturer"),
+                engine_model=vessel_data.get("engine_model"),
+                engine_variant=vessel_data.get("engine_variant"),
+                engine_builder=vessel_data.get("engine_builder"),
+                cylinder_count=vessel_data.get("cylinder_count"),
+                bore_mm=vessel_data.get("bore_mm"),
+                stroke_mm=vessel_data.get("stroke_mm"),
+                rated_power_kw=vessel_data.get("rated_power_kw"),
+                rated_rpm=vessel_data.get("rated_rpm"),
+                is_geared=vessel_data.get("is_geared"),
+                crane_count=vessel_data.get("crane_count"),
+                crane_swl_tonnes=vessel_data.get("crane_swl_tonnes"),
                 created_at=now_utc,
                 updated_at=now_utc,
             )
@@ -795,6 +1083,18 @@ class VesselRegistry:
             "built_year",
             "flag_country",
             "flag_code",
+            "engine_manufacturer",
+            "engine_model",
+            "engine_variant",
+            "engine_builder",
+            "cylinder_count",
+            "bore_mm",
+            "stroke_mm",
+            "rated_power_kw",
+            "rated_rpm",
+            "is_geared",
+            "crane_count",
+            "crane_swl_tonnes",
         ]
 
         for attr in prov_attrs:
@@ -837,10 +1137,32 @@ class VesselRegistry:
             # Apply resolved canonical value to vessel attribute
             if hasattr(vessel, attr):
                 # Ensure correct type cast before setting on model
-                if attr in {"dwt_tonnage", "gross_tonnage", "net_tonnage", "length_meters", "width_meters", "draft_max_meters", "air_draft_meters", "grain_cubic_meters"}:
+                if attr in {
+                    "dwt_tonnage",
+                    "gross_tonnage",
+                    "net_tonnage",
+                    "length_meters",
+                    "width_meters",
+                    "draft_max_meters",
+                    "air_draft_meters",
+                    "grain_cubic_meters",
+                    "bore_mm",
+                    "stroke_mm",
+                    "rated_power_kw",
+                    "rated_rpm",
+                    "crane_swl_tonnes",
+                }:
                     setattr(vessel, attr, float(canonical_val) if canonical_val is not None else None)
-                elif attr in {"built_year", "vessel_type_code", "holds_count", "hatches_count"}:
+                elif attr in {"built_year", "vessel_type_code", "holds_count", "hatches_count", "cylinder_count", "crane_count"}:
                     setattr(vessel, attr, int(canonical_val) if canonical_val is not None else None)
+                elif attr == "is_geared":
+                    if canonical_val is not None:
+                        if isinstance(canonical_val, bool):
+                            setattr(vessel, attr, canonical_val)
+                        else:
+                            setattr(vessel, attr, str(canonical_val).lower() in {"true", "1", "yes", "geared"})
+                    else:
+                        setattr(vessel, attr, None)
                 else:
                     setattr(vessel, attr, canonical_val)
 
@@ -850,6 +1172,88 @@ class VesselRegistry:
             self.db.refresh(vessel)
 
         return vessel, created, recorded_provenance
+
+    def get_vessel_machinery(
+        self,
+        imo: Optional[Union[str, int]] = None,
+        mmsi: Optional[Union[str, int]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Retrieve verified machinery particulars and field-level provenance for a vessel.
+
+        Returns:
+            Dictionary containing canonical machinery attributes, overall machinery status,
+            and field-level provenance details.
+        """
+        vessel = self.resolve_canonical_vessel(imo=imo, mmsi=mmsi)
+        if not vessel:
+            return None
+
+        machinery_attrs = [
+            "engine_manufacturer",
+            "engine_model",
+            "engine_variant",
+            "engine_builder",
+            "cylinder_count",
+            "bore_mm",
+            "stroke_mm",
+            "rated_power_kw",
+            "rated_rpm",
+            "is_geared",
+            "crane_count",
+            "crane_swl_tonnes",
+        ]
+
+        prov_records = (
+            self.db.query(VesselAttributeProvenance)
+            .filter(
+                VesselAttributeProvenance.vessel_id == vessel.id,
+                VesselAttributeProvenance.attribute_name.in_(machinery_attrs),
+            )
+            .order_by(desc(VesselAttributeProvenance.retrieved_at))
+            .all()
+        )
+
+        prov_by_attr = {}
+        for p in prov_records:
+            if p.attribute_name not in prov_by_attr:
+                prov_by_attr[p.attribute_name] = {
+                    "raw_value": p.raw_value,
+                    "normalized_value": p.normalized_value,
+                    "source_name": p.source_name,
+                    "source_record_id": p.source_record_id,
+                    "source_url": p.source_url,
+                    "verification_status": p.verification_status,
+                    "observation_date": p.observation_date.isoformat() if p.observation_date else None,
+                    "retrieved_at": p.retrieved_at.isoformat() if p.retrieved_at else None,
+                    "is_conflicting": p.is_conflicting,
+                }
+
+        # Determine overall machinery verification status
+        eng_model_prov = prov_by_attr.get("engine_model", {})
+        eng_status = eng_model_prov.get("verification_status", VerificationStatus.UNAVAILABLE)
+
+        return {
+            "vessel_id": vessel.id,
+            "imo": vessel.imo,
+            "vessel_name": vessel.vessel_name,
+            "vessel_class": vessel.vessel_class,
+            "overall_machinery_status": eng_status,
+            "machinery_fields": {
+                "engine_manufacturer": vessel.engine_manufacturer,
+                "engine_model": vessel.engine_model,
+                "engine_variant": vessel.engine_variant,
+                "engine_builder": vessel.engine_builder,
+                "cylinder_count": vessel.cylinder_count,
+                "bore_mm": vessel.bore_mm,
+                "stroke_mm": vessel.stroke_mm,
+                "rated_power_kw": vessel.rated_power_kw,
+                "rated_rpm": vessel.rated_rpm,
+                "is_geared": vessel.is_geared,
+                "crane_count": vessel.crane_count,
+                "crane_swl_tonnes": vessel.crane_swl_tonnes,
+            },
+            "fields_provenance": prov_by_attr,
+        }
 
     def record_operational_estimate(
         self,

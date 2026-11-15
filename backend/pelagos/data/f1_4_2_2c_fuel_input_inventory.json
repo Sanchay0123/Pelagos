@@ -1,0 +1,284 @@
+{
+  "inventory_metadata": {
+    "document_id": "INVENTORY-F1422C-001",
+    "title": "Pelagos Vessel Fuel Consumption Intelligence Input Inventory & Data Feasibility Specification",
+    "stage": "F1.4.2.2c.3",
+    "created_at": "2026-11-15T06:50:00Z",
+    "governance_standard": "Naval Architecture Hydrodynamic Modeling and Statutory Class Registry Integrity Standard",
+    "evidence_governance_principles": [
+      "Distinguish directly inspected statutory registers (ClassNK, DNV) from secondary source-reported builder delivery particulars.",
+      "Shipyard benchmark power is explicitly Continuous Service Rating engine brake power (P_B,CSR), NOT delivered shaft power (P_S) or trial measured power (P_trial).",
+      "Calculated propulsion power represents estimated required engine brake power at the flywheel coupling. Both numerator and denominator in engine-load calculation use compatible brake-power definitions.",
+      "All candidate vessel CSR values correspond to approximately 85% of MCR (IRIS BLISS: 8210/9660 ≈ 84.990%, NAVIOS VICTORY: 7080/8330 ≈ 84.994%, BERGE GALDHOPIGGEN: 5185/6100 = 85.000%). Because statutory registers do not index CSR, whether these are independent trial benchmarks or nominal 85% MCR derivations is unverified. The relationship is strictly classified as UNVERIFIED_SECONDARY_RELATIONSHIP.",
+      "Single-point Admiralty calibration is a first-order research tool, NOT an independent validation of the full speed-power curve.",
+      "The model strictly evaluates continuous rated-power capacity (<= 100% MCR) and fails closed when the continuous rated boundary is exceeded.",
+      "Ballast hydrostatics are unindexed in public registers and fail closed to UNAVAILABLE without arbitrary percentage assumptions."
+    ]
+  },
+  "speed_to_power_method_evaluation": {
+    "admiralty_coefficient_method": {
+      "method_name": "Calibrated Admiralty Coefficient Method",
+      "formula": "P = (Delta^(2/3) * V^3) / C_adm",
+      "applicable_vessel_types": "Displacement hulls (Bulk carriers, tankers) operating in the sub-critical Froude regime (Fn <= 0.18, approx 10-15 knots).",
+      "input_requirements": [
+        "Displacement Delta (metric tonnes) for specified loading condition (laden or ballast). NEVER substitute DWT.",
+        "Vessel speed V (knots through water).",
+        "Calibrated design Admiralty coefficient C_adm established from certified sea-trial or yard delivery design points."
+      ],
+      "feasibility_in_pelagos": "FEASIBLE_WITH_CERTIFIED_BENCHMARKS. Supported for vessels with authentic yard delivery specifications (Oshima, Koyo, DNV) in research mode. Fails closed to UNAVAILABLE if displacement or certified design speed is absent.",
+      "known_assumptions_and_uncertainty": "Assumes geometric and dynamic similarity across normal service speed range; valid within +/- 15-20% of design speed. Single-point calibration assumes constant C_adm and represents a first-order research approximation, NOT an independent validation of the full speed-power curve. Shipyard benchmark power represents Continuous Service Rating engine brake power (P_B,CSR), NOT delivered shaft power (P_S) or trial measured power (P_trial). The contractual 15% sea margin is an UNVERIFIED_SECONDARY_RELATIONSHIP. Ballast hydrostatics are unindexed in public registers and fail closed to UNAVAILABLE."
+    },
+    "holtrop_mennen_resistance_method": {
+      "method_name": "Holtrop-Mennen Empirical Resistance Method (1982, 1984)",
+      "formula": "R_total = R_f*(1+k1) + R_app + R_w + R_b + R_tr + R_a",
+      "applicable_vessel_types": "General displacement and semi-displacement merchant hulls.",
+      "input_requirements": [
+        "Waterline length (Lwl), beam (B), draft (T), displacement volume (Nabla).",
+        "Block coefficient (Cb), prismatic coefficient (Cp), midship coefficient (Cm), waterplane area coefficient (Cwp).",
+        "Longitudinal center of buoyancy (LCB), forward bulbous bow cross-sectional area (A_BT), bulb center height (h_b).",
+        "Immersed transom stern area (A_t), stem entrance angle (i_e), wetted surface area (S).",
+        "Propulsive efficiencies (eta_0, eta_R, eta_H, eta_M)."
+      ],
+      "feasibility_in_pelagos": "INFEASIBLE_WITHOUT_SYNTHETIC_DATA. Public statutory classification society registers (ClassNK, DNV, LR, BV) DO NOT report bulbous bow geometry, transom area, waterplane coefficient, or lines plans. Running Holtrop-Mennen would require fabricating 10+ proprietary hull parameters. Prohibited under Pelagos non-synthetic data governance.",
+      "known_assumptions_and_uncertainty": "Requires full lines plan and model basin calibration; high sensitivity to estimated bulb and transom parameters."
+    }
+  },
+  "field_level_input_inventory": {
+    "vessel_particulars": [
+      {
+        "field_name": "imo",
+        "domain": "vessel_particulars",
+        "unit": "string (7 digits)",
+        "exists_in_pelagos": true,
+        "provenance_status": "DIRECTLY_VERIFIED",
+        "source": "Statutory Class / IMO Checksum Algorithm",
+        "is_mandatory": true,
+        "missing_behavior": "REJECT_CALCULATION"
+      },
+      {
+        "field_name": "vessel_name",
+        "domain": "vessel_particulars",
+        "unit": "string",
+        "exists_in_pelagos": true,
+        "provenance_status": "DIRECTLY_VERIFIED",
+        "source": "ClassNK / DNV / Statutory Registry",
+        "is_mandatory": true,
+        "missing_behavior": "WARN_AND_CONTINUE"
+      },
+      {
+        "field_name": "vessel_type",
+        "domain": "vessel_particulars",
+        "unit": "string",
+        "exists_in_pelagos": true,
+        "provenance_status": "DIRECTLY_VERIFIED",
+        "source": "ClassNK / DNV / Commercial Directory",
+        "is_mandatory": true,
+        "missing_behavior": "REJECT_CALCULATION"
+      },
+      {
+        "field_name": "vessel_class",
+        "domain": "vessel_particulars",
+        "unit": "string (e.g. Kamsarmax, Panamax, Handysize)",
+        "exists_in_pelagos": true,
+        "provenance_status": "SOURCE_REPORTED",
+        "source": "Commercial Registry / Yard Spec",
+        "is_mandatory": false,
+        "missing_behavior": "INFER_FROM_DWT"
+      },
+      {
+        "field_name": "length_meters",
+        "domain": "vessel_particulars",
+        "unit": "meters (LOA)",
+        "exists_in_pelagos": true,
+        "provenance_status": "DIRECTLY_VERIFIED",
+        "source": "ClassNK / DNV Register of Ships",
+        "is_mandatory": true,
+        "missing_behavior": "REJECT_CALCULATION"
+      },
+      {
+        "field_name": "width_meters",
+        "domain": "vessel_particulars",
+        "unit": "meters (Beam)",
+        "exists_in_pelagos": true,
+        "provenance_status": "DIRECTLY_VERIFIED",
+        "source": "ClassNK / DNV Register of Ships",
+        "is_mandatory": true,
+        "missing_behavior": "REJECT_CALCULATION"
+      },
+      {
+        "field_name": "draft_max_meters",
+        "domain": "vessel_particulars",
+        "unit": "meters (Summer Scantling Draft)",
+        "exists_in_pelagos": true,
+        "provenance_status": "DIRECTLY_VERIFIED",
+        "source": "ClassNK / DNV Register of Ships",
+        "is_mandatory": true,
+        "missing_behavior": "REJECT_CALCULATION"
+      },
+      {
+        "field_name": "dwt_tonnage",
+        "domain": "vessel_particulars",
+        "unit": "metric tonnes",
+        "exists_in_pelagos": true,
+        "provenance_status": "DIRECTLY_VERIFIED",
+        "source": "ClassNK / DNV Register of Ships",
+        "is_mandatory": true,
+        "missing_behavior": "REJECT_CALCULATION"
+      },
+      {
+        "field_name": "laden_displacement_mt",
+        "domain": "vessel_particulars",
+        "unit": "metric tonnes",
+        "exists_in_pelagos": true,
+        "provenance_status": "SOURCE_REPORTED (LDT + Statutory DWT)",
+        "source": "Shipyard Technical Delivery Sheet (LDT) combined with ClassNK/DNV Summer Scantling Deadweight (DWT). Directly inspected class registers publish DWT and draft, but not LDT.",
+        "is_mandatory": true,
+        "missing_behavior": "FAIL_CLOSED_UNAVAILABLE (DWT is never substituted for displacement)"
+      },
+      {
+        "field_name": "ballast_displacement_mt",
+        "domain": "vessel_particulars",
+        "unit": "metric tonnes",
+        "exists_in_pelagos": false,
+        "provenance_status": "UNAVAILABLE in public statutory registers",
+        "source": "Unpublished in statutory registers; fails closed without verified sea-trial record",
+        "is_mandatory": false,
+        "missing_behavior": "FAIL_CLOSED_UNAVAILABLE (when condition=ballast; arbitrary percentage scaling and silent fallback to laden coefficients strictly prohibited)"
+      },
+      {
+        "field_name": "design_speed_knots",
+        "domain": "vessel_particulars",
+        "unit": "knots",
+        "exists_in_pelagos": true,
+        "provenance_status": "SOURCE_REPORTED",
+        "source": "Shipyard Specification / Class Society Design Point",
+        "is_mandatory": true,
+        "missing_behavior": "FAIL_CLOSED_UNAVAILABLE (Admiralty coefficient cannot be calibrated without design speed)"
+      }
+    ],
+    "machinery_particulars": [
+      {
+        "field_name": "engine_manufacturer",
+        "domain": "machinery",
+        "unit": "string",
+        "exists_in_pelagos": true,
+        "provenance_status": "DIRECTLY_VERIFIED",
+        "source": "ClassNK / DNV Register of Ships",
+        "is_mandatory": true,
+        "missing_behavior": "FAIL_CLOSED_UNAVAILABLE"
+      },
+      {
+        "field_name": "engine_model",
+        "domain": "machinery",
+        "unit": "string",
+        "exists_in_pelagos": true,
+        "provenance_status": "DIRECTLY_VERIFIED",
+        "source": "ClassNK / DNV Register of Ships",
+        "is_mandatory": true,
+        "missing_behavior": "FAIL_CLOSED_UNAVAILABLE"
+      },
+      {
+        "field_name": "engine_variant",
+        "domain": "machinery",
+        "unit": "string",
+        "exists_in_pelagos": true,
+        "provenance_status": "SOURCE_REPORTED / DIRECTLY_VERIFIED",
+        "source": "Shipyard Spec / DNV Register",
+        "is_mandatory": false,
+        "missing_behavior": "FALLBACK_TO_FAMILY_REFERENCE"
+      },
+      {
+        "field_name": "rated_power_kw",
+        "domain": "machinery",
+        "unit": "kW",
+        "exists_in_pelagos": true,
+        "provenance_status": "DIRECTLY_VERIFIED",
+        "source": "ClassNK / DNV Register of Ships",
+        "is_mandatory": true,
+        "missing_behavior": "FAIL_CLOSED_UNAVAILABLE"
+      },
+      {
+        "field_name": "rated_rpm",
+        "domain": "machinery",
+        "unit": "rpm",
+        "exists_in_pelagos": true,
+        "provenance_status": "DIRECTLY_VERIFIED",
+        "source": "ClassNK / DNV Register of Ships",
+        "is_mandatory": false,
+        "missing_behavior": "WARN_AND_CONTINUE"
+      },
+      {
+        "field_name": "power_rating_definition",
+        "domain": "machinery",
+        "unit": "string (MCR, CSR_BRAKE_POWER)",
+        "exists_in_pelagos": true,
+        "provenance_status": "DIRECTLY_VERIFIED",
+        "source": "ClassNK / DNV Register of Ships",
+        "is_mandatory": true,
+        "missing_behavior": "DEFAULT_TO_MCR"
+      },
+      {
+        "field_name": "design_power_definition",
+        "domain": "machinery",
+        "unit": "string (CSR_BRAKE_POWER)",
+        "exists_in_pelagos": true,
+        "provenance_status": "SOURCE_REPORTED (CSR_BRAKE_POWER)",
+        "source": "Shipyard Technical Delivery Specification (Continuous Service Rating engine brake power P_B,CSR). Secondary relationship to MCR (CSR ~ 85% MCR) is classified as UNVERIFIED_SECONDARY_RELATIONSHIP.",
+        "is_mandatory": true,
+        "missing_behavior": "DEFAULT_TO_CSR_BRAKE_POWER"
+      },
+      {
+        "field_name": "is_geared",
+        "domain": "machinery",
+        "unit": "boolean",
+        "exists_in_pelagos": true,
+        "provenance_status": "SOURCE_REPORTED / DIRECTLY_VERIFIED",
+        "source": "DNV / Shipyard Delivery Specification",
+        "is_mandatory": true,
+        "missing_behavior": "DEFAULT_TO_GEARLESS"
+      },
+      {
+        "field_name": "crane_count",
+        "domain": "machinery",
+        "unit": "integer",
+        "exists_in_pelagos": true,
+        "provenance_status": "SOURCE_REPORTED / DIRECTLY_VERIFIED",
+        "source": "DNV / Shipyard Delivery Specification",
+        "is_mandatory": false,
+        "missing_behavior": "DEFAULT_TO_0"
+      }
+    ],
+    "operating_conditions": [
+      {
+        "field_name": "requested_speed_knots",
+        "domain": "operating_conditions",
+        "unit": "knots",
+        "exists_in_pelagos": true,
+        "provenance_status": "DYNAMIC_INPUT",
+        "source": "User Query / Routing Profile",
+        "is_mandatory": true,
+        "missing_behavior": "REJECT_CALCULATION"
+      },
+      {
+        "field_name": "loading_condition",
+        "domain": "operating_conditions",
+        "unit": "string ('laden' | 'ballast')",
+        "exists_in_pelagos": true,
+        "provenance_status": "DYNAMIC_INPUT",
+        "source": "Charter Leg Specification",
+        "is_mandatory": true,
+        "missing_behavior": "DEFAULT_TO_LADEN"
+      },
+      {
+        "field_name": "weather_margin_pct",
+        "domain": "operating_conditions",
+        "unit": "percentage (e.g. 0.0 for calm water, 10.0-15.0 for standard research scenario)",
+        "exists_in_pelagos": true,
+        "provenance_status": "RESEARCH_SENSITIVITY_PARAMETER",
+        "source": "User-configured research sensitivity parameter. NOT a dynamic NOAA/Copernicus meteo-oceanographic correction. Preserves physical distinction: Speed Through Water (STW) differs from Speed Over Ground (SOG).",
+        "is_mandatory": false,
+        "missing_behavior": "DEFAULT_TO_CALM_WATER_0"
+      }
+    ]
+  }
+}

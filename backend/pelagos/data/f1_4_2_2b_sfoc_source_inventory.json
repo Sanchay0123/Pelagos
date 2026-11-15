@@ -1,0 +1,257 @@
+{
+  "inventory_metadata": {
+    "document_id": "INVENTORY-F1422B-001",
+    "title": "Pelagos Engine SFOC Library Source Inventory, Dimensional Governance & Evidence Matrix",
+    "stage": "F1.4.2.2b.1",
+    "created_at": "2026-11-15T00:30:00Z",
+    "governance_standard": "Statutory Class and Engine Manufacturer Technical Documentation Integrity Standard"
+  },
+  "governance_dimensions": {
+    "dimension_1_source_authenticity": {
+      "definition": "Whether the source and reported numerical values are traceable to the cited primary document.",
+      "values": {
+        "DIRECTLY_VERIFIED": "Primary manufacturer manual (MIM) or statutory document inspected and certified; table/section verified.",
+        "SOURCE_REPORTED": "Cited or extracted from public manufacturer project guide diagrams or yard specifications; primary shop-test test bed report uninspected.",
+        "UNVERIFIED": "Third-party or secondary literature claim lacking primary document traceability."
+      }
+    },
+    "dimension_2_technical_applicability": {
+      "definition": "Whether the curve applies to an exact engine variant, an engine family, or only an aggregate research population.",
+      "values": {
+        "EXACT_VARIANT": "Curve matches exact engine model, variant, and rating layout (e.g. WinGD 5RT-flex50D Tier II at Rating Point R1).",
+        "FAMILY_REFERENCE": "Curve represents generic engine family baseline or nominal project guide layout (e.g. MAN B&W S60ME-C family).",
+        "AGGREGATE_RESEARCH": "Fleet-wide statistical average; not applicable to specific manufacturer engines.",
+        "UNAVAILABLE": "Engine particulars or curve unindexed in public registers."
+      }
+    },
+    "dimension_3_permitted_use": {
+      "definition": "Whether the source permits operational commercial use, research use, internal retention, or redistribution.",
+      "values": {
+        "OPERATIONAL_PERMITTED": "Explicitly licensed or open public domain data authorized for commercial automated calculations.",
+        "RESEARCH_ONLY": "Publicly accessible technical manual (e.g. WinGD MIM) permitted for non-commercial research, benchmarking, and internal testing; commercial operational calculations prohibited without manufacturer license.",
+        "RESTRICTED_PENDING_PERMISSION": "Proprietary manufacturer project guide (e.g. MAN B&W Project Guide); extraction, retention, and operational reuse are restricted under copyright without explicit licensing agreement.",
+        "AGGREGATE_RESEARCH_ONLY": "Public statistical aggregation (e.g. IMO GHG Study); permitted for research comparisons only, not operational engine calculations."
+      }
+    }
+  },
+  "candidate_vessels_applicability_matrix": {
+    "9766944": {
+      "vessel_name": "IRIS BLISS",
+      "vessel_class": "Kamsarmax",
+      "registered_engine_maker": "MAN Energy Solutions",
+      "registered_engine_model": "MAN B&W 6S60ME-C",
+      "registered_engine_variant": "6S60ME-C8.2",
+      "authenticity_status": "SOURCE_REPORTED",
+      "applicable_curve_code": "MAN_S60ME_C8_2_TII_NOMINAL",
+      "technical_applicability": "FAMILY_REFERENCE",
+      "permitted_use": "RESTRICTED_PENDING_PERMISSION",
+      "operational_availability": "RESTRICTED_PENDING_PERMISSION",
+      "applicability_rationale": "Engine model verified via ClassNK-162819. Variant 6S60ME-C8.2 is source-reported from Oshima yard spec. Specific shop-test certificate is unindexed in public registers. Associated as family-level reference with explicit uncertainty flag; commercial operational use is restricted pending licensing."
+    },
+    "9713430": {
+      "vessel_name": "NAVIOS VICTORY",
+      "vessel_class": "Panamax",
+      "registered_engine_maker": "MAN Energy Solutions",
+      "registered_engine_model": "MAN B&W 6S60ME-C",
+      "registered_engine_variant": "6S60ME-C8.2",
+      "authenticity_status": "SOURCE_REPORTED",
+      "applicable_curve_code": "MAN_S60ME_C8_2_TII_NOMINAL",
+      "technical_applicability": "FAMILY_REFERENCE",
+      "permitted_use": "RESTRICTED_PENDING_PERMISSION",
+      "operational_availability": "RESTRICTED_PENDING_PERMISSION",
+      "applicability_rationale": "Engine model verified via ClassNK-145541. Registered rated power is CSR 8,330 kW @ 80.5 rpm (derated from 9,660 kW MCR). Nominal manufacturer L1 curve is applicable only as family reference; commercial operational use is restricted pending licensing."
+    },
+    "9753284": {
+      "vessel_name": "BERGE GALDHOPIGGEN",
+      "vessel_class": "Handysize",
+      "registered_engine_maker": "WinGD / Wärtsilä",
+      "registered_engine_model": "5RT-flex50D",
+      "registered_engine_variant": "RT-flex50D Tier II",
+      "authenticity_status": "DIRECTLY_VERIFIED",
+      "applicable_curve_code": "WINGD_RT_FLEX50D_TII_STD",
+      "technical_applicability": "EXACT_VARIANT",
+      "permitted_use": "RESEARCH_ONLY",
+      "operational_availability": "RESEARCH_ONLY",
+      "applicability_rationale": "Exact engine model and Tier II variant are directly verified via DNV Vessel Register ID 34947. Manufacturer Marine Installation Manual (MIM Issue 05/2016, Table 1-2) provides certified baseline curve for RT-flex50-D Tier II at Rating Point R1. Permitted for internal research/benchmarking only; commercial operational calculations restricted without manufacturer license."
+    },
+    "9441295": {
+      "vessel_name": "EGRET BULKER",
+      "vessel_class": "Supramax",
+      "registered_engine_maker": null,
+      "registered_engine_model": null,
+      "registered_engine_variant": null,
+      "authenticity_status": "UNAVAILABLE",
+      "applicable_curve_code": null,
+      "technical_applicability": "UNAVAILABLE",
+      "permitted_use": "UNAVAILABLE",
+      "operational_availability": "UNAVAILABLE",
+      "applicability_rationale": "Machinery particulars unavailable in primary public classification society registers (BV 14751X unindexed). Strictly fail-closed; no synthetic guessing or proxy inheritance permitted."
+    },
+    "9406087": {
+      "vessel_name": "HADEEL",
+      "vessel_class": "Handysize",
+      "registered_engine_maker": null,
+      "registered_engine_model": null,
+      "registered_engine_variant": null,
+      "authenticity_status": "UNAVAILABLE",
+      "applicable_curve_code": null,
+      "technical_applicability": "UNAVAILABLE",
+      "permitted_use": "UNAVAILABLE",
+      "operational_availability": "UNAVAILABLE",
+      "applicability_rationale": "Machinery particulars unavailable in primary public classification society registers (BV 12891K unindexed). Strictly fail-closed; no synthetic guessing permitted."
+    },
+    "9591301": {
+      "vessel_name": "BULK UNITY",
+      "vessel_class": "Capesize",
+      "registered_engine_maker": null,
+      "registered_engine_model": null,
+      "registered_engine_variant": null,
+      "authenticity_status": "UNAVAILABLE",
+      "applicable_curve_code": null,
+      "technical_applicability": "UNAVAILABLE",
+      "permitted_use": "UNAVAILABLE",
+      "operational_availability": "UNAVAILABLE",
+      "applicability_rationale": "Machinery particulars unavailable in primary public classification society registers (LR 9591301 unindexed). Strictly fail-closed; no synthetic guessing permitted."
+    }
+  },
+  "manufacturer_sfoc_sources": [
+    {
+      "curve_code": "WINGD_RT_FLEX50D_TII_STD",
+      "engine_manufacturer": "Winterthur Gas & Diesel Ltd. (WinGD)",
+      "engine_model": "RT-flex50-D",
+      "engine_variant": "RT-flex50D Tier II",
+      "engine_family": "WinGD RT-flex50",
+      "authenticity_status": "DIRECTLY_VERIFIED",
+      "technical_applicability": "EXACT_VARIANT",
+      "permitted_use": "RESEARCH_ONLY",
+      "tuning_strategy": "Standard / Delta Bypass Tuning",
+      "source_document": "WinGD RT-flex50-D Marine Installation Manual (MIM)",
+      "source_revision": "Issue 05/2016",
+      "source_citation_details": "Section 1 'Engine Performance Data', Section 1.03 'Fuel Consumption', Table 1-2 'Brake Specific Fuel Consumption at Rating Point R1'",
+      "source_document_url": "https://www.wingd.com/en/documents/marine-installation-manuals/rt-flex/mim-rt-flex50-d/",
+      "retrieval_date": "2026-11-15",
+      "reference_conditions": "ISO 15550 and ISO 3046-1: Ambient air pressure 1000 mbar, ambient air temperature 25 C, scavenge air coolant temperature 25 C, fuel lower calorific value (LCV) 42.7 MJ/kg (10,200 kcal/kg).",
+      "fuel_type": "ISO_DMA_DIESEL",
+      "fuel_lcv_mj_kg": 42.7,
+      "min_load_percent": 50.0,
+      "max_load_percent": 100.0,
+      "documented_load_points": [
+        {"load_percent": 50.0, "sfoc_g_kwh": 163.6, "tolerance_pct": 7.0, "is_guaranteed": false, "notes": "Part load, Delta Bypass Tuning"},
+        {"load_percent": 65.0, "sfoc_g_kwh": 161.9, "tolerance_pct": 6.0, "is_guaranteed": false, "notes": "Intermediate load sweet spot"},
+        {"load_percent": 75.0, "sfoc_g_kwh": 162.2, "tolerance_pct": 6.0, "is_guaranteed": false, "notes": "Normal continuous rating point"},
+        {"load_percent": 90.0, "sfoc_g_kwh": 166.1, "tolerance_pct": 5.0, "is_guaranteed": false, "notes": "High load matching point"},
+        {"load_percent": 100.0, "sfoc_g_kwh": 171.8, "tolerance_pct": 5.0, "is_guaranteed": true, "notes": "Contractual guarantee rating point R1"}
+      ]
+    },
+    {
+      "curve_code": "WINGD_RT_FLEX50D_TII_LOWLOAD",
+      "engine_manufacturer": "Winterthur Gas & Diesel Ltd. (WinGD)",
+      "engine_model": "RT-flex50-D",
+      "engine_variant": "RT-flex50D Tier II Low-Load",
+      "engine_family": "WinGD RT-flex50",
+      "authenticity_status": "DIRECTLY_VERIFIED",
+      "technical_applicability": "EXACT_VARIANT",
+      "permitted_use": "RESEARCH_ONLY",
+      "tuning_strategy": "Low-load Tuning",
+      "source_document": "WinGD RT-flex50-D Marine Installation Manual (MIM)",
+      "source_revision": "Issue 05/2016",
+      "source_citation_details": "Section 1 'Engine Performance Data', Section 1.04 'Low-Load Tuning Options', Table 1-3",
+      "source_document_url": "https://www.wingd.com/en/documents/marine-installation-manuals/rt-flex/mim-rt-flex50-d/",
+      "retrieval_date": "2026-11-15",
+      "reference_conditions": "ISO 15550 and ISO 3046-1: Ambient air pressure 1000 mbar, ambient air temperature 25 C, scavenge air coolant temperature 25 C, fuel lower calorific value (LCV) 42.7 MJ/kg.",
+      "fuel_type": "ISO_DMA_DIESEL",
+      "fuel_lcv_mj_kg": 42.7,
+      "min_load_percent": 50.0,
+      "max_load_percent": 100.0,
+      "documented_load_points": [
+        {"load_percent": 50.0, "sfoc_g_kwh": 160.6, "tolerance_pct": 7.0, "is_guaranteed": false, "notes": "Low-load optimized point"},
+        {"load_percent": 65.0, "sfoc_g_kwh": 158.9, "tolerance_pct": 6.0, "is_guaranteed": false, "notes": "Optimum part-load consumption"},
+        {"load_percent": 75.0, "sfoc_g_kwh": 162.2, "tolerance_pct": 6.0, "is_guaranteed": false, "notes": "Normal continuous rating point"},
+        {"load_percent": 90.0, "sfoc_g_kwh": 166.5, "tolerance_pct": 5.0, "is_guaranteed": false, "notes": "High load matching point"},
+        {"load_percent": 100.0, "sfoc_g_kwh": 172.8, "tolerance_pct": 5.0, "is_guaranteed": true, "notes": "Contractual guarantee rating point R1"}
+      ]
+    },
+    {
+      "curve_code": "MAN_S60ME_C8_2_TII_NOMINAL",
+      "engine_manufacturer": "MAN Energy Solutions",
+      "engine_model": "MAN B&W S60ME-C8.2",
+      "engine_variant": "S60ME-C8.2 Tier II",
+      "engine_family": "MAN B&W S60ME-C",
+      "authenticity_status": "SOURCE_REPORTED",
+      "technical_applicability": "FAMILY_REFERENCE",
+      "permitted_use": "RESTRICTED_PENDING_PERMISSION",
+      "tuning_strategy": "High-Load Tuning (Standard Tier II)",
+      "source_document": "MAN B&W S60ME-C8.2-TII Project Guide - Marine Engines with Electronic Control",
+      "source_revision": "Edition 1.0 (Tier II)",
+      "source_citation_details": "Section 2.09 'SFOC Calculations', Diagram 2.09.01 'Nominal Baseline SFOC at Layout Point L1'",
+      "source_document_url": "https://www.man-es.com/marine/products/planning-tools-and-downloads/project-guides",
+      "retrieval_date": "2026-11-15",
+      "reference_conditions": "ISO 3046-1: Ambient air pressure 1000 mbar, ambient air temperature 25 C, scavenge air coolant temperature 25 C, fuel lower calorific value (LCV) 42.7 MJ/kg (10,200 kcal/kg).",
+      "fuel_type": "ISO_DMA_DIESEL",
+      "fuel_lcv_mj_kg": 42.7,
+      "min_load_percent": 50.0,
+      "max_load_percent": 100.0,
+      "documented_load_points": [
+        {"load_percent": 50.0, "sfoc_g_kwh": 164.5, "tolerance_pct": 5.0, "is_guaranteed": false, "notes": "Nominal L1 baseline slow steaming point"},
+        {"load_percent": 75.0, "sfoc_g_kwh": 162.5, "tolerance_pct": 5.0, "is_guaranteed": false, "notes": "Nominal L1 continuous rating sweet spot"},
+        {"load_percent": 85.0, "sfoc_g_kwh": 164.0, "tolerance_pct": 5.0, "is_guaranteed": false, "notes": "Nominal service matching point"},
+        {"load_percent": 100.0, "sfoc_g_kwh": 168.0, "tolerance_pct": 5.0, "is_guaranteed": true, "notes": "Nominal L1 MCR contractual rating point"}
+      ]
+    },
+    {
+      "curve_code": "MAN_S60ME_C_FAMILY_REF",
+      "engine_manufacturer": "MAN Energy Solutions",
+      "engine_model": "MAN B&W S60ME-C",
+      "engine_variant": null,
+      "engine_family": "MAN B&W S60ME-C",
+      "authenticity_status": "SOURCE_REPORTED",
+      "technical_applicability": "FAMILY_REFERENCE",
+      "permitted_use": "RESTRICTED_PENDING_PERMISSION",
+      "tuning_strategy": "High-Load Tuning (Standard Family Baseline)",
+      "source_document": "MAN B&W Two-stroke Engines Project Guide - S60ME-C Family",
+      "source_revision": "Edition 2012",
+      "source_citation_details": "Section 2 'Engine Layout and Load Diagrams', Section 2.05 'Standard High-Load SFOC'",
+      "source_document_url": "https://www.man-es.com/marine/products/planning-tools-and-downloads/project-guides",
+      "retrieval_date": "2026-11-15",
+      "reference_conditions": "ISO 3046-1: Ambient air pressure 1000 mbar, ambient air temperature 25 C, scavenge air coolant temperature 25 C, fuel lower calorific value (LCV) 42.7 MJ/kg.",
+      "fuel_type": "ISO_DMA_DIESEL",
+      "fuel_lcv_mj_kg": 42.7,
+      "min_load_percent": 50.0,
+      "max_load_percent": 100.0,
+      "documented_load_points": [
+        {"load_percent": 50.0, "sfoc_g_kwh": 165.0, "tolerance_pct": 5.0, "is_guaranteed": false, "notes": "Generic family baseline slow steaming point"},
+        {"load_percent": 75.0, "sfoc_g_kwh": 163.0, "tolerance_pct": 5.0, "is_guaranteed": false, "notes": "Generic family continuous rating sweet spot"},
+        {"load_percent": 85.0, "sfoc_g_kwh": 164.5, "tolerance_pct": 5.0, "is_guaranteed": false, "notes": "Generic family service matching point"},
+        {"load_percent": 100.0, "sfoc_g_kwh": 169.0, "tolerance_pct": 5.0, "is_guaranteed": true, "notes": "Generic family MCR rating point"}
+      ]
+    }
+  ],
+  "separate_research_datasets": [
+    {
+      "dataset_code": "IMO4_2STROKE_SSD_POST2010",
+      "dataset_title": "Fourth IMO GHG Study 2020 Aggregate 2-Stroke Slow Speed Diesel Baseline",
+      "publisher": "International Maritime Organization (IMO)",
+      "source_document": "Fourth IMO GHG Study 2020 - Final Report (MEPC 75/7/15)",
+      "source_revision": "2020 Final Publication",
+      "source_citation_details": "Annex 1 'Bottom-up methodology', Section 2.2 'Machinery and SFOC modeling', Table A1-3",
+      "source_document_url": "https://www.imo.org/en/OurWork/Environment/Pages/Fourth-IMO-GHG-Study-2020.aspx",
+      "retrieval_date": "2026-11-15",
+      "authenticity_status": "DIRECTLY_VERIFIED",
+      "technical_applicability": "AGGREGATE_RESEARCH",
+      "permitted_use": "AGGREGATE_RESEARCH_ONLY",
+      "is_aggregate_research": true,
+      "reference_conditions": "Global reporting fleet average test conditions; fuel lower calorific value (LCV) 42.7 MJ/kg.",
+      "fuel_type": "ISO_DMA_DIESEL",
+      "fuel_lcv_mj_kg": 42.7,
+      "min_load_percent": 25.0,
+      "max_load_percent": 100.0,
+      "notes": "Aggregate research baseline representing statistical global fleet average across post-2010 2-stroke diesel vessels. Must not be used as a manufacturer engine curve or associated with individual vessels."
+    }
+  ],
+  "prohibited_inferences_and_engineering_boundaries": {
+    "speed_to_power_barrier": "SFOC indicates grams of fuel per kilowatt-hour of shaft mechanical energy at a specified relative load. It DOES NOT determine the brake power required to achieve a vessel speed through water. Converting speed to power requires naval architecture hydrodynamic modeling (Admiralty coefficient, Holtrop-Mennen, or CFD sea trial data) with valid displacement Delta = DWT + LDT.",
+    "dwt_displacement_boundary": "Displacement is NEVER equal to DWT. A 82k DWT Kamsarmax has displacement ~95k MT. Substituting DWT for displacement underestimates resistance by ~15-20%.",
+    "extrapolation_prohibition": "No extrapolation below min_load_percent or above max_load_percent is permitted. Engine behavior below 25-50% load is non-linear due to auxiliary blower operation and thermal inefficiencies.",
+    "mrv_separation": "EU THETIS-MRV provides annual aggregate sea-time and distance-based consumption, encompassing weather, hull fouling, auxiliary boilers, and port idle. It MUST NOT be directly equated to an isolated main-engine manufacturer SFOC curve without full operational decomposing."
+  }
+}

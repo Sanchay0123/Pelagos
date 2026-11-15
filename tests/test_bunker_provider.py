@@ -254,7 +254,8 @@ class TestBunkerRouteIntelligenceFusion:
         # Ingest genuine fixture (which has ARBUE and DKSKA, but no Seattle/Houston/Yokohama)
         refresh_bunker_prices(db=test_db_session, offline=True)
 
-        summary = resolve_corridor_bunker_fuel_references("PNW-JPN-BULK", db=test_db_session)
+        # Explicit audit mode evaluates historical quotes without operational gating
+        summary = resolve_corridor_bunker_fuel_references("PNW-JPN-BULK", db=test_db_session, operational_mode=False)
         assert summary.status == "unavailable"
         assert summary.hubs_with_prices_count == 0
         assert len(summary.bunkering_hubs_in_scope) == 3
@@ -296,7 +297,8 @@ class TestBunkerRouteIntelligenceFusion:
         test_db_session.add(obs)
         test_db_session.commit()
 
-        summary = resolve_corridor_bunker_fuel_references("PNW-JPN-BULK", db=test_db_session)
+        # Explicit audit mode evaluates historical quote match
+        summary = resolve_corridor_bunker_fuel_references("PNW-JPN-BULK", db=test_db_session, operational_mode=False)
         assert summary.status == "partial"  # 1 of 3 hubs available
         assert summary.hubs_with_prices_count == 1
 
@@ -1115,6 +1117,24 @@ class TestBunkerOfflineFixtureGovernance:
         assert summary_audit.operational_availability == "RESTRICTED_HISTORICAL_AUDIT_ONLY"
         assert summary_audit.operational_use_permitted is False
         assert summary_audit.data_governance_role == "HISTORICAL_AUDIT_EVIDENCE"
+
+    def test_default_operational_mode_is_fail_closed(self, test_db_session: Session):
+        """Calling resolve_corridor_bunker_fuel_references without operational_mode defaults to fail-closed True."""
+        from pelagos.routing.bunker import resolve_corridor_bunker_fuel_references
+
+        refresh_bunker_prices(db=test_db_session, offline=True)
+
+        # Omit operational_mode parameter entirely: must default to operational_mode=True
+        summary_default = resolve_corridor_bunker_fuel_references(
+            db=test_db_session,
+            corridor_code="PNW-JPN-BULK",
+        )
+        assert summary_default.operational_availability == "UNAVAILABLE"
+        assert summary_default.operational_use_permitted is False
+        assert summary_default.data_governance_role == "RESTRICTED_HISTORICAL_AUDIT_ONLY"
+        assert summary_default.status == "unavailable"
+        assert all(h.status == "unavailable" for h in summary_default.bunkering_hubs_in_scope)
+        assert len(summary_default.latest_quotes) == 0
 
     def test_historical_audit_observations_preserved_unaltered(self):
         """Confirms genuine_bunker_prices.json contains exactly the 6 historical audit records uncorrupted."""

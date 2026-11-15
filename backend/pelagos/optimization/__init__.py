@@ -41,6 +41,22 @@ from pelagos.optimization.chartering import (
     assess_vessel_for_voyage,
     recommend_charter_strategy,
 )
+from pelagos.optimization.vessel_fuel_model import (
+    VesselFuelModel,
+    VesselFuelModelError,
+    HydrostaticsUnavailableError,
+    InvalidDisplacementError,
+    InvalidSpeedError,
+    EngineOverloadError,
+    EngineLoadUnderflowError,
+    FuelModelRestrictedError,
+    PropulsionPowerEstimate,
+    EngineLoadEstimate,
+    MainEngineFuelEstimate,
+    AuxiliaryFuelEstimate,
+    VesselFuelBreakdown,
+    seed_vessel_hydrostatics,
+)
 
 __all__ = [
     "CalculationStatus",
@@ -74,5 +90,19 @@ __all__ = [
     "match_suitable_vessels",
     "assess_vessel_for_voyage",
     "recommend_charter_strategy",
+    "VesselFuelModel",
+    "VesselFuelModelError",
+    "HydrostaticsUnavailableError",
+    "InvalidDisplacementError",
+    "InvalidSpeedError",
+    "EngineOverloadError",
+    "EngineLoadUnderflowError",
+    "FuelModelRestrictedError",
+    "PropulsionPowerEstimate",
+    "EngineLoadEstimate",
+    "MainEngineFuelEstimate",
+    "AuxiliaryFuelEstimate",
+    "VesselFuelBreakdown",
+    "seed_vessel_hydrostatics",
 ]
 

@@ -11,8 +11,8 @@
     "gross_tonnage": 33045.0,
     "net_tonnage": null,
     "length_meters": 189.99,
-    "width_meters": 32.30,
-    "draft_max_meters": 12.80,
+    "width_meters": 32.3,
+    "draft_max_meters": 12.8,
     "air_draft_meters": null,
     "grain_cubic_meters": null,
     "holds_count": null,
@@ -106,8 +106,140 @@
         "unit": "country_name",
         "reporting_date": "2026-11-13",
         "selection_rationale": "Statutory flag administration verified in USCG MISLE."
+      },
+      "engine_manufacturer": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "engine_model": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "engine_variant": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "engine_builder": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "cylinder_count": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "bore_mm": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "stroke_mm": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "rated_power_kw": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "rated_rpm": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "is_geared": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "USCG PSIX / Commercial Directory",
+        "source_record_id": "PSIX-9441295",
+        "source_url": "https://cgmix.uscg.mil/psix/",
+        "raw_value": "true",
+        "unit": "boolean",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Visual PSC inspection records indicate vessel is geared with 4 deck cranes."
+      },
+      "crane_count": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "USCG PSIX / Commercial Directory",
+        "source_record_id": "PSIX-9441295",
+        "source_url": "https://cgmix.uscg.mil/psix/",
+        "raw_value": "4",
+        "unit": "integer",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Reported 4 cargo cranes from port state inspection overview."
+      },
+      "crane_swl_tonnes": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "Dayang Shipbuilding Specification / BalticShipping",
+        "source_record_id": "BS-9441295",
+        "source_url": "https://www.balticshipping.com",
+        "raw_value": "30.5",
+        "unit": "metric_tonnes",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Secondary shipyard specification reports 30.5 MT SWL. Unaccredited for statutory capacity."
       }
-    }
+    },
+    "engine_manufacturer": null,
+    "engine_model": null,
+    "engine_variant": null,
+    "engine_builder": null,
+    "cylinder_count": null,
+    "bore_mm": null,
+    "stroke_mm": null,
+    "rated_power_kw": null,
+    "rated_rpm": null,
+    "is_geared": true,
+    "crane_count": 4,
+    "crane_swl_tonnes": 30.5
   },
   {
     "imo": "9713430",
@@ -216,8 +348,140 @@
         "unit": "country_name",
         "reporting_date": "2026-11-13",
         "selection_rationale": "Statutory flag administration (Panama) certified in ClassNK Register."
+      },
+      "engine_manufacturer": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-145541",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9713430&reg_no=145541",
+        "raw_value": "Mitsui E&S Machinery Co., Ltd. / Kawasaki (Licensee for MAN Energy Solutions)",
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Official ClassNK Register No. 145541 certifies main engine designer/licensee relationship."
+      },
+      "engine_model": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-145541",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9713430&reg_no=145541",
+        "raw_value": "1DE : 2 SA 6 CY (MAN B&W 6S60ME-C)",
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified main engine model designation in ClassNK Register No. 145541."
+      },
+      "engine_variant": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "Koyo Dockyard Delivery Specification",
+        "source_record_id": "KOYO-1410",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9713430&reg_no=145541",
+        "raw_value": "6S60ME-C8.2 Tier II",
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Builder delivery specification variant designation. Sub-variant 8.2 is source-reported."
+      },
+      "engine_builder": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-145541",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9713430&reg_no=145541",
+        "raw_value": "Mitsui E&S Machinery Co., Ltd. / Kawasaki",
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified engine builder in ClassNK Register No. 145541."
+      },
+      "cylinder_count": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-145541",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9713430&reg_no=145541",
+        "raw_value": "6",
+        "unit": "integer",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified cylinder count ('2 SA 6 CY') in ClassNK Register No. 145541."
+      },
+      "bore_mm": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-145541",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9713430&reg_no=145541",
+        "raw_value": "600.0",
+        "unit": "mm",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified cylinder bore in ClassNK Register No. 145541."
+      },
+      "stroke_mm": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-145541",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9713430&reg_no=145541",
+        "raw_value": "2400.0",
+        "unit": "mm",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified piston stroke in ClassNK Register No. 145541."
+      },
+      "rated_power_kw": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-145541",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9713430&reg_no=145541",
+        "raw_value": "8330.0",
+        "unit": "kW",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified Continuous Service Rating (8,330 kW / 11,326 PS @ 80.5 rpm) in ClassNK Register No. 145541. MCR is 9,660 kW @ 89.0 rpm."
+      },
+      "rated_rpm": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-145541",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9713430&reg_no=145541",
+        "raw_value": "80.5",
+        "unit": "rpm",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified CSR revolutions (80.5 rpm) in ClassNK Register No. 145541."
+      },
+      "is_geared": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "Koyo Dockyard Delivery Specification",
+        "source_record_id": "KOYO-1410",
+        "source_url": "https://www.imabari.co.jp",
+        "raw_value": "false",
+        "unit": "boolean",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Shipyard delivery specification explicitly specifies gearless Panamax bulk carrier configuration."
+      },
+      "crane_count": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "Koyo Dockyard Delivery Specification",
+        "source_record_id": "KOYO-1410",
+        "source_url": "https://www.imabari.co.jp",
+        "raw_value": "0",
+        "unit": "integer",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Shipyard delivery specification reports 0 cargo handling cranes."
+      },
+      "crane_swl_tonnes": {
+        "status": "UNAVAILABLE",
+        "source_name": "ClassNK Register of Ships / Koyo Specification",
+        "source_record_id": "ClassNK-145541",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9713430&reg_no=145541",
+        "raw_value": "null",
+        "unit": "metric_tonnes",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is gearless; cargo crane safe working load is unavailable/not applicable. Not directly verified."
       }
-    }
+    },
+    "engine_manufacturer": "MAN Energy Solutions",
+    "engine_model": "MAN B&W 6S60ME-C",
+    "engine_variant": "6S60ME-C8.2",
+    "engine_builder": "Mitsui E&S Machinery Co., Ltd. / Kawasaki",
+    "cylinder_count": 6,
+    "bore_mm": 600.0,
+    "stroke_mm": 2400.0,
+    "rated_power_kw": 8330.0,
+    "rated_rpm": 80.5,
+    "is_geared": false,
+    "crane_count": 0,
+    "crane_swl_tonnes": null
   },
   {
     "imo": "9766944",
@@ -326,8 +590,140 @@
         "unit": "country_name",
         "reporting_date": "2026-11-13",
         "selection_rationale": "Statutory flag administration (Singapore) certified in ClassNK Register."
+      },
+      "engine_manufacturer": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-162819",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9766944&reg_no=162819",
+        "raw_value": "Kawasaki Heavy Industries, Ltd. (Licensee for MAN Energy Solutions)",
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Official ClassNK Register No. 162819 certifies main engine designer/licensee relationship."
+      },
+      "engine_model": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-162819",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9766944&reg_no=162819",
+        "raw_value": "1DE : 2 SA 6 CY (MAN B&W 6S60ME-C)",
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified main engine model designation in ClassNK Register No. 162819."
+      },
+      "engine_variant": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "Oshima Shipbuilding Delivery Specification",
+        "source_record_id": "OSHIMA-10793",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9766944&reg_no=162819",
+        "raw_value": "6S60ME-C8.2 Tier II",
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Builder delivery specification variant designation. ClassNK certifies model family 6S60ME-C; sub-variant 8.2 is source-reported."
+      },
+      "engine_builder": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-162819",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9766944&reg_no=162819",
+        "raw_value": "Kawasaki Heavy Industries, Ltd.",
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified engine builder in ClassNK Register No. 162819."
+      },
+      "cylinder_count": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-162819",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9766944&reg_no=162819",
+        "raw_value": "6",
+        "unit": "integer",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified cylinder count ('2 SA 6 CY') in ClassNK Register No. 162819."
+      },
+      "bore_mm": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-162819",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9766944&reg_no=162819",
+        "raw_value": "600.0",
+        "unit": "mm",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified cylinder bore in ClassNK Register No. 162819."
+      },
+      "stroke_mm": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-162819",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9766944&reg_no=162819",
+        "raw_value": "2400.0",
+        "unit": "mm",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified piston stroke in ClassNK Register No. 162819."
+      },
+      "rated_power_kw": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-162819",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9766944&reg_no=162819",
+        "raw_value": "9660.0",
+        "unit": "kW",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified maximum continuous rated power (9,660 kW / 13,134 PS) in ClassNK Register No. 162819. Consistent with 6 cyl * 1610 kW/cyl."
+      },
+      "rated_rpm": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "ClassNK Register of Ships",
+        "source_record_id": "ClassNK-162819",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9766944&reg_no=162819",
+        "raw_value": "89.0",
+        "unit": "rpm",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified rated engine revolutions in ClassNK Register No. 162819."
+      },
+      "is_geared": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "Oshima Shipbuilding Delivery Specification",
+        "source_record_id": "OSHIMA-10793",
+        "source_url": "https://www.oshima-shipbuilding.co.jp",
+        "raw_value": "false",
+        "unit": "boolean",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Shipyard delivery specification explicitly specifies gearless Kamsarmax bulk carrier configuration."
+      },
+      "crane_count": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "Oshima Shipbuilding Delivery Specification",
+        "source_record_id": "OSHIMA-10793",
+        "source_url": "https://www.oshima-shipbuilding.co.jp",
+        "raw_value": "0",
+        "unit": "integer",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Shipyard delivery specification reports 0 cargo handling cranes."
+      },
+      "crane_swl_tonnes": {
+        "status": "UNAVAILABLE",
+        "source_name": "ClassNK Register of Ships / Oshima Specification",
+        "source_record_id": "ClassNK-162819",
+        "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9766944&reg_no=162819",
+        "raw_value": "null",
+        "unit": "metric_tonnes",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is gearless; cargo crane safe working load is unavailable/not applicable. Not directly verified."
       }
-    }
+    },
+    "engine_manufacturer": "MAN Energy Solutions",
+    "engine_model": "MAN B&W 6S60ME-C",
+    "engine_variant": "6S60ME-C8.2",
+    "engine_builder": "Kawasaki Heavy Industries, Ltd.",
+    "cylinder_count": 6,
+    "bore_mm": 600.0,
+    "stroke_mm": 2400.0,
+    "rated_power_kw": 9660.0,
+    "rated_rpm": 89.0,
+    "is_geared": false,
+    "crane_count": 0,
+    "crane_swl_tonnes": null
   },
   {
     "imo": "9753284",
@@ -341,8 +737,8 @@
     "gross_tonnage": 25569.0,
     "net_tonnage": null,
     "length_meters": 179.85,
-    "width_meters": 32.00,
-    "draft_max_meters": 10.50,
+    "width_meters": 32.0,
+    "draft_max_meters": 10.5,
     "air_draft_meters": null,
     "grain_cubic_meters": null,
     "holds_count": null,
@@ -436,8 +832,140 @@
         "unit": "country_name",
         "reporting_date": "2026-11-13",
         "selection_rationale": "Official statutory registry documentation."
+      },
+      "engine_manufacturer": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "DNV Vessel Register",
+        "source_record_id": "DNV-34947",
+        "source_url": "https://vesselregister.dnv.com/vesselregister/details/34947",
+        "raw_value": "WinGD / W\u00e4rtsil\u00e4",
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Official DNV Vessel Register (ID 34947) certifies engine designer."
+      },
+      "engine_model": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "DNV Vessel Register",
+        "source_record_id": "DNV-34947",
+        "source_url": "https://vesselregister.dnv.com/vesselregister/details/34947",
+        "raw_value": "5RT-flex50D",
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified main engine model in DNV Vessel Register ID 34947."
+      },
+      "engine_variant": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "DNV Vessel Register",
+        "source_record_id": "DNV-34947",
+        "source_url": "https://vesselregister.dnv.com/vesselregister/details/34947",
+        "raw_value": "RT-flex50D Tier II",
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified engine tier and variant in DNV Vessel Register ID 34947."
+      },
+      "engine_builder": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "DNV Vessel Register",
+        "source_record_id": "DNV-34947",
+        "source_url": "https://vesselregister.dnv.com/vesselregister/details/34947",
+        "raw_value": "CSSC-MES Diesel Co., Ltd. (CMD)",
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified engine builder in DNV Vessel Register ID 34947."
+      },
+      "cylinder_count": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "DNV Vessel Register",
+        "source_record_id": "DNV-34947",
+        "source_url": "https://vesselregister.dnv.com/vesselregister/details/34947",
+        "raw_value": "5",
+        "unit": "integer",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified cylinder count (5 cylinders) in DNV Vessel Register ID 34947."
+      },
+      "bore_mm": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "DNV Vessel Register",
+        "source_record_id": "DNV-34947",
+        "source_url": "https://vesselregister.dnv.com/vesselregister/details/34947",
+        "raw_value": "500.0",
+        "unit": "mm",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified cylinder bore (500 mm) in DNV Vessel Register ID 34947."
+      },
+      "stroke_mm": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "DNV Vessel Register",
+        "source_record_id": "DNV-34947",
+        "source_url": "https://vesselregister.dnv.com/vesselregister/details/34947",
+        "raw_value": "2050.0",
+        "unit": "mm",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified piston stroke (2,050 mm) in DNV Vessel Register ID 34947."
+      },
+      "rated_power_kw": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "DNV Vessel Register",
+        "source_record_id": "DNV-34947",
+        "source_url": "https://vesselregister.dnv.com/vesselregister/details/34947",
+        "raw_value": "6100.0",
+        "unit": "kW",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified MCR power (6,100 kW @ 99.0 rpm; CSR 4,575 kW @ 89.9 rpm) in DNV Vessel Register ID 34947. Consistent with 5 cyl * 1220 kW/cyl."
+      },
+      "rated_rpm": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "DNV Vessel Register",
+        "source_record_id": "DNV-34947",
+        "source_url": "https://vesselregister.dnv.com/vesselregister/details/34947",
+        "raw_value": "99.0",
+        "unit": "rpm",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified MCR revolutions (99.0 rpm) in DNV Vessel Register ID 34947."
+      },
+      "is_geared": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "DNV Vessel Register",
+        "source_record_id": "DNV-34947",
+        "source_url": "https://vesselregister.dnv.com/vesselregister/details/34947",
+        "raw_value": "true",
+        "unit": "boolean",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified geared bulk carrier with electro-hydraulic cargo handling deck cranes in DNV Vessel Register ID 34947."
+      },
+      "crane_count": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "DNV Vessel Register",
+        "source_record_id": "DNV-34947",
+        "source_url": "https://vesselregister.dnv.com/vesselregister/details/34947",
+        "raw_value": "4",
+        "unit": "integer",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified 4 cargo cranes in DNV Vessel Register ID 34947."
+      },
+      "crane_swl_tonnes": {
+        "status": "DIRECTLY_VERIFIED",
+        "source_name": "DNV Vessel Register",
+        "source_record_id": "DNV-34947",
+        "source_url": "https://vesselregister.dnv.com/vesselregister/details/34947",
+        "raw_value": "30.5",
+        "unit": "metric_tonnes",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Certified Safe Working Load (SWL 30.5 MT) in DNV Vessel Register ID 34947."
       }
-    }
+    },
+    "engine_manufacturer": "WinGD / W\u00e4rtsil\u00e4",
+    "engine_model": "5RT-flex50D",
+    "engine_variant": "RT-flex50D Tier II",
+    "engine_builder": "CSSC-MES Diesel Co., Ltd. (CMD)",
+    "cylinder_count": 5,
+    "bore_mm": 500.0,
+    "stroke_mm": 2050.0,
+    "rated_power_kw": 6100.0,
+    "rated_rpm": 99.0,
+    "is_geared": true,
+    "crane_count": 4,
+    "crane_swl_tonnes": 30.5
   },
   {
     "imo": "9406087",
@@ -450,9 +978,9 @@
     "dwt_tonnage": 30420.0,
     "gross_tonnage": 19972.0,
     "net_tonnage": null,
-    "length_meters": 178.70,
-    "width_meters": 28.00,
-    "draft_max_meters": 9.80,
+    "length_meters": 178.7,
+    "width_meters": 28.0,
+    "draft_max_meters": 9.8,
     "air_draft_meters": null,
     "grain_cubic_meters": null,
     "holds_count": null,
@@ -546,8 +1074,140 @@
         "unit": "country_name",
         "reporting_date": "2026-11-13",
         "selection_rationale": "Statutory flag administration documented in Panama ship registry."
+      },
+      "engine_manufacturer": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "engine_model": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "engine_variant": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "engine_builder": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "cylinder_count": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "bore_mm": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "stroke_mm": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "rated_power_kw": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "rated_rpm": {
+        "status": "UNAVAILABLE",
+        "source_name": "Bureau Veritas (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Bureau Veritas. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "is_geared": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "USCG PSIX / Commercial Directory",
+        "source_record_id": "PSIX-9406087",
+        "source_url": "https://cgmix.uscg.mil/psix/",
+        "raw_value": "true",
+        "unit": "boolean",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Visual PSC inspection records indicate vessel is geared with 4 deck cranes."
+      },
+      "crane_count": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "USCG PSIX / Commercial Directory",
+        "source_record_id": "PSIX-9406087",
+        "source_url": "https://cgmix.uscg.mil/psix/",
+        "raw_value": "4",
+        "unit": "integer",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Reported 4 cargo cranes from port state inspection overview."
+      },
+      "crane_swl_tonnes": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "Dayang Shipbuilding Specification / BalticShipping",
+        "source_record_id": "BS-9406087",
+        "source_url": "https://www.balticshipping.com",
+        "raw_value": "30.0",
+        "unit": "metric_tonnes",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Secondary shipyard specification reports 30.5 MT SWL. Unaccredited for statutory capacity."
       }
-    }
+    },
+    "engine_manufacturer": null,
+    "engine_model": null,
+    "engine_variant": null,
+    "engine_builder": null,
+    "cylinder_count": null,
+    "bore_mm": null,
+    "stroke_mm": null,
+    "rated_power_kw": null,
+    "rated_rpm": null,
+    "is_geared": true,
+    "crane_count": 4,
+    "crane_swl_tonnes": 30.0
   },
   {
     "imo": "9591301",
@@ -560,8 +1220,8 @@
     "dwt_tonnage": 205616.0,
     "gross_tonnage": 106796.0,
     "net_tonnage": null,
-    "length_meters": 299.90,
-    "width_meters": 50.00,
+    "length_meters": 299.9,
+    "width_meters": 50.0,
     "draft_max_meters": 18.25,
     "air_draft_meters": null,
     "grain_cubic_meters": null,
@@ -656,7 +1316,139 @@
         "unit": "country_name",
         "reporting_date": "2026-11-13",
         "selection_rationale": "Statutory flag administration documented in Liberian ship registry."
+      },
+      "engine_manufacturer": {
+        "status": "UNAVAILABLE",
+        "source_name": "Lloyd's Register (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Lloyd's Register. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "engine_model": {
+        "status": "UNAVAILABLE",
+        "source_name": "Lloyd's Register (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Lloyd's Register. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "engine_variant": {
+        "status": "UNAVAILABLE",
+        "source_name": "Lloyd's Register (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Lloyd's Register. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "engine_builder": {
+        "status": "UNAVAILABLE",
+        "source_name": "Lloyd's Register (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "string",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Lloyd's Register. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "cylinder_count": {
+        "status": "UNAVAILABLE",
+        "source_name": "Lloyd's Register (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Lloyd's Register. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "bore_mm": {
+        "status": "UNAVAILABLE",
+        "source_name": "Lloyd's Register (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Lloyd's Register. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "stroke_mm": {
+        "status": "UNAVAILABLE",
+        "source_name": "Lloyd's Register (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Lloyd's Register. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "rated_power_kw": {
+        "status": "UNAVAILABLE",
+        "source_name": "Lloyd's Register (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Lloyd's Register. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "rated_rpm": {
+        "status": "UNAVAILABLE",
+        "source_name": "Lloyd's Register (Unindexed in ClassNK/DNV)",
+        "source_record_id": null,
+        "source_url": null,
+        "raw_value": null,
+        "unit": "numeric",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is classed by Lloyd's Register. Public ClassNK and DNV registers return NO RECORD. Retained as UNAVAILABLE without synthetic inference."
+      },
+      "is_geared": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "Baltic Exchange Commercial Register Profile",
+        "source_record_id": "BALTIC-9591301",
+        "source_url": "https://www.balticexchange.com",
+        "raw_value": "false",
+        "unit": "boolean",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Commercial registry specification reports gearless Capesize bulk carrier configuration."
+      },
+      "crane_count": {
+        "status": "SOURCE_REPORTED",
+        "source_name": "Baltic Exchange Commercial Register Profile",
+        "source_record_id": "BALTIC-9591301",
+        "source_url": "https://www.balticexchange.com",
+        "raw_value": "0",
+        "unit": "integer",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Gearless Capesize profile reports 0 cargo handling cranes."
+      },
+      "crane_swl_tonnes": {
+        "status": "UNAVAILABLE",
+        "source_name": "Liberian Registry (LISCR) / Baltic Profile",
+        "source_record_id": "LISCR-9591301",
+        "source_url": "https://www.liscr.com",
+        "raw_value": "null",
+        "unit": "metric_tonnes",
+        "reporting_date": "2026-11-13",
+        "selection_rationale": "Vessel is gearless; cargo crane safe working load is unavailable/not applicable. Not directly verified."
       }
-    }
+    },
+    "engine_manufacturer": null,
+    "engine_model": null,
+    "engine_variant": null,
+    "engine_builder": null,
+    "cylinder_count": null,
+    "bore_mm": null,
+    "stroke_mm": null,
+    "rated_power_kw": null,
+    "rated_rpm": null,
+    "is_geared": false,
+    "crane_count": 0,
+    "crane_swl_tonnes": null
   }
 ]

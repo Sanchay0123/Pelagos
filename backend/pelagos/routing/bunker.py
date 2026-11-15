@@ -181,7 +181,7 @@ def resolve_corridor_bunker_fuel_references(
     corridor_code: str,
     db: Optional[Session] = None,
     as_of: Optional[str] = None,
-    operational_mode: bool = False,
+    operational_mode: bool = True,
 ) -> BunkerFuelSummary:
     """Resolve bunker fuel reference data and genuine market quotes for a freight corridor.
 

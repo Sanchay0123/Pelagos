@@ -1,0 +1,32 @@
+[
+  {
+    "dataset_code": "IMO4_2STROKE_SSD_POST2010",
+    "dataset_title": "Fourth IMO GHG Study 2020 Aggregate 2-Stroke Slow Speed Diesel Baseline",
+    "publisher": "International Maritime Organization (IMO)",
+    "source_document": "Fourth IMO GHG Study 2020 - Final Report (MEPC 75/7/15)",
+    "source_revision": "2020 Final Publication",
+    "source_citation_details": "Annex 1 'Bottom-up methodology', Section 2.2 'Machinery and SFOC modeling', Table A1-3",
+    "source_document_url": "https://www.imo.org/en/OurWork/Environment/Pages/Fourth-IMO-GHG-Study-2020.aspx",
+    "retrieval_date": "2026-11-15",
+    "licensing_status": "AGGREGATE_ONLY",
+    "authenticity_status": "DIRECTLY_VERIFIED",
+    "applicability_scope": "AGGREGATE_RESEARCH",
+    "permitted_use": "AGGREGATE_RESEARCH_ONLY",
+    "is_aggregate_research": true,
+    "reference_conditions": "Global reporting fleet average test conditions; fuel lower calorific value (LCV) 42.7 MJ/kg.",
+    "fuel_type": "ISO_DMA_DIESEL",
+    "fuel_lcv_mj_kg": 42.7,
+    "tolerance_pct": 5.0,
+    "min_load_percent": 25.0,
+    "max_load_percent": 100.0,
+    "notes": "Aggregate research baseline representing statistical global fleet average across post-2010 2-stroke diesel vessels. Must not be used as a manufacturer engine curve or associated with individual vessels.",
+    "load_points": [
+      {"load_percent": 25.0, "sfoc_g_kwh": 184.0, "tolerance_pct": 8.0, "is_guaranteed": false, "notes": "IMO global statistical average low-load point"},
+      {"load_percent": 50.0, "sfoc_g_kwh": 164.0, "tolerance_pct": 6.0, "is_guaranteed": false, "notes": "IMO global statistical average part-load point"},
+      {"load_percent": 75.0, "sfoc_g_kwh": 161.5, "tolerance_pct": 5.0, "is_guaranteed": false, "notes": "IMO global statistical average service point"},
+      {"load_percent": 85.0, "sfoc_g_kwh": 163.0, "tolerance_pct": 5.0, "is_guaranteed": false, "notes": "IMO global statistical average high service point"},
+      {"load_percent": 100.0, "sfoc_g_kwh": 167.5, "tolerance_pct": 5.0, "is_guaranteed": false, "notes": "IMO global statistical average MCR point"}
+    ]
+  }
+]
+

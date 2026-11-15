@@ -39,6 +39,57 @@ class VerificationStatus:
     }
 
 
+class CurveApplicabilityScope:
+    """Applicability scope of an engine SFOC curve (Stage F1.4.2.2b)."""
+    EXACT_VARIANT = "EXACT_VARIANT"
+    FAMILY_REFERENCE = "FAMILY_REFERENCE"
+    AGGREGATE_RESEARCH = "AGGREGATE_RESEARCH"
+    UNAVAILABLE = "UNAVAILABLE"
+
+    ALL = {
+        EXACT_VARIANT,
+        FAMILY_REFERENCE,
+        AGGREGATE_RESEARCH,
+        UNAVAILABLE,
+    }
+
+
+class SourceLicensingStatus:
+    """Licensing and accessibility status for technical machinery documentation (Stage F1.4.2.2b)."""
+    OPEN_OPERATIONAL = "OPEN_OPERATIONAL"
+    OPEN_RESEARCH_ONLY = "OPEN_RESEARCH_ONLY"
+    REGISTRATION_REQUIRED = "REGISTRATION_REQUIRED"
+    LICENSE_RESTRICTED = "LICENSE_RESTRICTED"
+    AGGREGATE_ONLY = "AGGREGATE_ONLY"
+    NOT_ACCESSIBLE = "NOT_ACCESSIBLE"
+    UNVERIFIED = "UNVERIFIED"
+
+    ALL = {
+        OPEN_OPERATIONAL,
+        OPEN_RESEARCH_ONLY,
+        REGISTRATION_REQUIRED,
+        LICENSE_RESTRICTED,
+        AGGREGATE_ONLY,
+        NOT_ACCESSIBLE,
+        UNVERIFIED,
+    }
+
+
+class SfocPermittedUse:
+    """Permitted operational and research use classifications for SFOC data (Stage F1.4.2.2b.1)."""
+    OPERATIONAL_PERMITTED = "OPERATIONAL_PERMITTED"
+    RESEARCH_ONLY = "RESEARCH_ONLY"
+    RESTRICTED_PENDING_PERMISSION = "RESTRICTED_PENDING_PERMISSION"
+    AGGREGATE_RESEARCH_ONLY = "AGGREGATE_RESEARCH_ONLY"
+
+    ALL = {
+        OPERATIONAL_PERMITTED,
+        RESEARCH_ONLY,
+        RESTRICTED_PENDING_PERMISSION,
+        AGGREGATE_RESEARCH_ONLY,
+    }
+
+
 def validate_imo(imo: Optional[Union[str, int]]) -> Tuple[bool, Optional[str], Optional[str]]:
     """Validate a 7-digit maritime IMO ship identification number against the modulo-10 algorithm.
 
@@ -619,6 +670,25 @@ class Vessel(Base):
     flag_code = Column(String(8), nullable=True)
     source_name = Column(String(128), nullable=False)
     commercial_status = Column(String(32), nullable=False, default="unknown")  # active | laid_up | unknown
+
+    # Stage F1.4.2.2a: Verified Machinery & Cargo Gear Particulars
+    engine_manufacturer = Column(String(128), nullable=True)
+    engine_model = Column(String(128), nullable=True)
+    engine_variant = Column(String(128), nullable=True)
+    engine_builder = Column(String(128), nullable=True)
+    cylinder_count = Column(Integer, nullable=True)
+    bore_mm = Column(Float, nullable=True)
+    stroke_mm = Column(Float, nullable=True)
+    rated_power_kw = Column(Float, nullable=True)
+    rated_rpm = Column(Float, nullable=True)
+    is_geared = Column(Boolean, nullable=True)
+    crane_count = Column(Integer, nullable=True)
+    crane_swl_tonnes = Column(Float, nullable=True)
+
+    # Synonyms for backward compatibility and plural conventions
+    cylinders_count = synonym("cylinder_count")
+    cranes_count = synonym("crane_count")
+
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
 
@@ -626,6 +696,7 @@ class Vessel(Base):
     mmsi_history = relationship("VesselMmsiHistory", back_populates="vessel", cascade="all, delete-orphan", order_by="desc(VesselMmsiHistory.valid_from)")
     provenance_records = relationship("VesselAttributeProvenance", back_populates="vessel", cascade="all, delete-orphan", order_by="desc(VesselAttributeProvenance.retrieved_at)")
     operational_estimates = relationship("VesselOperationalEstimates", back_populates="vessel", cascade="all, delete-orphan", order_by="desc(VesselOperationalEstimates.computed_at)")
+    hydrostatics = relationship("VesselHydrostatics", back_populates="vessel", cascade="all, delete-orphan", uselist=False)
 
     __table_args__ = (
         Index("idx_vessels_imo_unique", "imo", unique=True),
@@ -711,6 +782,54 @@ class VesselOperationalEstimates(Base):
 
     __table_args__ = (
         Index("idx_vessel_op_est", "vessel_id", "model_name"),
+    )
+
+
+class VesselHydrostatics(Base):
+    """
+    Certified hydrostatic, hydrodynamic, and shipyard delivery benchmarks.
+    Preserves displacement, lightweight tonnage, design speed/draft/power,
+    and calibrated Admiralty coefficients derived from official shipyard trials
+    or statutory classification society records.
+
+    Naval Architecture Invariant:
+    Displacement Delta != DWT.
+    Laden Displacement = DWT + Lightweight Tonnage (or directly certified yard value).
+    """
+    __tablename__ = "vessel_hydrostatics"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    vessel_id = Column(Integer, ForeignKey("vessels.id", ondelete="CASCADE"), index=True, nullable=False)
+
+    # Hydrostatic mass parameters (in Metric Tonnes)
+    lightweight_tonnage_mt = Column(Float, nullable=True)
+    laden_displacement_mt = Column(Float, nullable=True)
+    ballast_displacement_mt = Column(Float, nullable=True)
+
+    # Certified design speed, draft, and service power
+    design_speed_knots = Column(Float, nullable=True)
+    design_draft_meters = Column(Float, nullable=True)
+    design_power_kw = Column(Float, nullable=True)
+    design_power_definition = Column(String(32), nullable=True, default="CSR_BRAKE_POWER")  # CSR_BRAKE_POWER, MCR
+
+    # Calibrated Admiralty coefficients: C_adm = (Delta^(2/3) * V^3) / P
+    calibrated_admiralty_coefficient = Column(Float, nullable=True)
+    ballast_admiralty_coefficient = Column(Float, nullable=True)
+
+    # Source provenance and licensing governance
+    source_name = Column(String(128), nullable=False)
+    source_record_id = Column(String(64), nullable=True)
+    source_url = Column(String(512), nullable=True)
+    retrieval_date = Column(String(32), nullable=True)
+    verification_status = Column(String(32), nullable=False, default="SOURCE_REPORTED")  # DIRECTLY_VERIFIED, SOURCE_REPORTED, UNAVAILABLE
+    permitted_use = Column(String(32), nullable=False, default="RESEARCH_ONLY")  # OPERATIONAL_PERMITTED, RESEARCH_ONLY, RESTRICTED_PENDING_PERMISSION
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    vessel = relationship("Vessel", back_populates="hydrostatics")
+
+    __table_args__ = (
+        Index("idx_vessel_hydrostatics_vessel_id", "vessel_id"),
     )
 
 
@@ -810,4 +929,84 @@ class BunkerPriceObservation(Base):
         UniqueConstraint("idempotency_key", name="uq_bunker_obs_idempotency_key"),
         Index("idx_bunker_obs_port_grade", "port_code", "fuel_grade"),
         Index("idx_bunker_obs_time", "observation_time"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Stage F1.4.2.2b: Engine SFOC Library & Load-Curve Parameterization
+# ---------------------------------------------------------------------------
+
+class EngineSfocCurve(Base):
+    """
+    Traceable, variant-aware marine engine Specific Fuel Oil Consumption (SFOC) curve.
+    Maintains provenance to manufacturer project guides, marine installation manuals (MIM),
+    and verified statutory documentation (Stage F1.4.2.2b).
+    """
+    __tablename__ = "engine_sfoc_curves"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    curve_code = Column(String(64), unique=True, index=True, nullable=False)
+    engine_manufacturer = Column(String(128), index=True, nullable=False)
+    engine_model = Column(String(128), index=True, nullable=False)
+    engine_variant = Column(String(128), index=True, nullable=True)
+    engine_family = Column(String(128), index=True, nullable=False)
+    applicability_scope = Column(String(64), nullable=False, default=CurveApplicabilityScope.FAMILY_REFERENCE)
+    authenticity_status = Column(String(32), nullable=False, default=VerificationStatus.DIRECTLY_VERIFIED)
+    permitted_use = Column(String(64), nullable=False, default=SfocPermittedUse.RESEARCH_ONLY)
+    is_aggregate_research = Column(Boolean, nullable=False, default=False)
+    cylinder_count = Column(Integer, nullable=True)
+    rated_power_kw = Column(Float, nullable=True)
+    rated_rpm = Column(Float, nullable=True)
+    tuning_strategy = Column(String(128), nullable=True)
+    fuel_type = Column(String(64), nullable=False, default="ISO_DMA_DIESEL")
+    fuel_lcv_mj_kg = Column(Float, nullable=False, default=42.7)
+    reference_conditions = Column(Text, nullable=True)
+    tolerance_pct = Column(Float, nullable=True, default=5.0)
+    source_name = Column(String(256), nullable=False)
+    source_document = Column(String(256), nullable=False)
+    source_document_url = Column(String(512), nullable=True)
+    source_revision = Column(String(128), nullable=True)
+    source_citation_details = Column(String(256), nullable=True)
+    retrieval_date = Column(String(32), nullable=True)
+    licensing_status = Column(String(64), nullable=False, default=SourceLicensingStatus.OPEN_RESEARCH_ONLY)
+    min_load_percent = Column(Float, nullable=False, default=50.0)
+    max_load_percent = Column(Float, nullable=False, default=100.0)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    load_points = relationship(
+        "EngineSfocLoadPoint",
+        back_populates="curve",
+        cascade="all, delete-orphan",
+        order_by="EngineSfocLoadPoint.load_percent",
+    )
+
+    __table_args__ = (
+        Index("idx_sfoc_curve_maker_model", "engine_manufacturer", "engine_model"),
+        Index("idx_sfoc_curve_family", "engine_family"),
+    )
+
+
+class EngineSfocLoadPoint(Base):
+    """
+    Documented or calibrated SFOC load point for a marine engine curve (Stage F1.4.2.2b).
+    Preserves exact manufacturer load points and provides boundaries for piecewise linear interpolation.
+    """
+    __tablename__ = "engine_sfoc_load_points"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    curve_id = Column(Integer, ForeignKey("engine_sfoc_curves.id", ondelete="CASCADE"), nullable=False, index=True)
+    load_percent = Column(Float, nullable=False)
+    sfoc_g_kwh = Column(Float, nullable=False)
+    tolerance_pct = Column(Float, nullable=True)
+    is_guaranteed = Column(Boolean, nullable=False, default=False)
+    is_interpolated = Column(Boolean, nullable=False, default=False)
+    notes = Column(String(256), nullable=True)
+
+    curve = relationship("EngineSfocCurve", back_populates="load_points")
+
+    __table_args__ = (
+        UniqueConstraint("curve_id", "load_percent", name="uq_sfoc_curve_load"),
+        Index("idx_sfoc_curve_load", "curve_id", "load_percent"),
     )
