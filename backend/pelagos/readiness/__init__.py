@@ -31,6 +31,15 @@ from pelagos.readiness.voyage_readiness_service import (
     VoyageReadinessAssessmentResult,
     VoyageReadinessStatus,
 )
+from pelagos.readiness.fixture_validation import (
+    CommissionGovernanceTier,
+    DurationStatus,
+    FixtureLineItemInput,
+    VoyageDurationInput,
+    CommercialFixturePayload,
+    ValidatedFixtureResult,
+    CommercialFixtureValidationEngine,
+)
 
 __all__ = [
     "VesselReadinessAssessment",
@@ -47,5 +56,12 @@ __all__ = [
     "VoyageReadinessService",
     "VoyageReadinessAssessmentResult",
     "VoyageReadinessStatus",
+    "CommissionGovernanceTier",
+    "DurationStatus",
+    "FixtureLineItemInput",
+    "VoyageDurationInput",
+    "CommercialFixturePayload",
+    "ValidatedFixtureResult",
+    "CommercialFixtureValidationEngine",
 ]
 

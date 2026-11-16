@@ -57,6 +57,13 @@ from pelagos.optimization.vessel_fuel_model import (
     VesselFuelBreakdown,
     seed_vessel_hydrostatics,
 )
+from pelagos.optimization.voyage_economics import (
+    GrossOceanFreightResult,
+    NetVoyageRevenueResult,
+    VoyageTCEResult,
+    OwnerOperatingProfitabilityResult,
+    VoyageEconomicsService,
+)
 
 __all__ = [
     "CalculationStatus",
@@ -104,5 +111,10 @@ __all__ = [
     "AuxiliaryFuelEstimate",
     "VesselFuelBreakdown",
     "seed_vessel_hydrostatics",
+    "GrossOceanFreightResult",
+    "NetVoyageRevenueResult",
+    "VoyageTCEResult",
+    "OwnerOperatingProfitabilityResult",
+    "VoyageEconomicsService",
 ]
 

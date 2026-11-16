@@ -101,6 +101,16 @@ class VesselReadinessAssessment:
             "field_evaluations": {k: v.to_dict() for k, v in self.field_evaluations.items()},
         }
 
+    @property
+    def is_ready_for_evaluation(self) -> bool:
+        """Alias for is_ready_for_research used by fixture validation gates."""
+        return self.is_ready_for_research
+
+    @property
+    def blocked_reasons(self) -> List[str]:
+        """Alias for blocking_reasons used by fixture validation gates."""
+        return self.blocking_reasons
+
 
 @dataclass
 class VesselParticularItem:
@@ -148,6 +158,38 @@ class VesselReadinessService:
 
     def __init__(self, db: Optional[Session] = None):
         self.db = db
+
+    def evaluate_readiness(
+        self,
+        vessel_imo: Optional[Union[int, str]] = None,
+        canal_transits: Optional[List[str]] = None,
+        port_calls: Optional[List[str]] = None,
+        transit_date: Optional[datetime.date] = None,
+        operational_mode: bool = False,
+        vessel: Optional[Union[Vessel, Dict[str, Any]]] = None,
+        **kwargs,
+    ) -> VesselReadinessAssessment:
+        """
+        Convenience gateway for evaluating vessel readiness from IMO, voyage itinerary, and transit date.
+        If vessel is not provided but db session exists, queries Vessel from db by IMO.
+        """
+        target_vessel = vessel
+        if target_vessel is None and self.db is not None and vessel_imo is not None:
+            try:
+                imo_int = int(vessel_imo)
+                target_vessel = self.db.query(Vessel).filter(Vessel.imo == imo_int).first()
+            except Exception:
+                target_vessel = None
+
+        return self.evaluate_vessel_readiness(
+            vessel=target_vessel,
+            vessel_imo=vessel_imo,
+            canal_transits=canal_transits,
+            port_calls=port_calls,
+            transit_date=transit_date,
+            operational_mode=operational_mode,
+            **kwargs,
+        )
 
     def evaluate_vessel_readiness(
         self,

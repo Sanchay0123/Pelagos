@@ -12,7 +12,9 @@ from pelagos.api.routes import health, vessels, ingestion, analytics, freight, r
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize database tables and additive schema compatibility; zero network or auto-seeding on startup
+    # Initialize database tables and additive schema compatibility; zero network or auto-seeding on startup.
+    # Safe isolation invariant (FINDING-P2-006): init_db() is deferred to server lifespan startup
+    # and MUST NEVER be invoked at top-level module scope to avoid touching databases during test imports.
     init_db()
     yield
 

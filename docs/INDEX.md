@@ -3,9 +3,9 @@ title: Pelagos Documentation Index
 document_id: DOC-003
 type: documentation_index
 status: approved
-version: 1.0.40
+version: 1.0.47
 created: 2026-10-10
-updated: 2026-11-15
+updated: 2026-11-16
 tags:
   - index
   - navigation
@@ -77,6 +77,15 @@ N/A
 * [Stage F1.4.3 Phase 1 Independent Verification Gate Report (VERIFY-F143-PHASE1-001)](./F1_4_3_PHASE1_INDEPENDENT_VERIFICATION.md) (v1.0.0, Status: Verified & Remediated — Stage F1.4.3 Phase 1 Gate Verdict PASS)
 * [Stage F1.4.3 Phase 1 Final Evidence Reconciliation Report (VERIFY-F143-PHASE1-RECON-001)](./F1_4_3_PHASE1_FINAL_RECONCILIATION.md) (v1.0.0, Status: Reconciled & Approved — Final Stage F1.4.3 Phase 1 Verdict PASS)
 * [Stage F1.4.3 Phase 1 Final Regression & Evidence Closure Report (VERIFY-F143-PHASE1-CLOSE-001)](./F1_4_3_PHASE1_FINAL_SIGNOFF.md) (v1.0.0, Status: Approved Final Evidence Closure — Stage F1.4.3 Phase 1 Closed)
+* [Stage F1.4.3 Phase 2 Architecture Specification (DOC-F143-PHASE2-ARCH-001)](./F1_4_3_PHASE2_ARCHITECTURE.md) (v1.2.0 / Rev 3, Status: Approved Architecture Specification — Stage F1.4.3 Phase 2)
+* [Stage F1.4.3 Phase 2 Implementation Plan (PLAN-F143-PHASE2-001)](./F1_4_3_PHASE2_IMPLEMENTATION_PLAN.md) (v1.2.0 / Rev 3, Status: Approved Implementation Plan — Stage F1.4.3 Phase 2)
+* [Stage F1.4.3 Phase 2 Implementation Report (REPORT-F143-PHASE2-001)](./F1_4_3_PHASE2_IMPLEMENTATION_REPORT.md) (v1.0.0, Status: Approved Implementation Report — Stage F1.4.3 Phase 2)
+* [Stage F1.4.3 Phase 2 Independent Verification Report (VERIFY-F143-PHASE2-001)](./F1_4_3_PHASE2_INDEPENDENT_VERIFICATION.md) (v1.0.0, Status: Approved Independent Verification Gate Report — Stage F1.4.3 Phase 2)
+* [Stage F1.4.3 Phase 2 Independent Verification Audit Report (AUDIT-F143-PHASE2-001)](./F1_4_3_PHASE2_INDEPENDENT_AUDIT.md) (v1.0.0, Status: Approved Audit Report — Stage F1.4.3 Phase 2)
+* [Stage F1.4.3 Phase 2 Test Inventory Reconciliation Report (RECON-F143-PHASE2-001)](./F1_4_3_PHASE2_TEST_RECONCILIATION.md) (v1.0.0, Status: Approved Test Reconciliation Report — Stage F1.4.3 Phase 2)
+* [Stage F1.4.3 Phase 2 Remediation Register (REGISTER-F143-PHASE2-001)](./F1_4_3_PHASE2_REMEDIATION_REGISTER.md) (v1.0.0, Status: Approved Remediation Register — Stage F1.4.3 Phase 2)
+* [Stage F1.4.3 Phase 2 Remediation & Closure Verification Report (REPORT-F143-PHASE2-REMED-001)](./F1_4_3_PHASE2_REMEDIATION_REPORT.md) (v1.0.0, Status: Formally Remediated & Verified — Final Stage F1.4.3 Phase 2 Verdict UNCONDITIONAL PASS)
+* [Stage F1.4.3 Phase 2 Controlled Publication Report (GIT-PUBLISH-F143-PHASE2-001)](./GIT_PUBLISH_F143_PHASE2_REPORT.md) (v1.0.0, Status: Approved Publication Report — Published to origin/main)
 
 ### Engineering and Operations
 * [Stage E1 Platform Data Overview & Detailed Data Explorer Specification (API-001)](./architecture/platform-data-explorer.md) (v1.0.2, Status: Under Review)
@@ -162,3 +171,10 @@ Links to established, governed documentation within the repository, and maps pla
 | 1.0.38 | 2026-11-15 | Verification Agent | Registered Stage F1.4.3 Phase 1 Independent Verification Gate Report (`VERIFY-F143-PHASE1-001`, v1.0.0) with comprehensive independent audit, narrow remediations, isolated migration validation, and final gate verdict PASS. Status: approved. |
 | 1.0.39 | 2026-11-15 | Verification Agent | Registered Stage F1.4.3 Phase 1 Final Evidence Reconciliation Report (`VERIFY-F143-PHASE1-RECON-001`, v1.0.0) resolving provider-specific FX lookbacks, complete 12-column additive migration inventory, source permission governance, statutory concession applicability, and platform regression verification. Status: approved. |
 | 1.0.40 | 2026-11-15 | Verification Agent | Registered Stage F1.4.3 Phase 1 Final Regression & Evidence Closure Report (`VERIFY-F143-PHASE1-CLOSE-001`, v1.0.0) recording reproduction of original and expanded inventories, source permission taxonomy, Decimal monetary precision remediation, and Suez Article 58 evidence closure. Status: approved. |
+| 1.0.41 | 2026-11-16 | Architecture Agent | Registered Stage F1.4.3 Phase 2 Architecture Specification (DOC-F143-PHASE2-ARCH-001, v1.0.0) and Phase 2 Implementation Plan (PLAN-F143-PHASE2-001, v1.0.0) establishing detailed designs, schemas, cryptographic gates, voyage calculator integration, tamper-evident audit ledger, and operational TCE gap analysis. Status: approved. |
+| 1.0.42 | 2026-11-16 | Architecture Agent | Revised Stage F1.4.3 Phase 2 Architecture (DOC-F143-PHASE2-ARCH-001 Rev 2) and Plan (PLAN-F143-PHASE2-001 Rev 2) under DESIGN-F143-PHASE2-REV-001: separated four voyage economics concepts (Gross Freight, Net Revenue, Conventional TCE excluding OPEX, and Owner Profitability), defined RFC 8785 canonical Decimal monetary representation, corrected multi-tiered immutability model (disclaiming SQLite admin-proof status), separated IMO syntax from identity and statutory certificates, established candidate cryptographic policy (Ed25519 and P-384 pending evidence), removed implicit commission defaults, defined 1h token / 2h CRL offline window, and ordered implementation sequence (P2-A -> P2-B -> P2-D -> P2-C -> P2-ALL). Status: approved. |
+| 1.0.43 | 2026-11-16 | Architecture Agent | Finalized Stage F1.4.3 Phase 2 Architecture (DOC-F143-PHASE2-ARCH-001 Rev 3) and Plan (PLAN-F143-PHASE2-001 Rev 3) under DESIGN-F143-PHASE2-REV-003: codified 5-tier financial precision lifecycle, refined field-specific canonical Decimal string scales, derived 5 timeline scenarios for offline CRL revocation threat model, separated RFC 6962 record Merkle tree (0x00/0x01) from chronological monotonic audit chain (0x02), expanded 7-component voyage duration denominator accounting, and restricted Phase 2 to dev/simulation tokens while barring production release tokens. Status: approved. |
+| 1.0.44 | 2026-11-16 | Implementation & Verification Agent | Registered Stage F1.4.3 Phase 2 Implementation Report (REPORT-F143-PHASE2-001, v1.0.0) and Independent Verification Report (VERIFY-F143-PHASE2-001, v1.0.0) establishing unified implementation and verified closure across P2-A (Commercial Fixture Engine), P2-B (Cryptographic Primitives), P2-D (Tamper-Evident Audit Ledger), P2-C (Decoupled Voyage Economics), and 10-scenario Adversarial Security Attack Matrix; Level 3 operational status locked inactive. Status: approved. |
+| 1.0.45 | 2026-11-16 | Independent Audit Agent | Registered Stage F1.4.3 Phase 2 Independent Audit Report (AUDIT-F143-PHASE2-001, v1.0.0), Test Reconciliation Report (RECON-F143-PHASE2-001, v1.0.0), and Remediation Register (REGISTER-F143-PHASE2-001, v1.0.0); independently audited source code across Areas A–F, reconciled 200 distinct platform tests (38 Phase 2 + 162 expanded predecessor), verified 10 adversarial attack scenarios, confirmed zero database mutations, and cataloged five medium/low findings under CONDITIONAL PASS. Status: approved. |
+| 1.0.46 | 2026-11-16 | Remediation Agent | Registered Stage F1.4.3 Phase 2 Remediation & Closure Verification Report (REPORT-F143-PHASE2-REMED-001, v1.0.0) closing findings P2-001 through P2-006; verified production DB isolation (pelagos.db intact), vessel readiness statutory integration, concurrent token replay handling, Merkle multi-set terminology, and 206 platform tests (100% passing) under UNCONDITIONAL PASS. Status: approved. |
+| 1.0.47 | 2026-11-16 | Publication Agent | Registered Stage F1.4.3 Phase 2 Controlled Publication Report (GIT-PUBLISH-F143-PHASE2-001, v1.0.0) documenting formal verification and publication of Phase 2 implementation, tests, and documentation to origin/main. Status: approved. |

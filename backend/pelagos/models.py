@@ -1189,6 +1189,12 @@ class VoyageDisbursementRecord(Base):
     unallocated_overage_usd = Column(Float, nullable=True)
     disclaimer = Column(Text, nullable=True)
 
+    # Cryptographic Content Hashing & Attestation (Stage F1.4.3 Phase 2)
+    merkle_root = Column(String(64), nullable=True)
+    record_payload_hash = Column(String(64), nullable=True)
+    attestation_signature = Column(Text, nullable=True)
+    signing_key_id = Column(String(64), nullable=True)
+
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
 
@@ -1242,4 +1248,54 @@ class VoyageDisbursementLineItem(Base):
     __table_args__ = (
         Index("idx_vydisb_line_item_loc_cat", "location_code", "charge_category"),
         Index("idx_vydisb_line_item_tariff", "tariff_identifier"),
+    )
+
+
+class ConsumedOperationalToken(Base):
+    """
+    Append-only single-use ledger for consumed operational release tokens (Stage F1.4.3 Phase 2).
+    Prevents token replay attacks across execution attempts.
+    """
+    __tablename__ = "consumed_operational_tokens"
+
+    jti = Column(String(64), primary_key=True)
+    consumed_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    voyage_id = Column(String(64), nullable=False, index=True)
+    vessel_imo = Column(Integer, nullable=False)
+    disbursement_record_id = Column(Integer, nullable=False)
+    caller_identity = Column(String(128), nullable=False)
+    signature_hash = Column(String(64), nullable=False)
+
+    __table_args__ = (
+        Index("idx_consumed_tokens_voyage", "voyage_id"),
+        Index("idx_consumed_tokens_vessel", "vessel_imo"),
+    )
+
+
+class VoyageDisbursementAuditLog(Base):
+    """
+    Append-only chronological audit ledger for voyage disbursement events (Stage F1.4.3 Phase 2).
+    Enforces strictly monotonic sequence numbers and SHA-256 hash chaining back to the genesis root.
+    INVARIANT: Chronological audit events are strictly append-only and never sorted lexicographically.
+    """
+    __tablename__ = "voyage_disbursement_audit_log"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    sequence_number = Column(BigInteger, nullable=False, unique=True, index=True)
+    record_id = Column(Integer, ForeignKey("voyage_disbursement_records.id", ondelete="CASCADE"), nullable=False, index=True)
+    voyage_id = Column(String(64), nullable=False, index=True)
+    vessel_imo = Column(Integer, nullable=False)
+    event_type = Column(String(32), nullable=False)
+    merkle_root = Column(String(64), nullable=False)
+    record_payload_hash = Column(String(64), nullable=False)
+    attestation_signature = Column(Text, nullable=False)
+    signing_key_id = Column(String(64), nullable=False)
+    previous_chain_hash = Column(String(64), nullable=False)
+    chain_hash = Column(String(64), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    __table_args__ = (
+        Index("idx_vydisb_audit_seq", "sequence_number"),
+        Index("idx_vydisb_audit_record", "record_id"),
+        Index("idx_vydisb_audit_voyage", "voyage_id"),
     )

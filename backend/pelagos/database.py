@@ -291,6 +291,14 @@ def ensure_schema_compatibility(target_engine=None):
                 conn.execute(text("ALTER TABLE voyage_disbursement_records ADD COLUMN unallocated_overage_usd FLOAT"))
             if "disclaimer" not in cols_rec:
                 conn.execute(text("ALTER TABLE voyage_disbursement_records ADD COLUMN disclaimer TEXT"))
+            if "merkle_root" not in cols_rec:
+                conn.execute(text("ALTER TABLE voyage_disbursement_records ADD COLUMN merkle_root VARCHAR(64)"))
+            if "record_payload_hash" not in cols_rec:
+                conn.execute(text("ALTER TABLE voyage_disbursement_records ADD COLUMN record_payload_hash VARCHAR(64)"))
+            if "attestation_signature" not in cols_rec:
+                conn.execute(text("ALTER TABLE voyage_disbursement_records ADD COLUMN attestation_signature TEXT"))
+            if "signing_key_id" not in cols_rec:
+                conn.execute(text("ALTER TABLE voyage_disbursement_records ADD COLUMN signing_key_id VARCHAR(64)"))
 
         if "voyage_disbursement_line_items" not in table_names:
             import pelagos.models
@@ -314,7 +322,96 @@ def ensure_schema_compatibility(target_engine=None):
             if "is_provisional" not in cols:
                 conn.execute(text("ALTER TABLE voyage_disbursement_line_items ADD COLUMN is_provisional BOOLEAN DEFAULT 0"))
 
+        # Stage F1.4.3 Phase 2: Consumed Operational Tokens Ledger
+        if "consumed_operational_tokens" not in table_names:
+            import pelagos.models
+            pelagos.models.ConsumedOperationalToken.__table__.create(conn)
+
+        # Stage F1.4.3 Phase 2: Append-Only Chronological Audit Log
+        if "voyage_disbursement_audit_log" not in table_names:
+            import pelagos.models
+            pelagos.models.VoyageDisbursementAuditLog.__table__.create(conn)
+
         conn.commit()
+
+
+def install_disbursement_immutability_triggers(target_engine=None):
+    """
+    Install storage engine triggers enforcing append-only immutability.
+    Defends against application-level ORM mutations and accidental SQL updates.
+    
+    ENGINE SCOPE SPECIFICATION (FINDING-P2-002):
+    - Supported Certified Engine: SQLite (dialect 'sqlite') is the sole certified and supported
+      persistence engine for Pelagos Stage F1.4.3. Full write-protection triggers are installed.
+    - Scope Limitation: PostgreSQL trigger protection is an unsupported scope limitation.
+      In a PostgreSQL deployment, trigger-based storage protection is not active and audit immutability
+      relies exclusively on application ORM contracts and DisbursementAuditVerifier cryptographic verification.
+      Native PL/pgSQL trigger installation is deferred to future architectural revisions.
+    
+    LIMITATION NOTE: Database triggers provide defense-in-depth against application
+    errors, but do NOT establish administrator-proof immutability against adversaries
+    with direct database file or root filesystem access.
+    """
+    eng = target_engine or engine
+    with eng.connect() as conn:
+        if eng.dialect.name == "sqlite":
+            conn.execute(text("""
+                CREATE TRIGGER IF NOT EXISTS trg_vydisb_records_no_update
+                BEFORE UPDATE ON voyage_disbursement_records
+                BEGIN
+                    SELECT RAISE(ABORT, 'IMMUTABILITY VIOLATION: voyage_disbursement_records is append-only.');
+                END;
+            """))
+            conn.execute(text("""
+                CREATE TRIGGER IF NOT EXISTS trg_vydisb_records_no_delete
+                BEFORE DELETE ON voyage_disbursement_records
+                BEGIN
+                    SELECT RAISE(ABORT, 'IMMUTABILITY VIOLATION: voyage_disbursement_records cannot be deleted.');
+                END;
+            """))
+            conn.execute(text("""
+                CREATE TRIGGER IF NOT EXISTS trg_vydisb_lines_no_update
+                BEFORE UPDATE ON voyage_disbursement_line_items
+                BEGIN
+                    SELECT RAISE(ABORT, 'IMMUTABILITY VIOLATION: voyage_disbursement_line_items is append-only.');
+                END;
+            """))
+            conn.execute(text("""
+                CREATE TRIGGER IF NOT EXISTS trg_vydisb_lines_no_delete
+                BEFORE DELETE ON voyage_disbursement_line_items
+                BEGIN
+                    SELECT RAISE(ABORT, 'IMMUTABILITY VIOLATION: voyage_disbursement_line_items cannot be deleted.');
+                END;
+            """))
+            conn.execute(text("""
+                CREATE TRIGGER IF NOT EXISTS trg_consumed_tokens_no_update
+                BEFORE UPDATE ON consumed_operational_tokens
+                BEGIN
+                    SELECT RAISE(ABORT, 'IMMUTABILITY VIOLATION: consumed_operational_tokens is append-only.');
+                END;
+            """))
+            conn.execute(text("""
+                CREATE TRIGGER IF NOT EXISTS trg_consumed_tokens_no_delete
+                BEFORE DELETE ON consumed_operational_tokens
+                BEGIN
+                    SELECT RAISE(ABORT, 'IMMUTABILITY VIOLATION: consumed_operational_tokens cannot be deleted.');
+                END;
+            """))
+            conn.execute(text("""
+                CREATE TRIGGER IF NOT EXISTS trg_vydisb_audit_no_update
+                BEFORE UPDATE ON voyage_disbursement_audit_log
+                BEGIN
+                    SELECT RAISE(ABORT, 'IMMUTABILITY VIOLATION: voyage_disbursement_audit_log is append-only.');
+                END;
+            """))
+            conn.execute(text("""
+                CREATE TRIGGER IF NOT EXISTS trg_vydisb_audit_no_delete
+                BEFORE DELETE ON voyage_disbursement_audit_log
+                BEGIN
+                    SELECT RAISE(ABORT, 'IMMUTABILITY VIOLATION: voyage_disbursement_audit_log cannot be deleted.');
+                END;
+            """))
+            conn.commit()
 
 
 def init_db(target_engine=None):
