@@ -1010,3 +1010,236 @@ class EngineSfocLoadPoint(Base):
         UniqueConstraint("curve_id", "load_percent", name="uq_sfoc_curve_load"),
         Index("idx_sfoc_curve_load", "curve_id", "load_percent"),
     )
+
+
+# ---------------------------------------------------------------------------
+# Stage F1.4.2.3a: Canal Tariff Registry & Currency Conversion Models
+# ---------------------------------------------------------------------------
+
+class CurrencyExchangeRate(Base):
+    """
+    Statutory and reference currency exchange rate (Stage F1.4.2.3a).
+    Supports multi-currency settlement conversion (e.g. IMF SDR, EUR, GBP, SGD to USD)
+    with strict effective-date gating and provenance audit trails.
+    """
+    __tablename__ = "currency_exchange_rates"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    base_currency = Column(String(8), nullable=False, default="USD")
+    quote_currency = Column(String(8), nullable=False, index=True)
+    rate = Column(Float, nullable=False)
+    effective_date = Column(Date, nullable=False, index=True)
+    rate_provider = Column(String(128), nullable=False)
+    retrieval_timestamp = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    source_reference = Column(String(256), nullable=False)
+    evidence_status = Column(String(32), nullable=False, default="DIRECTLY_VERIFIED")
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    __table_args__ = (
+        Index("idx_fx_base_quote_date", "base_currency", "quote_currency", "effective_date"),
+        UniqueConstraint("base_currency", "quote_currency", "effective_date", "rate_provider", name="uq_fx_rate_entry"),
+    )
+
+
+class CanalTariffRecord(Base):
+    """
+    Structured statutory canal transit tariff record for Panama and Suez (Stage F1.4.2.3a).
+    Preserves all official statutory attributes, dimensional tier criteria, progressive
+    brackets, ballast treatments, effective-date schedules, and source references.
+    """
+    __tablename__ = "canal_tariff_records"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    canal_authority = Column(String(32), nullable=False, index=True)  # ACP, SCA
+    jurisdiction = Column(String(64), nullable=False)
+    tariff_identifier = Column(String(64), nullable=False, index=True)  # e.g. 1010.FR03, 1010.DR01, SCA-SDR-TIER1, SCA-CIRC-7-2023
+    charge_category = Column(String(64), nullable=False, index=True)  # FIXED_TOLL, CAPACITY_TOLL, PROGRESSIVE_BASE_TOLL, CIRCULAR_SURCHARGE, FRESHWATER_SURCHARGE_FIXED, FRESHWATER_SURCHARGE_VARIABLE, MOORING_LIGHTING_SERVICE
+    original_amount = Column(Float, nullable=True)
+    currency = Column(String(8), nullable=False, default="USD")  # USD, SDR
+    billing_unit = Column(String(64), nullable=False)  # USD/transit, USD/DWT, SDR/SCNT, PERCENTAGE
+    calculation_basis = Column(String(128), nullable=False)  # VESSEL_DIMENSIONS, DEADWEIGHT_TONNAGE, SUEZ_CANAL_NET_TONNAGE, PROGRESSIVE_BRACKET, SIGMOIDAL_WATER_LEVEL
+    vessel_applicability = Column(String(64), nullable=False, default="DRY_BULK")
+    cargo_applicability = Column(String(64), nullable=False, default="DRY_BULK")
+    loading_condition = Column(String(16), nullable=False, default="ANY")  # LADEN, BALLAST, ANY
+    tier_or_bracket = Column(String(32), nullable=True)  # Regular, Super, Neopanamax, Tier 1, Tier 2, etc.
+    min_threshold = Column(Float, nullable=True)
+    max_threshold = Column(Float, nullable=True)
+    rate_value = Column(Float, nullable=False)
+    ballast_factor = Column(Float, nullable=True)  # e.g. 0.85
+    effective_from = Column(Date, nullable=False, index=True)
+    effective_to = Column(Date, nullable=False, index=True)
+    publication_date = Column(Date, nullable=True)
+    retrieval_date = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    source_url = Column(String(512), nullable=False)
+    document_identifier = Column(String(128), nullable=False)
+    precise_source_reference = Column(String(256), nullable=False)
+    evidence_classification = Column(String(64), nullable=False, default="DIRECTLY_VERIFIED")  # DIRECTLY_VERIFIED, PARTIALLY_VERIFIED, SOURCE_REPORTED
+    permission_status = Column(String(64), nullable=False, default="PERMITTED_FOR_STATUTORY_ESTIMATION")
+    supersession_status = Column(String(32), nullable=False, default="HISTORICAL")  # CURRENT, HISTORICAL, SUPERSEDED
+    original_source_text = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    __table_args__ = (
+        Index("idx_canal_lookup", "canal_authority", "charge_category", "effective_from", "effective_to"),
+        Index("idx_canal_tier", "canal_authority", "tier_or_bracket"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Stage F1.4.2.3b: Global Port Disbursement Intelligence Models
+# ---------------------------------------------------------------------------
+
+class PortTariffRecord(Base):
+    """
+    Source-backed statutory and regulated port tariff record (Stage F1.4.2.3b).
+    Encodes normalized port disbursement structures: port dues, pilotage, towage,
+    dockage, wharfage, mooring, waste, security, and statutory charges.
+    """
+    __tablename__ = "port_tariff_records"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    un_locode = Column(String(8), nullable=False, index=True)  # e.g. SGSIN, NLRTM, USHOU
+    port_name = Column(String(128), nullable=False)
+    country_code = Column(String(8), nullable=False, index=True)
+    jurisdiction = Column(String(64), nullable=False)
+    port_authority = Column(String(128), nullable=False)
+    tariff_identifier = Column(String(64), nullable=False, index=True)  # e.g. MPA-PORT-DUES-2023, RTM-SEAPORT-DUES-2024
+    charge_category = Column(String(64), nullable=False, index=True)  # PORT_DUES, PILOTAGE, TOWAGE, BERTH_OCCUPANCY_DOCKAGE, WHARFAGE, MOORING_UNMOORING, ANCHORAGE, WASTE_RECEPTION, FRESHWATER_SERVICE, SECURITY_ISPS, AGENCY_FEE, STATUTORY_LIGHT_DUES
+    applicability_type = Column(String(32), nullable=False, default="MANDATORY")  # MANDATORY, CONDITIONAL, USAGE_BASED, OPTIONAL
+    vessel_class = Column(String(64), nullable=False, default="DRY_BULK")  # DRY_BULK, ALL_VESSELS, CONTAINER, TANKER
+    basis_dimension = Column(String(32), nullable=False)  # GT, DWT, LOA_METERS, LOA_FEET, BEAM_METERS, DRAFT_METERS, DRAFT_FEET, DURATION_HOURS, DURATION_DAYS, CALL_EVENT, CARGO_TONS, VOLUME_M3
+    min_threshold = Column(Float, nullable=True)
+    max_threshold = Column(Float, nullable=True)
+    rate_value = Column(Float, nullable=False)
+    currency = Column(String(8), nullable=False, default="USD")
+    billing_unit = Column(String(64), nullable=False)  # PER_100_GT_PER_DAY, EUR_PER_GT, USD_PER_FOOT_PER_DAY, FIXED_PER_CALL, USD_PER_DRAFT_FOOT
+    min_charge = Column(Float, nullable=True)
+    max_charge = Column(Float, nullable=True)
+    effective_from = Column(Date, nullable=False, index=True)
+    effective_to = Column(Date, nullable=False, index=True)
+    publication_date = Column(Date, nullable=True)
+    retrieval_date = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    source_url = Column(String(512), nullable=False)
+    document_identifier = Column(String(128), nullable=False)
+    precise_source_reference = Column(String(256), nullable=False)
+    evidence_classification = Column(String(64), nullable=False, default="DIRECTLY_VERIFIED")  # DIRECTLY_VERIFIED, SOURCE_REPORTED, PARTIALLY_VERIFIED, UNVERIFIED, UNAVAILABLE, HISTORICAL
+    permission_status = Column(String(64), nullable=False, default="PERMITTED_FOR_STATUTORY_ESTIMATION")
+    supersession_status = Column(String(32), nullable=False, default="HISTORICAL")  # CURRENT, HISTORICAL, SUPERSEDED
+    applicability_condition = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    __table_args__ = (
+        Index("idx_port_tariff_lookup", "un_locode", "charge_category", "effective_from", "effective_to"),
+        Index("idx_port_tariff_id", "un_locode", "tariff_identifier"),
+    )
+
+
+class VoyageDisbursementRecord(Base):
+    """
+    Voyage-level disbursement integration record (Stage F1.4.2.4).
+    Associates canal transit and port disbursement records with individual voyage assessments.
+    Strictly isolated from commercial TCE, net freight, and operational chartering recommendations.
+    """
+    __tablename__ = "voyage_disbursement_records"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    voyage_id = Column(String(64), nullable=False, index=True)
+    vessel_imo = Column(Integer, nullable=True, index=True)
+    vessel_name = Column(String(128), nullable=True)
+    vessel_class = Column(String(64), nullable=True)
+    origin_port_unlocode = Column(String(8), nullable=False, index=True)
+    destination_port_unlocode = Column(String(8), nullable=False, index=True)
+    intermediate_ports_json = Column(Text, nullable=True)  # JSON list of UN/LOCODEs
+    canal_transits_json = Column(Text, nullable=True)      # JSON list of canal IDs ("PANAMA", "SUEZ")
+    transit_date = Column(Date, nullable=False, index=True)
+
+    # Vessel Particulars at transit time
+    vessel_gt = Column(Float, nullable=True)
+    vessel_dwt = Column(Float, nullable=True)
+    vessel_loa_m = Column(Float, nullable=True)
+    vessel_beam_m = Column(Float, nullable=True)
+    vessel_draft_m = Column(Float, nullable=True)
+    scnt = Column(Float, nullable=True)
+    pc_ums_net = Column(Float, nullable=True)
+
+    # Synonyms for flexible access
+    loa_m = synonym("vessel_loa_m")
+    beam_m = synonym("vessel_beam_m")
+    draft_m = synonym("vessel_draft_m")
+
+    # Disbursement Financial Totals (USD)
+    total_disbursement_usd = Column(Float, nullable=True)
+    total_port_disbursement_usd = Column(Float, nullable=True)
+    total_canal_transit_usd = Column(Float, nullable=True)
+
+    # Readiness, Governance & Operational Gating
+    readiness_tier = Column(String(64), nullable=False, default="LEVEL_2_RESEARCH_ONLY")
+    completeness_status = Column(String(64), nullable=False)  # e.g. COMPLETE_WITHIN_REGISTERED_SCOPE, PARTIAL_COMPONENTS
+    is_complete = Column(Boolean, nullable=False, default=False)
+    has_partial_components = Column(Boolean, nullable=False, default=False)
+    is_operational_approved = Column(Boolean, nullable=False, default=False)  # Enforced False under Level 3 Block
+    blocked_reasons_json = Column(Text, nullable=True)
+    evidence_summary_json = Column(Text, nullable=True)
+    notes = Column(Text, nullable=True)
+    unallocated_overage_usd = Column(Float, nullable=True)
+    disclaimer = Column(Text, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    line_items = relationship("VoyageDisbursementLineItem", back_populates="voyage_record", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("idx_voyage_disbursement_voyage_id", "voyage_id"),
+        Index("idx_voyage_disbursement_origin_dest", "origin_port_unlocode", "destination_port_unlocode"),
+        Index("idx_voyage_disbursement_status", "completeness_status", "readiness_tier"),
+    )
+
+
+class VoyageDisbursementLineItem(Base):
+    """
+    Detailed line item associated with a voyage disbursement assessment (Stage F1.4.2.4).
+    Preserves fine-grained charge provenance, local amount, converted amount, and partial-component flag.
+    """
+    __tablename__ = "voyage_disbursement_line_items"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    voyage_disbursement_record_id = Column(Integer, ForeignKey("voyage_disbursement_records.id", ondelete="CASCADE"), nullable=False, index=True)
+    charge_type = Column(String(32), nullable=False)   # PORT_DISBURSEMENT | CANAL_TRANSIT
+    location_code = Column(String(32), nullable=False)  # UN/LOCODE (e.g. SGSIN) or Canal Name (PANAMA, SUEZ)
+    charge_category = Column(String(64), nullable=False)
+    tariff_identifier = Column(String(64), nullable=False, index=True)
+    description = Column(String(256), nullable=False)
+    applicability_type = Column(String(32), nullable=False)  # MANDATORY, CONDITIONAL, USAGE_BASED, OPTIONAL, COMMERCIALLY_NEGOTIATED / CONTRACTUAL
+    rate_value = Column(Float, nullable=False)
+    billing_unit = Column(String(64), nullable=False)
+    local_currency = Column(String(8), nullable=False)
+    amount_local = Column(Float, nullable=True)
+    exchange_rate_to_usd = Column(Float, nullable=True)
+    amount_usd = Column(Float, nullable=True)
+    fx_rate_provider = Column(String(128), nullable=True)
+    fx_observation_date = Column(Date, nullable=True)
+    requested_valuation_date = Column(Date, nullable=True)
+    fx_observation_lag_days = Column(Integer, nullable=True)
+    conversion_evidence_classification = Column(String(64), nullable=True)
+    charge_tier = Column(String(64), nullable=True)
+    contract_attribution = Column(String(128), nullable=True)
+    is_provisional = Column(Boolean, nullable=True, default=False)
+    is_partial_component = Column(Boolean, nullable=False, default=False)
+    is_available = Column(Boolean, nullable=False, default=True)
+    evidence_classification = Column(String(64), nullable=False, default="DIRECTLY_VERIFIED")
+    permission_status = Column(String(64), nullable=False, default="PERMITTED_STATUTORY_DISCLOSURE")
+    failure_reason = Column(String(256), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    voyage_record = relationship("VoyageDisbursementRecord", back_populates="line_items")
+
+    __table_args__ = (
+        Index("idx_vydisb_line_item_loc_cat", "location_code", "charge_category"),
+        Index("idx_vydisb_line_item_tariff", "tariff_identifier"),
+    )

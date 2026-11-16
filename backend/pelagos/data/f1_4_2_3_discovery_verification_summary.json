@@ -1,0 +1,366 @@
+{
+  "$schema": "pelagos-discovery-verification-summary-v1",
+  "version": "1.0.0",
+  "stage": "F1.4.2.3-VERIFICATION",
+  "title": "Pelagos Stage F1.4.2.3 Discovery Evidence Verification & Source Audit Summary",
+  "created_at": "2026-11-15T08:25:00Z",
+  "auditor": "Antigravity Quality Assurance & Maritime Intelligence Verifier",
+  "baseline_commit": "2929e61c5ddb8061ebfa9ad6c905b38b69335ef6",
+  "inventory_metadata": {
+    "target_inventory_file": "backend/pelagos/data/f1_4_2_3_disbursement_source_inventory.json",
+    "total_records_claimed": 31,
+    "actual_records_counted": 31,
+    "unique_source_ids_count": 31,
+    "unique_source_urls_count": 31,
+    "duplicate_records_detected": 0,
+    "total_unique_field_keys": 25,
+    "field_completeness_ratio": 1.0
+  },
+  "recalculated_headline_metrics": {
+    "total_source_records": {
+      "metric_name": "Total Source Records",
+      "counting_definition": "Count of distinct source items in the inventory JSON array",
+      "numerator": 31,
+      "denominator": 31,
+      "percentage": 100.0,
+      "record_ids": [
+        "SRC-DISB-PANAMA-ACP-001", "SRC-DISB-SUEZ-SCA-001", "SRC-DISB-KIEL-WSV-001", "SRC-DISB-SLSMC-GLS-001",
+        "SRC-DISB-SGP-MPA-001", "SRC-DISB-SGP-PSA-001", "SRC-DISB-NLD-RTM-001", "SRC-DISB-NLD-LOODS-001",
+        "SRC-DISB-BEL-ANR-001", "SRC-DISB-USA-HOU-001", "SRC-DISB-USA-HOUPILOT-001", "SRC-DISB-USA-CRBP-001",
+        "SRC-DISB-USA-USACE-HMF-001", "SRC-DISB-CAN-VFPA-001", "SRC-DISB-CAN-PPA-001", "SRC-DISB-GBR-PLA-001",
+        "SRC-DISB-GBR-TRINITY-001", "SRC-DISB-ESP-VAL-001", "SRC-DISB-IND-JNPA-001", "SRC-DISB-IND-DPA-001",
+        "SRC-DISB-IND-MUNDRA-001", "SRC-DISB-JPN-YOK-001", "SRC-DISB-JPN-JFPA-001", "SRC-DISB-CHN-MOT-001",
+        "SRC-DISB-ARE-DPW-001", "SRC-DISB-AUS-PPA-001", "SRC-DISB-AUS-MEL-001", "SRC-DISB-BRA-APS-001",
+        "SRC-DISB-ZAF-TNPA-001", "SRC-DISB-INT-UNCTAD-001", "SRC-DISB-INT-FONASBA-001"
+      ],
+      "headline_supported": true
+    },
+    "official_authority_sources": {
+      "metric_name": "Official Authority Sources",
+      "counting_definition": "Sources classified as AUTHORITATIVE_PRIMARY_LEGAL (sovereign governments, statutory port authorities, state pilotage commissions, canal administrations)",
+      "numerator": 25,
+      "denominator": 31,
+      "percentage": 80.65,
+      "record_ids": [
+        "SRC-DISB-PANAMA-ACP-001", "SRC-DISB-SUEZ-SCA-001", "SRC-DISB-KIEL-WSV-001", "SRC-DISB-SLSMC-GLS-001",
+        "SRC-DISB-SGP-MPA-001", "SRC-DISB-NLD-RTM-001", "SRC-DISB-NLD-LOODS-001", "SRC-DISB-BEL-ANR-001",
+        "SRC-DISB-USA-HOU-001", "SRC-DISB-USA-HOUPILOT-001", "SRC-DISB-USA-CRBP-001", "SRC-DISB-USA-USACE-HMF-001",
+        "SRC-DISB-CAN-VFPA-001", "SRC-DISB-CAN-PPA-001", "SRC-DISB-GBR-PLA-001", "SRC-DISB-GBR-TRINITY-001",
+        "SRC-DISB-ESP-VAL-001", "SRC-DISB-IND-JNPA-001", "SRC-DISB-IND-DPA-001", "SRC-DISB-JPN-YOK-001",
+        "SRC-DISB-JPN-JFPA-001", "SRC-DISB-CHN-MOT-001", "SRC-DISB-AUS-PPA-001", "SRC-DISB-AUS-MEL-001",
+        "SRC-DISB-BRA-APS-001", "SRC-DISB-ZAF-TNPA-001"
+      ],
+      "ambiguous_records": [
+        "SRC-DISB-INT-UNCTAD-001 (Intergovernmental UN body classified as AUTHORITATIVE_SECONDARY_REGULATORY; if included, count is 26/31)"
+      ],
+      "headline_supported": true
+    },
+    "commercial_operator_sources": {
+      "metric_name": "Commercial Operator / Licensee Sources",
+      "counting_definition": "Sources classified as AUTHORITATIVE_PRIMARY_OPERATOR or private trade associations",
+      "numerator": 3,
+      "denominator": 31,
+      "percentage": 9.68,
+      "record_ids": [
+        "SRC-DISB-SGP-PSA-001", "SRC-DISB-IND-MUNDRA-001", "SRC-DISB-ARE-DPW-001"
+      ],
+      "ambiguous_records": [
+        "SRC-DISB-INT-FONASBA-001 (International ship agent trade association classified as AUTHORITATIVE_SECONDARY_INDUSTRY_STANDARD; if included, count is 4/31)"
+      ],
+      "headline_supported": true
+    },
+    "sources_with_usable_public_tariffs": {
+      "metric_name": "Sources with Usable Public Tariffs or Deterministic Formulas",
+      "counting_definition": "Sources providing explicit line-item rates, tariff brackets, or deterministic mathematical formulas applicable to vessel calls",
+      "numerator": 27,
+      "denominator": 31,
+      "percentage": 87.10,
+      "record_ids": [
+        "SRC-DISB-PANAMA-ACP-001", "SRC-DISB-SUEZ-SCA-001", "SRC-DISB-KIEL-WSV-001", "SRC-DISB-SLSMC-GLS-001",
+        "SRC-DISB-SGP-MPA-001", "SRC-DISB-NLD-RTM-001", "SRC-DISB-NLD-LOODS-001", "SRC-DISB-BEL-ANR-001",
+        "SRC-DISB-USA-HOU-001", "SRC-DISB-USA-HOUPILOT-001", "SRC-DISB-USA-CRBP-001", "SRC-DISB-CAN-VFPA-001",
+        "SRC-DISB-CAN-PPA-001", "SRC-DISB-GBR-PLA-001", "SRC-DISB-GBR-TRINITY-001", "SRC-DISB-ESP-VAL-001",
+        "SRC-DISB-IND-JNPA-001", "SRC-DISB-IND-DPA-001", "SRC-DISB-IND-MUNDRA-001", "SRC-DISB-JPN-YOK-001",
+        "SRC-DISB-JPN-JFPA-001", "SRC-DISB-CHN-MOT-001", "SRC-DISB-ARE-DPW-001", "SRC-DISB-AUS-PPA-001",
+        "SRC-DISB-AUS-MEL-001", "SRC-DISB-BRA-APS-001", "SRC-DISB-ZAF-TNPA-001"
+      ],
+      "excluded_records": [
+        "SRC-DISB-USA-USACE-HMF-001 (Ad valorem tax code, not a port rate card)",
+        "SRC-DISB-SGP-PSA-001 (Towage BAF gated behind customer login)",
+        "SRC-DISB-INT-UNCTAD-001 (Macroeconomic framework, not a rate card)",
+        "SRC-DISB-INT-FONASBA-001 (Contractual framework, not a rate card)"
+      ],
+      "headline_supported": true
+    },
+    "manual_download_sources": {
+      "metric_name": "Sources Requiring Manual Document Downloads",
+      "counting_definition": "Sources published as PDF booklets, circulars, or gazette notices requiring document harvesting",
+      "numerator": 24,
+      "denominator": 31,
+      "percentage": 77.42,
+      "record_ids": [
+        "SRC-DISB-PANAMA-ACP-001", "SRC-DISB-SUEZ-SCA-001", "SRC-DISB-KIEL-WSV-001", "SRC-DISB-SLSMC-GLS-001",
+        "SRC-DISB-SGP-MPA-001", "SRC-DISB-SGP-PSA-001", "SRC-DISB-NLD-RTM-001", "SRC-DISB-NLD-LOODS-001",
+        "SRC-DISB-BEL-ANR-001", "SRC-DISB-USA-HOU-001", "SRC-DISB-USA-HOUPILOT-001", "SRC-DISB-USA-CRBP-001",
+        "SRC-DISB-CAN-VFPA-001", "SRC-DISB-CAN-PPA-001", "SRC-DISB-GBR-PLA-001", "SRC-DISB-ESP-VAL-001",
+        "SRC-DISB-IND-JNPA-001", "SRC-DISB-IND-DPA-001", "SRC-DISB-IND-MUNDRA-001", "SRC-DISB-JPN-YOK-001",
+        "SRC-DISB-JPN-JFPA-001", "SRC-DISB-CHN-MOT-001", "SRC-DISB-ARE-DPW-001", "SRC-DISB-AUS-PPA-001"
+      ],
+      "headline_supported": true
+    },
+    "api_or_bulk_sources": {
+      "metric_name": "Sources with API or Bulk Download Capability",
+      "counting_definition": "Sources exposing programmatic query endpoints, bulk download datasets, or interactive calculation tools",
+      "numerator": 4,
+      "denominator": 31,
+      "percentage": 12.90,
+      "record_ids": [
+        "SRC-DISB-PANAMA-ACP-001", "SRC-DISB-NLD-LOODS-001", "SRC-DISB-GBR-PLA-001", "SRC-DISB-INT-UNCTAD-001"
+      ],
+      "headline_supported": true
+    },
+    "unresolved_licensing_sources": {
+      "metric_name": "Sources with Unresolved / Commercial Licensing",
+      "counting_definition": "Sources governed by commercial operator terms, municipal terms without explicit open redistribution grants, or statutory notices lacking automated API permissions",
+      "numerator": 14,
+      "denominator": 31,
+      "percentage": 45.16,
+      "record_ids": [
+        "SRC-DISB-PANAMA-ACP-001", "SRC-DISB-SUEZ-SCA-001", "SRC-DISB-SLSMC-GLS-001", "SRC-DISB-SGP-MPA-001",
+        "SRC-DISB-SGP-PSA-001", "SRC-DISB-NLD-RTM-001", "SRC-DISB-NLD-LOODS-001", "SRC-DISB-BEL-ANR-001",
+        "SRC-DISB-CAN-VFPA-001", "SRC-DISB-CAN-PPA-001", "SRC-DISB-GBR-PLA-001", "SRC-DISB-IND-MUNDRA-001",
+        "SRC-DISB-ARE-DPW-001", "SRC-DISB-INT-FONASBA-001"
+      ],
+      "headline_supported": true
+    },
+    "explicit_commercial_open_sources": {
+      "metric_name": "Sources with Explicit Public Domain or Open Government Licences",
+      "counting_definition": "Sources published under explicit statutory public domain provisions or open government licences permitting commercial reuse",
+      "numerator": 5,
+      "denominator": 31,
+      "percentage": 16.13,
+      "record_ids": [
+        "SRC-DISB-KIEL-WSV-001", "SRC-DISB-USA-USACE-HMF-001", "SRC-DISB-GBR-TRINITY-001",
+        "SRC-DISB-ESP-VAL-001", "SRC-DISB-INT-UNCTAD-001"
+      ],
+      "headline_supported": true
+    }
+  },
+  "geographic_coverage_reconciliation": {
+    "claimed_regions_count": 11,
+    "actual_distinct_geographic_regions": 12,
+    "regions_list": [
+      "Central America (Panama)",
+      "Middle East & North Africa (Egypt / Suez)",
+      "Northwest Europe (Netherlands, Belgium, Germany / Kiel)",
+      "North America (United States & Canada)",
+      "United Kingdom & Republic of Ireland",
+      "Mediterranean (Spain)",
+      "Indian Subcontinent (India)",
+      "East Asia (China & Japan)",
+      "Southeast Asia (Singapore)",
+      "Arabian Gulf / Middle East (United Arab Emirates)",
+      "Oceania (Australia)",
+      "South America (Brazil)",
+      "Sub-Saharan Africa (South Africa)"
+    ],
+    "discrepancy_explanation": "The original discovery report summary cited '11 geographic regions' by grouping Egypt (Suez) and UAE into a single 'Middle East' region, and grouping UK/Ireland into 'Europe'. When evaluated as distinct maritime operational corridors, there are 12 regional jurisdictions plus 1 international benchmark category (total 13 entries in the coverage matrix table). This minor categorization difference is reconciled and documented."
+  },
+  "panama_canal_evidence": {
+    "source_id": "SRC-DISB-PANAMA-ACP-001",
+    "document_title": "Panama Canal Official Maritime Tariffs & Tolls Schedule; OP Notice to Shipping N-1 and N-7",
+    "official_url": "https://www.pancanal.com/en/maritime-services/maritime-tariff",
+    "issuing_authority": "Autoridad del Canal de Panamá (ACP)",
+    "publication_date": "2024-01-01",
+    "effective_date": "2024-01-01",
+    "measurement_system": "PC/UMS (Panama Canal Universal Measurement System)",
+    "fixed_toll_component": "Fixed capacity charge scaled by vessel class (Regular <=91 ft beam, Super 91-107 ft, Panamax Plus, Neopanamax >107 ft beam)",
+    "variable_toll_component": "Capacity toll per PC/UMS net ton (for bulk carriers/tankers) or per TEU (for container vessels)",
+    "freshwater_surcharge_formula": "Fixed base surcharge (1% to 2%) + Variable dynamic surcharge (0% to 10%) determined daily from Gatun Lake water level (range 80.0 ft to 88.5 ft)",
+    "mandatory_transit_assistance": "Locomotive wire charges for Panamax locks; tugboat allocation rates for Neopanamax locks; mandatory canal pilotage",
+    "booking_and_reservation": "Tiered advance booking fees (Period 1, 2, 3); auction slots for unallocated transit slots",
+    "settlement_currency": "USD",
+    "dynamic_inputs_required": [
+      "Daily Gatun Lake water level (feet) — affects FWS and draft limits",
+      "Live transit reservation auction clearing bids (USD) — during drought/congestion"
+    ],
+    "deterministic_implementation_readiness": "PARTIALLY_READY (Static baseline formula, fixed/variable tolls, and FWS formula are deterministic; dynamic slot auction fees cannot be derived from static tariffs)"
+  },
+  "suez_canal_evidence": {
+    "source_id": "SRC-DISB-SUEZ-SCA-001",
+    "document_title": "Suez Canal Navigation Circulars, Toll Schedules & Periodical Amendments (Circular No. 1/2024)",
+    "official_url": "https://www.suezcanal.gov.eg/English/Navigation/Pages/Tolls.aspx",
+    "issuing_authority": "Suez Canal Authority (SCA)",
+    "publication_date": "2024-01-15",
+    "effective_date": "2024-01-15",
+    "measurement_system": "SCNT (Suez Canal Net Tonnage under 1873 Constantinople Convention)",
+    "base_toll_brackets": "Progressive SDR rate per SCNT tier (first 5,000 SCNT, next 5,000 SCNT, next 10,000 SCNT, etc.)",
+    "laden_vs_ballast_differentiation": "Ballast transits receive ~15% to 20% lower base rates across all tiers",
+    "periodical_surcharges": "Published circular percentage surcharges (+5% to +15%) applied on top of SDR base dues by vessel type",
+    "mandatory_transit_assistance": "Compulsory escort tugs for laden bulk vessels >100,000 DWT or beam >48m; 4 compulsory transit pilot assignments (Port Said/Suez approaches + convoy)",
+    "ancillary_fees": "Mooring boats, projector searchlight rental, harbour master dues",
+    "settlement_currency": "SDR (Special Drawing Rights), converted to USD/EUR at National Bank of Egypt daily exchange rate",
+    "dynamic_inputs_required": [
+      "Daily SDR/USD exchange rate from National Bank of Egypt",
+      "Application-specific long-haul rebate grant status"
+    ],
+    "deterministic_implementation_readiness": "PARTIALLY_READY (SDR base bracket calculation, laden/ballast factors, and escort tug rules are deterministic; final USD settlement requires external daily forex rate)"
+  },
+  "other_canals_evidence": {
+    "kiel_canal": {
+      "source_id": "SRC-DISB-KIEL-WSV-001",
+      "document_title": "Nord-Ostsee-Kanal-Befahrungsabgabenverordnung (NOKBefAbgV) Annex 1",
+      "official_url": "https://www.elwis.de/DE/Schifffahrtsrecht/Seeschifffahrtsrecht/NOK/NOK-BefAbgV/NOK-BefAbgV-node.html",
+      "issuing_authority": "Generaldirektion Wasserstraßen und Schifffahrt (GDWS) / WSV Germany",
+      "measurement_basis": "Gross Tonnage (GT) and Traffic Group (Verkehrsgruppe 1 to 6)",
+      "components": "Canal Dues (Kanalabgaben) + Pilot Dues (Lotsabgaben) + Pilot Fees (Lotsgelder) + Canal Helmsmen (Steuerleute)",
+      "active_relief": "50% temporary fee reduction under § 8 NOKBefAbgV for vessels with mandatory pilotage",
+      "currency": "EUR",
+      "deterministic_readiness": "FULLY_READY"
+    },
+    "st_lawrence_seaway": {
+      "source_id": "SRC-DISB-SLSMC-GLS-001",
+      "document_title": "Great Lakes St. Lawrence Seaway Schedule of Tolls",
+      "official_url": "https://greatlakes-seaway.com/en/commercial-shipping/schedule-of-tolls/",
+      "issuing_authority": "St. Lawrence Seaway Management Corp (SLSMC) / Great Lakes St. Lawrence Seaway Development Corp (GLS)",
+      "measurement_basis": "Gross Registered Tonnage (GRT) + Cargo Metric Tonnes",
+      "components": "Vessel GRT Toll + Commodity Cargo Toll (bulk, grain, steel) across MLO and Welland Canal locks",
+      "currency": "Split CAD (SLSMC locks) and USD (GLS locks)",
+      "deterministic_readiness": "FULLY_READY"
+    }
+  },
+  "seed_vessels_canal_readiness": [
+    {
+      "imo": 9441295,
+      "vessel_name": "EGRET BULKER",
+      "vessel_class": "Supramax",
+      "dwt_tonnage": 57809.0,
+      "gross_tonnage": 33045.0,
+      "net_tonnage": null,
+      "pc_ums_net_tonnage": null,
+      "pc_ums_status": "UNAVAILABLE",
+      "scnt_tonnage": null,
+      "scnt_status": "UNAVAILABLE",
+      "evidence_notes": "Class certificate does not report PC/UMS or SCNT; no tonnage measurement certificate in project repository",
+      "inference_permitted": false
+    },
+    {
+      "imo": 9713430,
+      "vessel_name": "NAVIOS VICTORY",
+      "vessel_class": "Kamsarmax",
+      "dwt_tonnage": 81922.0,
+      "gross_tonnage": 40937.0,
+      "net_tonnage": null,
+      "pc_ums_net_tonnage": null,
+      "pc_ums_status": "UNAVAILABLE",
+      "scnt_tonnage": null,
+      "scnt_status": "UNAVAILABLE",
+      "evidence_notes": "ClassNK register 145541 verifies GT (40937) and DWT (81922), but does not publish PC/UMS or SCNT certificates",
+      "inference_permitted": false
+    },
+    {
+      "imo": 9766944,
+      "vessel_name": "IRIS BLISS",
+      "vessel_class": "Post-Panamax",
+      "dwt_tonnage": 87405.0,
+      "gross_tonnage": 44047.0,
+      "net_tonnage": null,
+      "pc_ums_net_tonnage": null,
+      "pc_ums_status": "UNAVAILABLE",
+      "scnt_tonnage": null,
+      "scnt_status": "UNAVAILABLE",
+      "evidence_notes": "ClassNK register 162819 verifies GT (44047) and DWT (87405), but PC/UMS and SCNT are not published on open registry",
+      "inference_permitted": false
+    },
+    {
+      "imo": 9753284,
+      "vessel_name": "BERGE GALDHOPIGGEN",
+      "vessel_class": "Handysize",
+      "dwt_tonnage": 38763.0,
+      "gross_tonnage": 25569.0,
+      "net_tonnage": null,
+      "pc_ums_net_tonnage": null,
+      "pc_ums_status": "UNAVAILABLE",
+      "scnt_tonnage": null,
+      "scnt_status": "UNAVAILABLE",
+      "evidence_notes": "DNV record 34947 verifies GT (25569) and DWT (38763); PC/UMS and SCNT require dedicated canal certificates",
+      "inference_permitted": false
+    },
+    {
+      "imo": 9406087,
+      "vessel_name": "HADEEL",
+      "vessel_class": "Handysize",
+      "dwt_tonnage": 31700.0,
+      "gross_tonnage": 19972.0,
+      "net_tonnage": null,
+      "pc_ums_net_tonnage": null,
+      "pc_ums_status": "UNAVAILABLE",
+      "scnt_tonnage": null,
+      "scnt_status": "UNAVAILABLE",
+      "evidence_notes": "BalticShipping secondary record; neither PC/UMS nor SCNT documented in project evidence",
+      "inference_permitted": false
+    },
+    {
+      "imo": 9591301,
+      "vessel_name": "BULK UNITY",
+      "vessel_class": "Capesize",
+      "dwt_tonnage": 207797.0,
+      "gross_tonnage": 106796.0,
+      "net_tonnage": null,
+      "pc_ums_net_tonnage": null,
+      "pc_ums_status": "UNAVAILABLE",
+      "scnt_tonnage": null,
+      "scnt_status": "UNAVAILABLE",
+      "evidence_notes": "BalticShipping secondary record; Capesize vessel generally exceeds standard Panama Canal lock dimensions; SCNT not documented",
+      "inference_permitted": false
+    }
+  ],
+  "schema_compatibility_audit": {
+    "existing_models_verified": {
+      "Port": "Authoritative port directory, keyed by unlocode. Fully compatible.",
+      "PortAlias": "Alternative names and terminal designations. Fully compatible.",
+      "Terminal": "Marine terminals within a port. Fully compatible.",
+      "Berth": "Individual berth faces with certified depths. Fully compatible.",
+      "NavigationalRestriction": "Draft/LOA constraints enforce physical feasibility. Fully compatible.",
+      "PortCrosswalk": "External identifier resolution. Fully compatible.",
+      "Vessel": "Vessel particulars table (dwt, gross_tonnage, net_tonnage, length, width, draft)."
+    },
+    "missing_schema_attributes": [
+      "Vessel.pc_ums_net_tonnage (FLOAT, nullable)",
+      "Vessel.scnt (FLOAT, nullable)"
+    ],
+    "migration_requirement": "Adding PC/UMS and SCNT to the Vessel entity will require an additive SQLite schema migration in database.py and models.py",
+    "currency_conversion_gap": "Pelagos has no foreign exchange rate table or forex conversion service. All existing calculators require USD. Non-USD tariffs (EUR, CAD, GBP, JPY, CNY, BRL, ZAR, AED, INR, SDR) cannot be converted to USD without introducing an explicit CurrencyExchangeRate model or reference rate table"
+  },
+  "material_corrections_to_discovery_report": [
+    {
+      "issue": "Geographic Region Count Reconciliation",
+      "original_claim": "11 geographic regions",
+      "verified_finding": "12 distinct regional jurisdictions plus 1 international benchmark category (total 13 entries in the coverage matrix table). The original figure counted Middle East as a single region, whereas the matrix distinguishes Egypt (Suez) and UAE (Arabian Gulf).",
+      "action_taken": "Documented in verification report without editing original discovery files."
+    },
+    {
+      "issue": "Commercial vs Statutory Separation for Agency Remuneration",
+      "original_claim": "Cost Domain D (Agency) investigated alongside port tariffs",
+      "verified_finding": "Agency remuneration (Normal Agency Fee) is governed strictly by bilateral commercial contracts under FONASBA/BIMCO standards, not port authority regulations.",
+      "action_taken": "Clarified that Domain D must not be modeled as a statutory port tariff; it must be an explicit commercial allowance."
+    },
+    {
+      "issue": "SDR Currency Conversion Reality for Suez Canal",
+      "original_claim": "Suez Canal tolls are calculated in SDR",
+      "verified_finding": "While base tolls are calculated in SDR, operational settlement is in USD or EUR. Pelagos currently lacks a forex service, meaning SDR tolls cannot be converted to USD without an explicit exchange rate model.",
+      "action_taken": "Identified as a mandatory architectural prerequisite for Stage F1.4.2.3a."
+    }
+  ],
+  "readiness_verdict": {
+    "stage": "F1.4.2.3a (Canal Tariff Foundation)",
+    "verdict": "CONDITIONALLY_READY",
+    "conditions": [
+      "1. Static canal toll formulas for Panama (ACP) and Suez (SCA) can be implemented deterministically using published base brackets, surcharges, and escort rules.",
+      "2. An additive database migration must be defined to add pc_ums_net_tonnage and scnt to the Vessel model.",
+      "3. Because all 6 seed vessels currently have UNAVAILABLE PC/UMS and SCNT certificates, the initial F1.4.2.3a implementation must fail closed when vessel-specific canal tonnage is missing, or operate under explicit RESEARCH_MODE with clearly disclaimed reference certificates.",
+      "4. A minimal, explicit currency exchange rate model (or SDR-to-USD reference rate table) must be introduced to support Suez Canal SDR conversion."
+    ]
+  }
+}
+

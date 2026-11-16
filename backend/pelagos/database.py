@@ -263,6 +263,57 @@ def ensure_schema_compatibility(target_engine=None):
                 if col_name not in cols:
                     conn.execute(text(f"ALTER TABLE vessel_hydrostatics ADD COLUMN {col_name} {col_type}"))
 
+        # Stage F1.4.2.3a: Canal Tariff Registry & Currency Exchange Rates
+        if "currency_exchange_rates" not in table_names:
+            import pelagos.models
+            pelagos.models.CurrencyExchangeRate.__table__.create(conn)
+
+        if "canal_tariff_records" not in table_names:
+            import pelagos.models
+            pelagos.models.CanalTariffRecord.__table__.create(conn)
+
+        # Stage F1.4.2.3b: Global Port Disbursement Records
+        if "port_tariff_records" not in table_names:
+            import pelagos.models
+            pelagos.models.PortTariffRecord.__table__.create(conn)
+
+        # Stage F1.4.2.4: Voyage Disbursement Records & Line Items
+        if "voyage_disbursement_records" not in table_names:
+            import pelagos.models
+            pelagos.models.VoyageDisbursementRecord.__table__.create(conn)
+        else:
+            cols_rec = {c["name"] for c in inspector.get_columns("voyage_disbursement_records")}
+            if "intermediate_ports_json" not in cols_rec:
+                conn.execute(text("ALTER TABLE voyage_disbursement_records ADD COLUMN intermediate_ports_json TEXT"))
+            if "canal_transits_json" not in cols_rec:
+                conn.execute(text("ALTER TABLE voyage_disbursement_records ADD COLUMN canal_transits_json TEXT"))
+            if "unallocated_overage_usd" not in cols_rec:
+                conn.execute(text("ALTER TABLE voyage_disbursement_records ADD COLUMN unallocated_overage_usd FLOAT"))
+            if "disclaimer" not in cols_rec:
+                conn.execute(text("ALTER TABLE voyage_disbursement_records ADD COLUMN disclaimer TEXT"))
+
+        if "voyage_disbursement_line_items" not in table_names:
+            import pelagos.models
+            pelagos.models.VoyageDisbursementLineItem.__table__.create(conn)
+        else:
+            cols = {c["name"] for c in inspector.get_columns("voyage_disbursement_line_items")}
+            if "fx_rate_provider" not in cols:
+                conn.execute(text("ALTER TABLE voyage_disbursement_line_items ADD COLUMN fx_rate_provider VARCHAR(128)"))
+            if "fx_observation_date" not in cols:
+                conn.execute(text("ALTER TABLE voyage_disbursement_line_items ADD COLUMN fx_observation_date DATE"))
+            if "requested_valuation_date" not in cols:
+                conn.execute(text("ALTER TABLE voyage_disbursement_line_items ADD COLUMN requested_valuation_date DATE"))
+            if "fx_observation_lag_days" not in cols:
+                conn.execute(text("ALTER TABLE voyage_disbursement_line_items ADD COLUMN fx_observation_lag_days INTEGER"))
+            if "conversion_evidence_classification" not in cols:
+                conn.execute(text("ALTER TABLE voyage_disbursement_line_items ADD COLUMN conversion_evidence_classification VARCHAR(64)"))
+            if "charge_tier" not in cols:
+                conn.execute(text("ALTER TABLE voyage_disbursement_line_items ADD COLUMN charge_tier VARCHAR(64)"))
+            if "contract_attribution" not in cols:
+                conn.execute(text("ALTER TABLE voyage_disbursement_line_items ADD COLUMN contract_attribution VARCHAR(128)"))
+            if "is_provisional" not in cols:
+                conn.execute(text("ALTER TABLE voyage_disbursement_line_items ADD COLUMN is_provisional BOOLEAN DEFAULT 0"))
+
         conn.commit()
 
 

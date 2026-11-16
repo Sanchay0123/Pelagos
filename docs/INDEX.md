@@ -3,7 +3,7 @@ title: Pelagos Documentation Index
 document_id: DOC-003
 type: documentation_index
 status: approved
-version: 1.0.30
+version: 1.0.40
 created: 2026-10-10
 updated: 2026-11-15
 tags:
@@ -65,6 +65,18 @@ N/A
 * [Vessel Fuel Consumption Intelligence Discovery & Machinery Registry (DISC-F1422-001-ADDENDUM)](./F1_4_2_2_FUEL_CONSUMPTION_INTELLIGENCE_DISCOVERY.md) (v1.2.0, Status: Completed — Stage F1.4.2.2a Implemented)
 * [Engine SFOC Library & Load-Curve Parameterization Specification (SPEC-F1422B-001)](./F1_4_2_2B_ENGINE_SFOC_LIBRARY.md) (v1.0.0, Status: Completed & Verified — Stage F1.4.2.2b Implemented)
 * [Vessel Fuel Consumption Intelligence Specification (DOC-F1422C-001-REV3)](./F1_4_2_2C_VESSEL_FUEL_INTELLIGENCE.md) (v1.3.0, Status: Approved Statutory Evidence & Technical Consistency Standard — Stage F1.4.2.2c, F1.4.2.2c.1, F1.4.2.2c.2 & F1.4.2.2c.3 Implemented)
+* [Global Port & Canal Disbursement Intelligence Discovery (DISC-F1423-001)](./F1_4_2_3_PORT_CANAL_DISBURSEMENT_DISCOVERY.md) (v1.0.0, Status: Discovery Completed — Stage F1.4.2.3 Feasibility Assessment)
+* [Global Port & Canal Disbursement Coverage Matrix (MATRIX-F1423-001)](./F1_4_2_3_GLOBAL_COVERAGE_MATRIX.md) (v1.0.0, Status: Completed — Stage F1.4.2.3 Regional Feasibility Matrix)
+* [Canal & Port Disbursement Discovery Closure (CLOSURE-F1423-001-REV2)](./F1_4_2_3_DISCOVERY_CLOSURE.md) (v1.2.0, Status: Approved Discovery Closure & Evidence Reconciliation)
+* [Canal Tariff Registry & Deterministic Rule Foundation (DOC-F1423A-001)](./F1_4_2_3A_CANAL_TARIFF_REGISTRY.md) (v1.0.0, Status: Implemented & Approved Foundation — Stage F1.4.2.3a)
+* [Global Port Disbursement Intelligence Foundation (DOC-F1423B-001)](./F1_4_2_3B_PORT_DISBURSEMENT_REGISTRY.md) (v1.0.0, Status: Implemented & Approved Foundation — Stage F1.4.2.3b)
+* [Voyage Disbursement Integration & TCE Gating Framework (DOC-F1424-001)](./F1_4_2_4_VOYAGE_DISBURSEMENT_INTEGRATION.md) (v1.0.0, Status: Implemented & Approved Integration — Stage F1.4.2.4)
+* [Voyage TCE Readiness Design Specification (DOC-F143-DESIGN-001)](./F1_4_3_VOYAGE_TCE_READINESS_DESIGN.md) (v1.0.0, Status: Approved Design Specification — Stage F1.4.3 Readiness)
+* [Voyage TCE Design Review Addendum (DOC-F143-DESIGN-REVIEW-001)](./F1_4_3_VOYAGE_TCE_DESIGN_REVIEW.md) (v1.0.0, Status: Approved Design Review Addendum — Stage F1.4.3 Readiness)
+* [Stage F1.4.3 Phase 1 Implementation Report (REPORT-F143-PHASE1-001)](./F1_4_3_PHASE1_IMPLEMENTATION_REPORT.md) (v1.0.0, Status: Implemented & Audited — Stage F1.4.3 Phase 1)
+* [Stage F1.4.3 Phase 1 Independent Verification Gate Report (VERIFY-F143-PHASE1-001)](./F1_4_3_PHASE1_INDEPENDENT_VERIFICATION.md) (v1.0.0, Status: Verified & Remediated — Stage F1.4.3 Phase 1 Gate Verdict PASS)
+* [Stage F1.4.3 Phase 1 Final Evidence Reconciliation Report (VERIFY-F143-PHASE1-RECON-001)](./F1_4_3_PHASE1_FINAL_RECONCILIATION.md) (v1.0.0, Status: Reconciled & Approved — Final Stage F1.4.3 Phase 1 Verdict PASS)
+* [Stage F1.4.3 Phase 1 Final Regression & Evidence Closure Report (VERIFY-F143-PHASE1-CLOSE-001)](./F1_4_3_PHASE1_FINAL_SIGNOFF.md) (v1.0.0, Status: Approved Final Evidence Closure — Stage F1.4.3 Phase 1 Closed)
 
 ### Engineering and Operations
 * [Stage E1 Platform Data Overview & Detailed Data Explorer Specification (API-001)](./architecture/platform-data-explorer.md) (v1.0.2, Status: Under Review)
@@ -140,3 +152,13 @@ Links to established, governed documentation within the repository, and maps pla
 | 1.0.28 | 2026-11-12 | Implementation Agent | Synchronized `API-001` reference (`v1.0.2`, updated `2026-11-12`) following C3.2/C3.3 experimental benchmark visibility integration inside `#/explorer/datasets`. Status: approved. |
 | 1.0.29 | 2026-11-15 | Implementation Agent | Registered Stage F1.4.2.2c.2 Vessel Fuel Consumption Intelligence Specification (`DOC-F1422C-001-REV2`, v1.2.0) with statutory evidence distinction, CSR brake power governance, unverified 15% sea margin, and continuous rated-power boundary overload semantics. Status: approved. |
 | 1.0.30 | 2026-11-15 | Implementation Agent | Registered Stage F1.4.2.2c.3 Vessel Fuel Consumption Intelligence Specification (`DOC-F1422C-001-REV3`, v1.3.0) with CSR 85% MCR derivation investigation, flywheel brake power physical consistency, and qualified overload boundary semantics. Status: approved. |
+| 1.0.31 | 2026-11-15 | Implementation Agent | Registered Stage F1.4.2.3 Discovery Closure (`CLOSURE-F1423-001-REV2`, v1.2.0) with reconciled evidence and vessel particulars. Status: approved. |
+| 1.0.32 | 2026-11-15 | Implementation Agent | Registered Stage F1.4.2.3a Canal Tariff Registry & Deterministic Rule Foundation (`DOC-F1423A-001`, v1.0.0). Status: approved. |
+| 1.0.33 | 2026-11-15 | Implementation Agent | Registered Stage F1.4.2.3b Global Port Disbursement Intelligence Foundation (`DOC-F1423B-001`, v1.0.0). Status: approved. |
+| 1.0.34 | 2026-11-15 | Implementation Agent | Registered Stage F1.4.2.4 Voyage Disbursement Integration & TCE Gating Framework (`DOC-F1424-001`, v1.0.0). Status: approved. |
+| 1.0.35 | 2026-11-15 | Implementation Agent | Registered Stage F1.4.3 Voyage TCE Readiness Design Specification (`DOC-F143-DESIGN-001`, v1.0.0). Status: approved. |
+| 1.0.36 | 2026-11-15 | Verification Agent | Registered Stage F1.4.3 Voyage TCE Design Review Addendum (`DOC-F143-DESIGN-REVIEW-001`, v1.0.0) resolving FX lookback, partial waiver governance, cryptographic unlock, and tamper-evident audit architecture. Status: approved. |
+| 1.0.37 | 2026-11-15 | Implementation Agent | Registered Stage F1.4.3 Phase 1 Implementation Report (`REPORT-F143-PHASE1-001`, v1.0.0) establishing deterministic, auditable, fail-closed voyage readiness foundation across Scopes A-F. Status: approved. |
+| 1.0.38 | 2026-11-15 | Verification Agent | Registered Stage F1.4.3 Phase 1 Independent Verification Gate Report (`VERIFY-F143-PHASE1-001`, v1.0.0) with comprehensive independent audit, narrow remediations, isolated migration validation, and final gate verdict PASS. Status: approved. |
+| 1.0.39 | 2026-11-15 | Verification Agent | Registered Stage F1.4.3 Phase 1 Final Evidence Reconciliation Report (`VERIFY-F143-PHASE1-RECON-001`, v1.0.0) resolving provider-specific FX lookbacks, complete 12-column additive migration inventory, source permission governance, statutory concession applicability, and platform regression verification. Status: approved. |
+| 1.0.40 | 2026-11-15 | Verification Agent | Registered Stage F1.4.3 Phase 1 Final Regression & Evidence Closure Report (`VERIFY-F143-PHASE1-CLOSE-001`, v1.0.0) recording reproduction of original and expanded inventories, source permission taxonomy, Decimal monetary precision remediation, and Suez Article 58 evidence closure. Status: approved. |

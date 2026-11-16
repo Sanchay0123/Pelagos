@@ -1,0 +1,127 @@
+{
+  "$schema": "pelagos-port-tariff-source-inventory-v1",
+  "version": "1.0.0",
+  "stage": "F1.4.2.3b",
+  "title": "Pelagos Port Disbursement Intelligence Source Inventory & Governance Catalog",
+  "created_at": "2026-11-15T08:30:00Z",
+  "author": "Pelagos Core Intelligence & Optimization Team",
+  "baseline_commit": "2929e61c5ddb8061ebfa9ad6c905b38b69335ef6",
+  "governance_policy": "Non-synthetic port disbursement modeling; fail-closed missing data policy; strict separation between statutory disclosure and operational commercial permission",
+  "readiness_tiers": {
+    "level_1_source_registry": "APPROVED",
+    "level_2_deterministic_rules": "CONDITIONALLY_APPROVED_RESEARCH_ONLY",
+    "level_3_operational_disbursement": "BLOCKED_FAIL_CLOSED"
+  },
+  "pilot_ports": [
+    {
+      "un_locode": "SGSIN",
+      "port_name": "Port of Singapore",
+      "country": "Singapore",
+      "jurisdiction": "Singapore Maritime Waters",
+      "lead_authority": "Maritime and Port Authority of Singapore (MPA)",
+      "primary_source_ids": ["SRC-DISB-SGP-MPA-001", "SRC-DISB-SGP-PSA-001"],
+      "statutory_currency": "SGD",
+      "basis_tonnage": "GROSS_TONNAGE_GT",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "pilot_status": "PILOT_FOUNDATION_ENCODED"
+    },
+    {
+      "un_locode": "NLRTM",
+      "port_name": "Port of Rotterdam",
+      "country": "Netherlands",
+      "jurisdiction": "Rotterdam-Rijnmond Port Area",
+      "lead_authority": "Havenbedrijf Rotterdam N.V. (Port of Rotterdam Authority)",
+      "primary_source_ids": ["SRC-DISB-NLD-RTM-001", "SRC-DISB-NLD-LOODS-001"],
+      "statutory_currency": "EUR",
+      "basis_tonnage": "GROSS_TONNAGE_GT_AND_CARGO_TONNES",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "pilot_status": "PILOT_FOUNDATION_ENCODED"
+    },
+    {
+      "un_locode": "USHOU",
+      "port_name": "Port of Houston",
+      "country": "United States",
+      "jurisdiction": "Houston Ship Channel / Harris County",
+      "lead_authority": "Port of Houston Authority (PHA) & Houston Pilots",
+      "primary_source_ids": ["SRC-DISB-USA-HOU-001", "SRC-DISB-USA-HOUPILOT-001", "SRC-DISB-USA-USACE-HMF-001"],
+      "statutory_currency": "USD",
+      "basis_tonnage": "LENGTH_OVERALL_FEET_AND_DRAFT_FEET",
+      "evidence_classification": "DIRECTLY_VERIFIED",
+      "pilot_status": "PILOT_FOUNDATION_ENCODED"
+    }
+  ],
+  "taxonomic_categories": [
+    {
+      "category_code": "PORT_DUES",
+      "category_name": "Port and Harbor Dues",
+      "default_applicability": "MANDATORY",
+      "description": "Statutory municipal or national dues assessed on vessel presence in port waters, typically based on Gross Tonnage (GT) and length of stay."
+    },
+    {
+      "category_code": "PILOTAGE",
+      "category_name": "Marine Pilotage Charges",
+      "default_applicability": "MANDATORY",
+      "description": "Compulsory navigation assistance fees for inbound, outbound, or shifting movements, billed by LOA, draft, GT, or fixed pilot unit."
+    },
+    {
+      "category_code": "TOWAGE",
+      "category_name": "Towage and Tug Assistance",
+      "default_applicability": "CONDITIONAL",
+      "description": "Assistance tug services for berthing, unberthing, and escorting. Billed per tug per hour or per maneuver based on bollard pull."
+    },
+    {
+      "category_code": "BERTH_OCCUPANCY_DOCKAGE",
+      "category_name": "Berth Occupancy / Dockage / Quay Dues",
+      "default_applicability": "USAGE_BASED",
+      "description": "Quay and terminal infrastructure charges assessed per foot or meter of LOA per 24-hour period, or per GT."
+    },
+    {
+      "category_code": "WHARFAGE",
+      "category_name": "Cargo Wharfage",
+      "default_applicability": "USAGE_BASED",
+      "description": "Fee assessed on cargo passing over the wharf or transferred between vessels, billed per metric or short ton."
+    },
+    {
+      "category_code": "MOORING_UNMOORING",
+      "category_name": "Mooring and Line-Handling Services",
+      "default_applicability": "MANDATORY",
+      "description": "Boatmen and shore line-handling services for securing and releasing vessel mooring lines at berth or buoys."
+    },
+    {
+      "category_code": "ANCHORAGE",
+      "category_name": "Anchorage Roadstead Dues",
+      "default_applicability": "CONDITIONAL",
+      "description": "Dues for remaining at designated anchorage grounds, often subject to a free grace period (e.g. 24 or 48 hours)."
+    },
+    {
+      "category_code": "WASTE_RECEPTION",
+      "category_name": "Ship Waste & MARPOL Reception Services",
+      "default_applicability": "MANDATORY",
+      "description": "Statutory fee for mandatory collection and treatment of ship-generated oily waste (Annex I), sewage (Annex IV), and garbage (Annex V)."
+    },
+    {
+      "category_code": "FRESHWATER_SERVICE",
+      "category_name": "Potable Fresh Water Supply",
+      "default_applicability": "OPTIONAL",
+      "description": "Supply of potable fresh water via shore hydrant or water barge, billed per cubic meter plus delivery charge."
+    },
+    {
+      "category_code": "SECURITY_ISPS",
+      "category_name": "Port Security (ISPS Code) Dues",
+      "default_applicability": "MANDATORY",
+      "description": "Statutory surcharge for International Ship and Port Facility Security (ISPS) compliance, billed as flat fee or dockage percentage."
+    },
+    {
+      "category_code": "AGENCY_FEE",
+      "category_name": "Ship Agency & Attendance Remuneration",
+      "default_applicability": "COMMERCIALLY_NEGOTIATED / CONTRACTUAL",
+      "description": "Commercial agent remuneration for vessel inward/outward clearance, supervisory attendance, and disbursement account processing under FONASBA / BIMCO standard agency agreements. Not a statutory port authority due; never generated as a universal fixed statutory fee."
+    },
+    {
+      "category_code": "STATUTORY_LIGHT_DUES",
+      "category_name": "Lighthouse and Navigational Aids Levy",
+      "default_applicability": "MANDATORY",
+      "description": "National navigational infrastructure levies (e.g. UK Trinity House light dues, Indian light dues) assessed per call or period."
+    }
+  ]
+}

@@ -1,0 +1,850 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.2.0",
+  "stage": "F1.4.2.3",
+  "title": "Pelagos Stage F1.4.2.3 Discovery Closure: Panama/Suez Tariff Evidence & Vessel Particulars Reconciliation",
+  "created_at": "2026-11-15T09:25:00Z",
+  "auditor": "DeepMind Antigravity Engineering Agent",
+  "baseline_commit": "2929e61c5ddb8061ebfa9ad6c905b38b69335ef6",
+  "closure_metadata": {
+    "closure_id": "CLOSURE-F1423-001-REV2",
+    "status": "APPROVED_FOR_F1423A_FOUNDATION",
+    "target_stage": "F1.4.2.3a",
+    "audit_scope": "Final Evidence Acceptance Gate, Primary Statutory Forensic Inspection, Multi-Tier Readiness Evaluation"
+  },
+  "source_metrics_reconciliation": {
+    "total_records": {
+      "definition": "Total distinct source objects in inventory array",
+      "count": 31,
+      "record_ids": [
+        "SRC-DISB-PANAMA-ACP-001",
+        "SRC-DISB-SUEZ-SCA-001",
+        "SRC-DISB-KIEL-WSV-001",
+        "SRC-DISB-SLSMC-GLS-001",
+        "SRC-DISB-SGP-MPA-001",
+        "SRC-DISB-SGP-PSA-001",
+        "SRC-DISB-NLD-RTM-001",
+        "SRC-DISB-NLD-LOODS-001",
+        "SRC-DISB-BEL-ANR-001",
+        "SRC-DISB-USA-HOU-001",
+        "SRC-DISB-USA-HOUPILOT-001",
+        "SRC-DISB-USA-CRBP-001",
+        "SRC-DISB-USA-USACE-HMF-001",
+        "SRC-DISB-CAN-VFPA-001",
+        "SRC-DISB-CAN-PPA-001",
+        "SRC-DISB-GBR-PLA-001",
+        "SRC-DISB-GBR-TRINITY-001",
+        "SRC-DISB-ESP-VAL-001",
+        "SRC-DISB-IND-JNPA-001",
+        "SRC-DISB-IND-DPA-001",
+        "SRC-DISB-IND-MUNDRA-001",
+        "SRC-DISB-JPN-YOK-001",
+        "SRC-DISB-JPN-JFPA-001",
+        "SRC-DISB-CHN-MOT-001",
+        "SRC-DISB-ARE-DPW-001",
+        "SRC-DISB-AUS-PPA-001",
+        "SRC-DISB-AUS-MEL-001",
+        "SRC-DISB-BRA-APS-001",
+        "SRC-DISB-ZAF-TNPA-001",
+        "SRC-DISB-INT-UNCTAD-001",
+        "SRC-DISB-INT-FONASBA-001"
+      ]
+    },
+    "unique_source_ids": 31,
+    "unique_source_urls": 31,
+    "official_primary_legal_sources": {
+      "definition": "Sovereign governments, statutory port authorities, state pilotage commissions, and statutory canal administrations classified as AUTHORITATIVE_PRIMARY_LEGAL",
+      "count": 26,
+      "record_ids": [
+        "SRC-DISB-PANAMA-ACP-001",
+        "SRC-DISB-SUEZ-SCA-001",
+        "SRC-DISB-KIEL-WSV-001",
+        "SRC-DISB-SLSMC-GLS-001",
+        "SRC-DISB-SGP-MPA-001",
+        "SRC-DISB-NLD-RTM-001",
+        "SRC-DISB-NLD-LOODS-001",
+        "SRC-DISB-BEL-ANR-001",
+        "SRC-DISB-USA-HOU-001",
+        "SRC-DISB-USA-HOUPILOT-001",
+        "SRC-DISB-USA-CRBP-001",
+        "SRC-DISB-USA-USACE-HMF-001",
+        "SRC-DISB-CAN-VFPA-001",
+        "SRC-DISB-CAN-PPA-001",
+        "SRC-DISB-GBR-PLA-001",
+        "SRC-DISB-GBR-TRINITY-001",
+        "SRC-DISB-ESP-VAL-001",
+        "SRC-DISB-IND-JNPA-001",
+        "SRC-DISB-IND-DPA-001",
+        "SRC-DISB-JPN-YOK-001",
+        "SRC-DISB-JPN-JFPA-001",
+        "SRC-DISB-CHN-MOT-001",
+        "SRC-DISB-AUS-PPA-001",
+        "SRC-DISB-AUS-MEL-001",
+        "SRC-DISB-BRA-APS-001",
+        "SRC-DISB-ZAF-TNPA-001"
+      ],
+      "inconsistency_resolution": "The previous verification report stated a numerator of 25 in its text while enumerating 26 distinct record IDs. The exact count of primary statutory/legal authorities is 26."
+    },
+    "commercial_operator_sources": {
+      "definition": "Private or commercial port/marine operators classified as AUTHORITATIVE_PRIMARY_OPERATOR",
+      "count": 3,
+      "record_ids": [
+        "SRC-DISB-SGP-PSA-001",
+        "SRC-DISB-IND-MUNDRA-001",
+        "SRC-DISB-ARE-DPW-001"
+      ]
+    },
+    "secondary_institutional_sources": {
+      "definition": "Intergovernmental bodies and trade associations providing analytical or contractual standards classified as SECONDARY_INSTITUTIONAL",
+      "count": 2,
+      "record_ids": [
+        "SRC-DISB-INT-UNCTAD-001",
+        "SRC-DISB-INT-FONASBA-001"
+      ]
+    },
+    "publicly_accessible_documents": {
+      "definition": "Source documents viewable or downloadable without requiring customer authentication credentials",
+      "count": 30,
+      "gated_records": [
+        "SRC-DISB-SGP-PSA-001 (PSA Marine IMOS portal gates monthly Towage BAF)"
+      ]
+    },
+    "publicly_accessible_tariff_rates_or_formulas_identified": {
+      "definition": "Sources exposing extractable line-item tariff rate cards, progressive brackets, or mathematical fee formulas",
+      "count": 27,
+      "record_ids": [
+        "SRC-DISB-PANAMA-ACP-001",
+        "SRC-DISB-SUEZ-SCA-001",
+        "SRC-DISB-KIEL-WSV-001",
+        "SRC-DISB-SLSMC-GLS-001",
+        "SRC-DISB-SGP-MPA-001",
+        "SRC-DISB-NLD-RTM-001",
+        "SRC-DISB-NLD-LOODS-001",
+        "SRC-DISB-BEL-ANR-001",
+        "SRC-DISB-USA-HOU-001",
+        "SRC-DISB-USA-HOUPILOT-001",
+        "SRC-DISB-USA-CRBP-001",
+        "SRC-DISB-CAN-VFPA-001",
+        "SRC-DISB-CAN-PPA-001",
+        "SRC-DISB-GBR-PLA-001",
+        "SRC-DISB-GBR-TRINITY-001",
+        "SRC-DISB-ESP-VAL-001",
+        "SRC-DISB-IND-JNPA-001",
+        "SRC-DISB-IND-DPA-001",
+        "SRC-DISB-IND-MUNDRA-001",
+        "SRC-DISB-JPN-YOK-001",
+        "SRC-DISB-JPN-JFPA-001",
+        "SRC-DISB-CHN-MOT-001",
+        "SRC-DISB-ARE-DPW-001",
+        "SRC-DISB-AUS-PPA-001",
+        "SRC-DISB-AUS-MEL-001",
+        "SRC-DISB-BRA-APS-001",
+        "SRC-DISB-ZAF-TNPA-001"
+      ],
+      "governance_disclaimer": "This metric signifies rate extraction feasibility ONLY. It does not imply operational-use authorization, commercial redistribution rights, complete PDA cost coverage, or real-time data feeds."
+    },
+    "manual_download_sources": {
+      "count": 24
+    },
+    "api_or_bulk_sources": {
+      "count": 4,
+      "record_ids": [
+        "SRC-DISB-PANAMA-ACP-001",
+        "SRC-DISB-NLD-LOODS-001",
+        "SRC-DISB-GBR-PLA-001",
+        "SRC-DISB-INT-UNCTAD-001"
+      ]
+    },
+    "unresolved_licensing_sources": {
+      "count": 14
+    },
+    "explicit_open_public_domain_sources": {
+      "count": 5,
+      "record_ids": [
+        "SRC-DISB-KIEL-WSV-001",
+        "SRC-DISB-USA-USACE-HMF-001",
+        "SRC-DISB-GBR-TRINITY-001",
+        "SRC-DISB-ESP-VAL-001",
+        "SRC-DISB-INT-UNCTAD-001"
+      ]
+    },
+    "explicit_operational_use_permission": {
+      "count": 0
+    },
+    "unknown_permission_sources": {
+      "count": 25
+    }
+  },
+  "geographic_taxonomy_reconciliation": {
+    "sovereign_coastal_states": {
+      "count": 17,
+      "description": "Sovereign nations exercising maritime jurisdiction over the surveyed ports and canals",
+      "members": [
+        "Panama",
+        "Egypt",
+        "Germany",
+        "Canada",
+        "United States",
+        "Singapore",
+        "Netherlands",
+        "Belgium",
+        "United Kingdom",
+        "Spain",
+        "India",
+        "Japan",
+        "China",
+        "United Arab Emirates",
+        "Australia",
+        "Brazil",
+        "South Africa"
+      ]
+    },
+    "selected_operational_maritime_jurisdictions": {
+      "count": 13,
+      "description": "Selected core operational transit and regional hub jurisdictions prioritized in Stage F1.4.2.3 feasibility evaluation (subset of global maritime coverage)",
+      "members": [
+        {
+          "jurisdiction_name": "Panama Canal Transit Corridor",
+          "sovereign_state": "Panama",
+          "macro_region": "Central America",
+          "ports_or_waterways": [
+            "Balboa",
+            "Cristobal",
+            "Panama Canal Locks"
+          ]
+        },
+        {
+          "jurisdiction_name": "Suez Canal Transit Corridor",
+          "sovereign_state": "Egypt",
+          "macro_region": "Middle East",
+          "ports_or_waterways": [
+            "Port Said",
+            "Port Tewfik",
+            "Suez Canal Great Bitter Lake"
+          ]
+        },
+        {
+          "jurisdiction_name": "Kiel Canal & North Sea / Baltic Link",
+          "sovereign_state": "Germany",
+          "macro_region": "Northern Europe",
+          "ports_or_waterways": [
+            "Brunsb\u00fcttel",
+            "Kiel-Holtenau",
+            "Nord-Ostsee-Kanal"
+          ]
+        },
+        {
+          "jurisdiction_name": "St. Lawrence Seaway & Great Lakes System",
+          "sovereign_state": "Canada & United States",
+          "macro_region": "North America",
+          "ports_or_waterways": [
+            "Montreal-Lake Ontario (MLO)",
+            "Welland Canal"
+          ]
+        },
+        {
+          "jurisdiction_name": "Singapore Straits Transshipment Hub",
+          "sovereign_state": "Singapore",
+          "macro_region": "Southeast Asia",
+          "ports_or_waterways": [
+            "Port of Singapore (Jurong, Pasir Panjang, Tuas)"
+          ]
+        },
+        {
+          "jurisdiction_name": "Rhine-Scheldt Delta Seaports",
+          "sovereign_state": "Netherlands & Belgium",
+          "macro_region": "Western Europe",
+          "ports_or_waterways": [
+            "Rotterdam (NLRTM)",
+            "Antwerp (BEANR)",
+            "Zeebrugge (BEZEE)"
+          ]
+        },
+        {
+          "jurisdiction_name": "US Gulf & Pacific Northwest Navigation Corridors",
+          "sovereign_state": "United States",
+          "macro_region": "North America",
+          "ports_or_waterways": [
+            "Houston Ship Channel (USHOU)",
+            "Columbia & Willamette Rivers (USPDX)"
+          ]
+        },
+        {
+          "jurisdiction_name": "Canadian Pacific Coast Terminals",
+          "sovereign_state": "Canada",
+          "macro_region": "North America",
+          "ports_or_waterways": [
+            "Vancouver (CAVAN)",
+            "Prince Rupert (CAPRR)"
+          ]
+        },
+        {
+          "jurisdiction_name": "British Isles Pilotage & Navigational Aids",
+          "sovereign_state": "United Kingdom",
+          "macro_region": "Western Europe",
+          "ports_or_waterways": [
+            "Port of London / River Thames (GBLON)",
+            "Trinity House Light Dues"
+          ]
+        },
+        {
+          "jurisdiction_name": "Western Mediterranean Hub",
+          "sovereign_state": "Spain",
+          "macro_region": "Mediterranean",
+          "ports_or_waterways": [
+            "Valencia (ESVLC)",
+            "Sagunto",
+            "Gand\u00eda"
+          ]
+        },
+        {
+          "jurisdiction_name": "Indian Subcontinent Major Ports",
+          "sovereign_state": "India",
+          "macro_region": "Indian Subcontinent",
+          "ports_or_waterways": [
+            "Nhava Sheva / JNPT (INNSA)",
+            "Deendayal / Kandla (INIXY)",
+            "Mundra (INMUN)"
+          ]
+        },
+        {
+          "jurisdiction_name": "East Asian Coastal Gateways",
+          "sovereign_state": "Japan & China",
+          "macro_region": "East Asia",
+          "ports_or_waterways": [
+            "Tokyo Bay / Yokohama (JPYOK)",
+            "Shanghai / Ningbo / MOT Coastal Ports"
+          ]
+        },
+        {
+          "jurisdiction_name": "Arabian Gulf Logistics Gateway",
+          "sovereign_state": "United Arab Emirates",
+          "macro_region": "Middle East",
+          "ports_or_waterways": [
+            "Jebel Ali (AEJEA)",
+            "Mina Rashid (AEDXB)"
+          ]
+        }
+      ],
+      "additional_inventory_jurisdictions_noted": [
+        "Western Australia (Pilbara Ports Authority - Port Hedland, Dampier)",
+        "Southern Australia (Port of Melbourne)",
+        "Brazilian Atlantic Coast (Porto de Santos - APS)",
+        "Southern Africa Seaports (Transnet National Ports Authority - Durban, Richards Bay, Cape Town, Saldanha)"
+      ]
+    },
+    "macro_geographic_regions": {
+      "count": 11,
+      "description": "Continental and macro-basin geographic groupings",
+      "members": [
+        "Central America",
+        "North America",
+        "South America",
+        "Northern Europe",
+        "Western Europe",
+        "Mediterranean",
+        "Middle East",
+        "Indian Subcontinent",
+        "Southeast Asia",
+        "East Asia",
+        "Oceania & Southern Africa"
+      ]
+    },
+    "international_benchmark_organizations": {
+      "count": 2,
+      "description": "Intergovernmental bodies and trade associations establishing global pricing and disbursement norms",
+      "members": [
+        {
+          "organization_name": "United Nations Trade & Development (UNCTAD)",
+          "record_id": "SRC-DISB-INT-UNCTAD-001",
+          "scope": "Global port pricing principles and Liner Shipping Connectivity Index (LSCI)"
+        },
+        {
+          "organization_name": "Federation of National Associations of Ship Brokers and Agents (FONASBA)",
+          "record_id": "SRC-DISB-INT-FONASBA-001",
+          "scope": "Standard port agency disbursement account (PDA) frameworks and quality standards"
+        }
+      ]
+    },
+    "ambiguity_resolution_summary": "The 11 vs 12 vs 13 ambiguity arose from mixing macro-geographic regions (11), regional operational jurisdictions (13 prioritized clusters), and sovereign states (17). The counts are reconciled and strictly separated."
+  },
+  "panama_canal_verified_tariff": {
+    "source_id": "SRC-DISB-PANAMA-ACP-001",
+    "official_authority": "Autoridad del Canal de Panam\u00e1 (ACP)",
+    "official_url": "https://pancanal.com/en/maritime-services/maritime-tariff/",
+    "statutory_primary_documents": [
+      {
+        "document_title": "Panama Canal Official Maritime Tariffs / Tarifas de Servicios Mar\u00edtimos",
+        "identifier": "Series 1010.0000 - Tolls (Peajes)",
+        "issuing_organization": "Autoridad del Canal de Panam\u00e1 (ACP) Board of Directors",
+        "official_url": "https://pancanal.com/en/maritime-services/maritime-tariff/",
+        "pdf_download_url": "https://pancanal.com/wp-content/uploads/2021/08/Tariffs-2024.pdf",
+        "effective_dates": "2024-01-01 and 2025-01-01",
+        "legal_basis": "Panama Canal Authority Board of Directors Resolution No. ACP-JD-RM22-01 (Cabinet Council Decree No. 22-22, Official Gazette No. 29566)",
+        "evidence_classification": "DIRECTLY_VERIFIED_PRIMARY_STATUTE"
+      },
+      {
+        "document_title": "Advisory to Shipping No. A-42-2023: Modifications to the variable component of the Fresh Water Surcharge (FWS)",
+        "identifier": "Advisory No. A-42-2023",
+        "issuing_organization": "Panama Canal Authority Vice Presidency for Operations",
+        "official_url": "https://pancanal.com/en/maritime-services/advisories-to-shipping/",
+        "issuance_date": "2023-09-25",
+        "effective_date": "2023-10-01 (Ongoing through 2024/2025)",
+        "evidence_classification": "DIRECTLY_VERIFIED_PRIMARY_OPERATIONAL_CIRCULAR"
+      },
+      {
+        "document_title": "Regulations for the Admeasurement of Vessels to Assess Tolls for the Use of the Panama Canal",
+        "identifier": "Admeasurement Regulations (Article 25)",
+        "issuing_organization": "Autoridad del Canal de Panam\u00e1",
+        "official_url": "https://pancanal.com/en/maritime-services/vessel-requirements/",
+        "evidence_classification": "DIRECTLY_VERIFIED_STATUTORY_REGULATION"
+      }
+    ],
+    "item_1010_fixed_fees_per_transit": {
+      "currency": "USD",
+      "applicability": "Non-containerized commercial vessels, including Dry Bulk Carriers",
+      "ballast_treatment": "Under Item 1010 provisions, the 85% ballast factor applies to BOTH the fixed rate and capacity components for qualifying non-containerized vessels in ballast",
+      "tiers": [
+        {
+          "tariff_code": "1010.FR03",
+          "vessel_tier": "Regular Vessel",
+          "dimensional_criteria": "Beam < 91.0 ft (27.74 m)",
+          "fixed_fee_usd": 60000.0,
+          "source_reference": "Series 1010, Section 1010.0000, Item 1010.FR03, Page 2",
+          "evidence_status": "DIRECTLY_VERIFIED"
+        },
+        {
+          "tariff_code": "1010.FS01",
+          "vessel_tier": "Super Vessel",
+          "dimensional_criteria": "91.0 ft <= Beam < 107.0 ft (32.61 m)",
+          "fixed_fee_usd": 100000.0,
+          "source_reference": "Series 1010, Section 1010.0000, Item 1010.FS01, Page 2",
+          "evidence_status": "DIRECTLY_VERIFIED"
+        },
+        {
+          "tariff_code": "1010.FN02",
+          "vessel_tier": "Neopanamax Vessel",
+          "dimensional_criteria": "Beam >= 107.0 ft or LOA > 966.0 ft (294.44 m)",
+          "fixed_fee_usd": 300000.0,
+          "source_reference": "Series 1010, Section 1010.0000, Item 1010.FN02, Page 3",
+          "evidence_status": "DIRECTLY_VERIFIED"
+        }
+      ]
+    },
+    "item_1010_dry_bulk_capacity_rates": {
+      "billing_unit": "Metric ton of Summer Deadweight (DWT) or Timber DWT (TDWT)",
+      "critical_finding": "Dry bulk capacity tolls in the Panama Canal are assessed on Deadweight Tonnage (DWT), NOT volumetric PC/UMS net tonnage",
+      "rates_schedule": [
+        {
+          "tariff_code": "1010.DR01",
+          "vessel_tier": "Regular Vessel",
+          "dimensional_criteria": "Beam < 91.0 ft (27.74 m)",
+          "rate_2024_usd_per_dwt": 1.25,
+          "rate_2025_usd_per_dwt": 1.65,
+          "source_reference": "Series 1010, Section 1010.0000, Item 1010.DR01, Page 5, Table: Graneles Secos / Dry Bulk",
+          "evidence_status": "DIRECTLY_VERIFIED"
+        },
+        {
+          "tariff_code": "1010.DS01",
+          "vessel_tier": "Super Vessel",
+          "dimensional_criteria": "91.0 ft <= Beam < 107.0 ft (32.61 m)",
+          "rate_2024_usd_per_dwt": 1.15,
+          "rate_2025_usd_per_dwt": 1.5,
+          "source_reference": "Series 1010, Section 1010.0000, Item 1010.DS01, Page 5, Table: Graneles Secos / Dry Bulk",
+          "evidence_status": "DIRECTLY_VERIFIED"
+        },
+        {
+          "tariff_code": "1010.DN01",
+          "vessel_tier": "Neopanamax Vessel",
+          "dimensional_criteria": "Beam >= 107.0 ft or LOA > 966.0 ft (294.44 m)",
+          "rate_2024_usd_per_dwt": 0.5,
+          "rate_2025_usd_per_dwt": 0.8,
+          "source_reference": "Series 1010, Section 1010.0000, Item 1010.DN01, Page 5, Table: Graneles Secos / Dry Bulk",
+          "evidence_status": "DIRECTLY_VERIFIED"
+        }
+      ],
+      "multi_year_resolution": "The 2024 official tariff document (Series 1010.0000) derives from the 2022 Cabinet Council approved multi-year reform (Resolution ACP-JD-RM22-01) which published both 2024 and 2025 rates side-by-side. A separate 2025 amendment decree is not required for these baseline rates."
+    },
+    "ballast_factor_substantiation": {
+      "ballast_percentage": 85.0,
+      "multiplier": 0.85,
+      "legal_basis": "Regulations for the Admeasurement of Vessels to Assess Tolls for the Use of the Panama Canal, Article 25; and Item 1010 General Notes for Vessels in Ballast",
+      "extracted_rule_text": "The toll calculation for all vessels in ballast applying 85% of the respective loaded toll only applies to the fixed rate and capacity components. It does not apply to rates for refrigerated, dry, and empty TEU on deck.",
+      "applicability_rules": "Applies to BOTH the fixed tariff component and the capacity tariff component (DWT rate) for qualifying dry bulk carriers in ballast condition",
+      "evidence_status": "DIRECTLY_VERIFIED"
+    },
+    "freshwater_surcharge_substantiation": {
+      "fixed_fee_schedule": {
+        "tariff_item": "Item 1065.0001 (Fresh Water Surcharge - Fixed Component)",
+        "source_reference": "Panama Canal Official Maritime Tariffs, Item 1065, Page 12",
+        "rules": [
+          {
+            "loa_range": "LOA <= 38.10 m (125 ft)",
+            "fee_usd": 0.0
+          },
+          {
+            "loa_range": "38.10 m < LOA <= 91.44 m (125 ft to 300 ft)",
+            "fee_usd": 4000.0
+          },
+          {
+            "loa_range": "LOA > 91.44 m (300 ft)",
+            "fee_usd": 10000.0,
+            "seed_fleet_applicability": "All 6 Pelagos seed bulk carriers have LOA >= 178.70 m, strictly qualifying for the $10,000 USD flat fee"
+          }
+        ],
+        "evidence_status": "DIRECTLY_VERIFIED"
+      },
+      "variable_percentage_formula": {
+        "source_documents": [
+          "ACP Advisory to Shipping No. A-03-2020",
+          "ACP Advisory to Shipping No. A-06-2020",
+          "ACP Advisory to Shipping No. A-42-2023"
+        ],
+        "formula_nature": "Sigmoidal/logistic response curve; NOT a linear formula with a 9.5-ft or 8.5-ft denominator",
+        "statutory_formula": "f(x) = 0.10 / (1 + exp(0.6 * (x - 79.0)))",
+        "formula_variables": {
+          "x": "Official Gatun Lake elevation in feet (rounded to one decimal place)",
+          "center_parameter": "Modified from 82.0 ft down to 79.0 ft under Advisory A-42-2023 (effective 2023-10-01)",
+          "scaling_factor": "0.6 (growth rate constant)",
+          "max_percentage": "10.0% (0.10)"
+        },
+        "measurement_presumption": "Explicitly prescribes the water level of Gatun Lake recorded at 1200 hours on the day prior to transit by the ACP Hydrometeorology Section, applicable to all transits on the following day",
+        "operational_requirement": "Evaluating FWS requires runtime dynamic hydrometeorological input (daily 1200 hrs lake elevation). Cannot be evaluated ex-ante in a purely static registry.",
+        "evidence_status": "PARTIALLY_VERIFIED_OPERATIONAL_INPUT_REQUIRED"
+      }
+    },
+    "dynamic_transit_components": {
+      "slot_auctions": "ACP OP Notice to Shipping N-7-2024. Dynamic market auction clearing prices are non-deterministic ex-ante. Excluded from static deterministic engine.",
+      "evidence_status": "EXCLUDED_FROM_STATIC_REGISTRY"
+    },
+    "historical_version_notice": "Tariff rates for 2024 (2024-01-01 to 2024-12-31) and 2025 (2025-01-01 to 2025-12-31) are historical versions. They cannot be assumed valid for 2026 or later."
+  },
+  "suez_canal_verified_tariff": {
+    "source_id": "SRC-DISB-SUEZ-SCA-001",
+    "official_authority": "Suez Canal Authority (SCA)",
+    "official_url": "https://www.suezcanal.gov.eg/English/Navigation/Pages/Tolls.aspx",
+    "statutory_primary_documents": [
+      {
+        "document_title": "SCA Navigation Circular No. 7/2023: Transit Dues for 2024",
+        "identifier": "Circular No. 7/2023",
+        "issuing_organization": "Suez Canal Authority Chairman & Managing Director (Admiral Ossama Rabiee)",
+        "issuance_date": "2023-10-16",
+        "effective_date": "2024-01-15",
+        "official_url": "https://www.suezcanal.gov.eg/English/Navigation/Pages/NavigationCirculars.aspx",
+        "clause_reference": "Article One, Paragraph (b)",
+        "extracted_text": "Increasing the normal Suez Canal transit dues by 5% for the following vessels\u2019 types: (Dry Bulk Vessels - General Cargo Vessels - Roll-On/Roll-Off (RO/RO) Vessels - Other Vessels). as per the attached schedules.",
+        "verified_rate": "+5.0% surcharge on normal transit dues (applies to both laden and ballast schedules)",
+        "evidence_classification": "DIRECTLY_VERIFIED_PRIMARY_STATUTE"
+      },
+      {
+        "document_title": "SCA Navigation Circular No. 1/2024: Regarding Mooring Services on Canal Transit",
+        "identifier": "Circular No. 1/2024",
+        "issuing_organization": "Suez Canal Authority",
+        "issuance_date": "2023-12-20",
+        "effective_date": "2024-05-01",
+        "official_url": "https://www.suezcanal.gov.eg/English/Navigation/Pages/NavigationCirculars.aspx",
+        "compulsory_standard_fee": "USD 3,500 total fee covering mooring and lighting services",
+        "conditional_charges": "Additional USD 1,000 for searchlight request/non-compliance (total USD 4,500); USD 5,000 penalty for refusing onboard service",
+        "evidence_classification": "DIRECTLY_VERIFIED_PRIMARY_STATUTE"
+      },
+      {
+        "document_title": "SCA Rules of Navigation (December 2020 edition, updated to December 2023)",
+        "identifier": "Rules of Navigation (Articles 28, 58, 105)",
+        "issuing_organization": "Suez Canal Authority",
+        "official_url": "https://www.suezcanal.gov.eg/English/Navigation/Pages/RulesOfNavigation.aspx",
+        "evidence_classification": "DIRECTLY_VERIFIED_PRIMARY_STATUTE"
+      }
+    ],
+    "seven_sdr_brackets_schedule": {
+      "billing_unit": "IMF Special Drawing Rights (SDR) per Suez Canal Net Ton (SCNT)",
+      "applicability": "Dry Bulk Vessels (Laden and Ballast conditions)",
+      "tiers": [
+        {
+          "tier": 1,
+          "bracket_range": "First 5,000 SCNT",
+          "laden_rate_sdr": 10.13,
+          "ballast_rate_sdr": 8.62,
+          "published_ballast_ratio": 0.8509
+        },
+        {
+          "tier": 2,
+          "bracket_range": "Next 5,000 SCNT (5,001 - 10,000)",
+          "laden_rate_sdr": 7.74,
+          "ballast_rate_sdr": 6.58,
+          "published_ballast_ratio": 0.8501
+        },
+        {
+          "tier": 3,
+          "bracket_range": "Next 10,000 SCNT (10,001 - 20,000)",
+          "laden_rate_sdr": 6.12,
+          "ballast_rate_sdr": 5.21,
+          "published_ballast_ratio": 0.8513
+        },
+        {
+          "tier": 4,
+          "bracket_range": "Next 20,000 SCNT (20,001 - 40,000)",
+          "laden_rate_sdr": 2.24,
+          "ballast_rate_sdr": 1.89,
+          "published_ballast_ratio": 0.8438
+        },
+        {
+          "tier": 5,
+          "bracket_range": "Next 30,000 SCNT (40,001 - 70,000)",
+          "laden_rate_sdr": 1.97,
+          "ballast_rate_sdr": 1.68,
+          "published_ballast_ratio": 0.8528
+        },
+        {
+          "tier": 6,
+          "bracket_range": "Next 50,000 SCNT (70,001 - 120,000)",
+          "laden_rate_sdr": 1.85,
+          "ballast_rate_sdr": 1.58,
+          "published_ballast_ratio": 0.8541
+        },
+        {
+          "tier": 7,
+          "bracket_range": "Excess over 120,000 SCNT",
+          "laden_rate_sdr": 1.77,
+          "ballast_rate_sdr": 1.5,
+          "published_ballast_ratio": 0.8475
+        }
+      ],
+      "ballast_rates_preservation": "Individual published ballast bracket rates are preserved exactly as official values; they must not be replaced with a blanket 85% multiplier",
+      "evidence_limitation_disclosure": "These bracket values match the official SCA online Tolls Calculator and accredited maritime agency schedules (Kadmar, Leth Agencies, Wilhelmsen). However, the original standalone statutory PDF circular establishing the baseline rate schedule prior to circular surcharges was not archived in the Pelagos data repository. Therefore, base brackets are preserved as PARTIALLY_VERIFIED.",
+      "evidence_status": "PARTIALLY_VERIFIED"
+    },
+    "escort_tug_thresholds": {
+      "legal_basis": "SCA Rules of Navigation, Chapter 3, Section III (Towage and Escorting), Article 58 (Escorting Tugs)",
+      "official_url": "https://www.suezcanal.gov.eg/English/Navigation/Pages/RulesOfNavigation.aspx",
+      "threshold_rules": [
+        {
+          "condition": "Laden Dry Bulk Vessel with SCNT < 70,000",
+          "rule": "1 escort tug required if draft > 47 ft (14.33 m) or deemed necessary by SCA"
+        },
+        {
+          "condition": "Laden Dry Bulk Vessel with 70,000 <= SCNT <= 90,000",
+          "rule": "Compulsory 1 escort tug"
+        },
+        {
+          "condition": "Laden Dry Bulk Vessel with SCNT > 90,000",
+          "rule": "Compulsory 2 escort tugs"
+        },
+        {
+          "condition": "Ballast Vessel with Beam over 218 ft up to 233 ft (66.45 m to 71.02 m)",
+          "rule": "Compulsory 1 escort tug"
+        },
+        {
+          "condition": "Ballast Vessel with Beam over 233 ft (71.02 m)",
+          "rule": "Compulsory 2 escort tugs"
+        },
+        {
+          "condition": "Ballast Vessel with SCNT > 130,000",
+          "rule": "Compulsory 1 escort tug"
+        }
+      ],
+      "evidence_status": "DIRECTLY_VERIFIED"
+    },
+    "additional_compulsory_charges": {
+      "mooring_fees": "SCA Circular No. 1/2024: USD 3,500 compulsory standard fee for mooring and lighting services",
+      "projector_and_electrician": "SCA Rules of Navigation Article 28 / Table of Ancillary Dues: USD 1,000 additional charge under Circular 1/2024 if non-compliant projector or requested",
+      "penalties": "USD 5,000 penalty for refusing assigned onboard mooring service",
+      "port_dues_and_pilotage": "Included in standard transit toll schedule; exceptional pilotage surcharges apply for delayed or out-of-convoy transit",
+      "evidence_status": "DIRECTLY_VERIFIED"
+    },
+    "sdr_settlement_and_currency_conversion": {
+      "legal_basis": "SCA Rules of Navigation Article 105 & SCA Financial Regulations",
+      "denomination": "Special Drawing Rights (SDR)",
+      "settlement_currency": "US Dollar (USD) or Euro (EUR)",
+      "conversion_mechanism": "Converted at the official daily exchange rate published by the Central Bank of Egypt (CBE) / National Bank of Egypt (NBE) on the transit date, based on the daily IMF SDR fixing basket",
+      "evidence_status": "PARTIALLY_VERIFIED (Official statutory rule verified; runtime live feed from CBE/NBE requires external market pipeline)"
+    },
+    "historical_version_notice": "SCA 2024 tariff schedule and Circular No. 7/2023 (effective 2024-01-15) are historical versions. They cannot be assumed valid for 2026 or later."
+  },
+  "seed_vessels_reconciliation_audit": [
+    {
+      "imo_number": "9713430",
+      "vessel_name": "NAVIOS VICTORY",
+      "vessel_class": "Panamax",
+      "verified_summer_dwt_mt": 77095.0,
+      "verified_gross_tonnage": 40937.0,
+      "verified_length_overall_m": 224.98,
+      "verified_extreme_breadth_m": 32.24,
+      "classification_society": "ClassNK",
+      "statutory_register_number": "ClassNK Reg No. 145541",
+      "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9713430&reg_no=145541",
+      "dwt_provenance_status": "DIRECTLY_VERIFIED",
+      "gt_provenance_status": "DIRECTLY_VERIFIED",
+      "loa_provenance_status": "DIRECTLY_VERIFIED",
+      "beam_provenance_status": "DIRECTLY_VERIFIED",
+      "reconciliation_verdict": "UPHELD_DIRECTLY_VERIFIED",
+      "conflict_investigation_notes": "Statutory register ClassNK Reg No. 145541 directly certifies 77,095 MT Summer DWT, 40,937 GT, LOA 224.98 m, beam 32.24 m. Built 2014 Koyo Dockyard (Hull 1410). The secondary 81,922 MT figure in the verification report was an unverified commercial marketing design DWT and is formally rejected."
+    },
+    {
+      "imo_number": "9766944",
+      "vessel_name": "IRIS BLISS",
+      "vessel_class": "Kamsarmax",
+      "verified_summer_dwt_mt": 82103.0,
+      "verified_gross_tonnage": 44047.0,
+      "verified_length_overall_m": 228.99,
+      "verified_extreme_breadth_m": 32.26,
+      "classification_society": "ClassNK",
+      "statutory_register_number": "ClassNK Reg No. 162819",
+      "source_url": "https://www.classnk.or.jp/hp/en/register/regships/regships.aspx?imo=9766944&reg_no=162819",
+      "dwt_provenance_status": "DIRECTLY_VERIFIED",
+      "gt_provenance_status": "DIRECTLY_VERIFIED",
+      "loa_provenance_status": "DIRECTLY_VERIFIED",
+      "beam_provenance_status": "DIRECTLY_VERIFIED",
+      "reconciliation_verdict": "UPHELD_DIRECTLY_VERIFIED",
+      "conflict_investigation_notes": "Statutory register ClassNK Reg No. 162819 directly certifies 82,103 MT Summer DWT, 44,047 GT, LOA 228.99 m, beam 32.26 m. Built 2016 Oshima Shipbuilding (Hull 10793). The secondary 87,405 MT figure was an unverified secondary displacement figure and is formally rejected."
+    },
+    {
+      "imo_number": "9753284",
+      "vessel_name": "BERGE GALDHOPIGGEN",
+      "vessel_class": "Handysize",
+      "verified_summer_dwt_mt": 38907.0,
+      "verified_gross_tonnage": 25569.0,
+      "verified_length_overall_m": 179.85,
+      "verified_extreme_breadth_m": 32.0,
+      "classification_society": "DNV (formerly GL) / Isle of Man Ship Registry",
+      "statutory_register_number": "DNV 34947 / IOM-9753284",
+      "source_url": "https://www.iomshipregistry.com",
+      "dwt_provenance_status": "SOURCE_REPORTED (ShipSpotting / SDARI specifications; DNV Reg No. 34947 secondary shipyard index)",
+      "gt_provenance_status": "DIRECTLY_VERIFIED (Isle of Man Ship Registry IOM-9753284)",
+      "loa_provenance_status": "SOURCE_REPORTED (SDARI Green Dolphin 38 design specifications)",
+      "beam_provenance_status": "SOURCE_REPORTED (SDARI Green Dolphin 38 design specifications)",
+      "reconciliation_verdict": "UPHELD_SOURCE_REPORTED",
+      "conflict_investigation_notes": "Gross tonnage 25,569 GT directly verified via Isle of Man Ship Registry. Summer deadweight 38,907 MT, LOA 179.85 m, and beam 32.00 m are SDARI Green Dolphin 38 design specifications and remain SOURCE_REPORTED. Overall vessel verdict is UPHELD_SOURCE_REPORTED. Secondary 38,763 MT was winter DWT and is formally rejected."
+    },
+    {
+      "imo_number": "9441295",
+      "vessel_name": "EGRET BULKER",
+      "vessel_class": "Supramax",
+      "verified_summer_dwt_mt": 57809.0,
+      "verified_gross_tonnage": 33045.0,
+      "verified_length_overall_m": 189.99,
+      "verified_extreme_breadth_m": 32.3,
+      "classification_society": "Bureau Veritas (uninspected in ClassNK)",
+      "statutory_register_number": "PSIX-9441295 / BS-9441295",
+      "source_url": "https://cgmix.uscg.mil/psix/",
+      "dwt_provenance_status": "SOURCE_REPORTED (BalticShipping BS-9441295)",
+      "gt_provenance_status": "DIRECTLY_VERIFIED (USCG PSIX VIN 9441295)",
+      "loa_provenance_status": "DIRECTLY_VERIFIED (USCG PSIX VIN 9441295, 623.3 ft)",
+      "beam_provenance_status": "DIRECTLY_VERIFIED (USCG PSIX VIN 9441295, 105.8 ft)",
+      "reconciliation_verdict": "UPHELD_SOURCE_REPORTED",
+      "conflict_investigation_notes": "Built 2010 Dayang Shipbuilding (TESS58). GT (33,045) and dimensions (LOA 189.99 m, beam 32.30 m) are directly verified via USCG PSIX. Summer DWT 57,809 MT is source-reported by BalticShipping. Retained as SOURCE_REPORTED pending direct class society inspection."
+    },
+    {
+      "imo_number": "9406087",
+      "vessel_name": "HADEEL",
+      "vessel_class": "Handysize",
+      "verified_summer_dwt_mt": 30420.0,
+      "verified_gross_tonnage": 19972.0,
+      "verified_length_overall_m": 178.7,
+      "verified_extreme_breadth_m": 28.0,
+      "classification_society": "Bureau Veritas (uninspected in ClassNK)",
+      "statutory_register_number": "VF-9406087 / MO-9406087",
+      "source_url": "https://www.vesselfinder.com/vessels/details/9406087",
+      "dwt_provenance_status": "SOURCE_REPORTED",
+      "gt_provenance_status": "SOURCE_REPORTED",
+      "loa_provenance_status": "SOURCE_REPORTED",
+      "beam_provenance_status": "SOURCE_REPORTED",
+      "reconciliation_verdict": "PRESERVED_SOURCE_REPORTED_WITH_UNRESOLVED_CONFLICT",
+      "conflict_investigation_notes": "Built 2010 Dayang Shipbuilding. Seed registry records 30,420 MT DWT, whereas some commercial tracking databases report 34,394 MT DWT. Retained as SOURCE_REPORTED with UNRESOLVED_CONFLICT. Seed value preserved without silent alteration."
+    },
+    {
+      "imo_number": "9591301",
+      "vessel_name": "BULK UNITY",
+      "vessel_class": "Capesize / Newcastlemax",
+      "verified_summer_dwt_mt": 205616.0,
+      "verified_gross_tonnage": 106796.0,
+      "verified_length_overall_m": 299.9,
+      "verified_extreme_breadth_m": 50.0,
+      "classification_society": "Bureau Veritas / Liberian Registry",
+      "statutory_register_number": "LISCR-9591301 / EMSA-THETIS-9591301",
+      "source_url": "https://mrv.emsa.europa.eu/#public",
+      "dwt_provenance_status": "SOURCE_REPORTED",
+      "gt_provenance_status": "DIRECTLY_VERIFIED (Liberian Registry / EU THETIS-MRV)",
+      "loa_provenance_status": "DIRECTLY_VERIFIED (Liberian Registry LISCR)",
+      "beam_provenance_status": "DIRECTLY_VERIFIED (Liberian Registry LISCR)",
+      "reconciliation_verdict": "PRESERVED_SOURCE_REPORTED_WITH_UNRESOLVED_CONFLICT",
+      "conflict_investigation_notes": "Built 2012 Hanjin Heavy Subic (Hull 041). GT (106,796) and dimensions (LOA 299.90 m, beam 50.00 m) directly verified via Liberian Registry (LISCR) and EU THETIS-MRV. DWT is reported as 205,616 MT in seed registry vs 206,306 MT in secondary databases. Retained as SOURCE_REPORTED with UNRESOLVED_CONFLICT. Seed value preserved."
+    }
+  ],
+  "pc_ums_and_scnt_tonnage_audit": {
+    "audit_finding": "Neither PC/UMS Net Tonnage nor Suez Canal Net Tonnage (SCNT) certificates exist in the Pelagos seed database or public registry sources for any of the 6 seed bulk carriers.",
+    "all_six_vessels_status": "UNAVAILABLE",
+    "prohibition_of_mathematical_inference": {
+      "rationale": "PC/UMS and SCNT are statutory tonnage measurement systems governed by specific international treaties and canal admeasurement rules. They apply complex geometric deductions for exempted spaces that vary non-linearly with hull geometry, cargo gear, and ballast tank layouts. Mathematical regressions from GT or DWT can deviate by 10% to 25%, producing monetary estimation errors of tens of thousands of dollars per transit.",
+      "operational_gate": "Operational voyage cost estimation must FAIL CLOSED (CANNOT_ESTIMATE_TARIFF_WITHOUT_CERTIFIED_TONNAGE) when certified PC/UMS or SCNT values are missing.",
+      "synthetic_tonnage_prohibition": "Synthetic estimation or regression of PC/UMS or SCNT from GT or DWT is strictly prohibited across all operational and research models. Pelagos shall never generate substitute statutory tonnage."
+    }
+  },
+  "currency_conversion_architecture": {
+    "recommendation": "Dedicated CurrencyExchangeRate Model & Conversion Service Required",
+    "base_currency": "USD",
+    "supported_quote_currencies": [
+      "SDR",
+      "EUR",
+      "GBP",
+      "SGD",
+      "CAD",
+      "JPY",
+      "CNY",
+      "AED",
+      "AUD",
+      "BRL",
+      "ZAR"
+    ],
+    "rate_sources": [
+      "IMF Daily SDR Fixing",
+      "Central Bank of Egypt / National Bank of Egypt",
+      "European Central Bank",
+      "Federal Reserve H.10"
+    ],
+    "governance_rules": [
+      "No hardcoding of conversion factors in canal calculation modules",
+      "Every cost output must preserve the original currency amount, exchange rate used, effective date, and rate provider",
+      "Operational mode must fail closed if exchange rate is missing for the transit date"
+    ],
+    "readiness_status": "CONDITIONALLY_READY (Architecture designed; implementation required in Stage F1.4.2.3a)"
+  },
+  "readiness_decision": {
+    "panama_source_evidence": "READY_FOR_DETERMINISTIC_TARIFF_REGISTRY",
+    "suez_source_evidence": "READY_FOR_DETERMINISTIC_TARIFF_REGISTRY",
+    "vessel_particulars": "CONDITIONALLY_READY",
+    "pc_ums_and_scnt_tonnages": "BLOCKED_FOR_OPERATIONAL_CANAL_CALCULATIONS",
+    "currency_conversion": "CONDITIONALLY_READY",
+    "overall_f1_4_2_3a_readiness_verdict": "CONDITIONALLY_READY",
+    "three_tier_readiness_evaluation": {
+      "level_1_source_and_document_registry": {
+        "status": "APPROVED",
+        "scope": "Permission to catalog, version, and link official Panama and Suez statutory circulars, tariffs, and terms of use in Pelagos."
+      },
+      "level_2_static_tariff_rules_engine": {
+        "status": "CONDITIONALLY_APPROVED",
+        "scope": "Permission to encode deterministic tariff formulas, progressive brackets, fixed fees, and ballast discounts in Stage F1.4.2.3a.",
+        "conditions": [
+          "Preserve base SDR brackets as PARTIALLY_VERIFIED online matches",
+          "Encode FWS sigmoidal formula with runtime Gatun Lake level dependency",
+          "Exclude dynamic auction slots from static engine"
+        ]
+      },
+      "level_3_vessel_specific_operational_tolls": {
+        "status": "BLOCKED_FAIL_CLOSED",
+        "scope": "Automated end-to-end voyage disbursement calculation for real-world chartering and freight optimization.",
+        "blockers": [
+          "Zero verified PC/UMS and SCNT certificates across seed fleet",
+          "Missing runtime hydrometeorological Gatun Lake elevation feed",
+          "Missing daily NBE/CBE SDR exchange rate feed"
+        ]
+      }
+    },
+    "remaining_evidence_gaps": [
+      "Original baseline statutory PDF circular establishing initial 7 SDR brackets prior to annual circular additions is not locally archived in repo",
+      "Live Gatun Lake water elevation telemetry at 1200 hrs day prior to transit is an external runtime variable",
+      "Certified PC/UMS and SCNT certificates are UNAVAILABLE for all 6 seed vessels",
+      "Secondary DWT conflicts exist for Hadeel (30,420 vs 34,394 MT) and Bulk Unity (205,616 vs 206,306 MT)",
+      "Live daily SDR exchange rate feed from National Bank of Egypt / Central Bank of Egypt requires implementation"
+    ]
+  }
+}
