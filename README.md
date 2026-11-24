@@ -3,6 +3,12 @@
 
 An intelligent maritime freight forecasting and vessel chartering optimization platform bringing together maritime data intelligence, historical freight analytics, route intelligence, vessel suitability, and voyage economics.
 
+<p align="center">
+  <img src="docs/media/screenshots/pelagos_demo.gif" alt="Pelagos Maritime Intelligence Command Center Live Demonstration" width="100%">
+  <br>
+  <em>Interactive demonstration of the Pelagos 3D Maritime Intelligence Command Center, Eurostat MARNET corridor routing, charter readiness gates, and multi-domain data exploration.</em>
+</p>
+
 ---
 
 ## 1. Project Overview
@@ -203,15 +209,65 @@ Pelagos has progressed through a sequence of formal design, implementation, agen
 
 ## 7. Screenshots & Interface Visuals
 
-Pelagos utilizes the God's Eye View 3D geospatial engine as its interactive command deck. 
+Pelagos utilizes the God's Eye View 3D geospatial engine as its interactive command deck. The platform unifies real-time 3D situational awareness, Eurostat MARNET sea-lane routing, multi-gate chartering audits, and tabular analytical exploration.
 
-> [!NOTE]
-> ### Interface Visual Directory
-> Authentic application screenshots and interface captures will be deposited here following UI verification:
-> - `docs/media/screenshots/command_deck_3d.png`: Global 3D maritime command deck displaying historical sample vessel positions and MARNET navigable fairways.
-> - `docs/media/screenshots/platform_data_explorer.png`: Multi-domain tabular data explorer (`#/explorer`) displaying canonical port directories and historical freight indices.
-> - `docs/media/screenshots/voyage_economics_panel.png`: Decoupled voyage economics calculation panel showing Gross Freight, Net Revenue, Conventional TCE, and Owner Profitability.
-> *(Placeholder paths reserved for genuine visual captures. No fabricated screenshots, mock telemetry, or undeployed live integrations are depicted.)*
+### Interactive Demonstration
+
+<p align="center">
+  <img src="docs/media/screenshots/pelagos_demo.gif" alt="Pelagos Command Center Demonstration" width="100%">
+</p>
+
+> [!TIP]
+> **Full-HD Video Demonstration Available:**  
+> A high-definition, 1080p recording of the complete interactive workflow is available in the repository at:  
+> [▶ **`docs/media/videos/pelagos_demo.mp4`**](docs/media/videos/pelagos_demo.mp4) (H.264 / 24 FPS with detailed technical captions).
+
+---
+
+### Interface Gallery & Capabilities
+
+#### 1. 3D Geospatial Maritime Command Deck
+Global 3D maritime situational awareness console powered by CesiumJS, featuring decoupled CartoDB Dark Matter and OpenStreetMap raster basemaps, telemetry HUD, and real-time navigational layers.
+
+![3D Geospatial Maritime Command Deck](docs/media/screenshots/command_deck_3d.png)
+
+*Figure 1: Full-screen CesiumJS 3D command deck displaying global telemetry HUD, docked navigational panels, and coordinate tracking.*
+
+---
+
+#### 2. Navigable Sea-Lane Corridors & Eurostat MARNET Routing
+Commercial sea routing evaluated over the 50 km Eurostat MARNET graph (>60,000 maritime edges), modeling canal passage through the Panama Canal, dynamic antimeridian Pacific seam sanitization, and speed-over-ground duration accounting.
+
+![Navigable Sea-Lane Routing Corridor](docs/media/screenshots/maritime_routing_corridor.png)
+
+*Figure 2: Plotted 9,363 NM navigable bulk route from Port Houston (USHOU) to Yokohama (JPYOK) transiting the Panama Canal with real-time waypoint metrics and antimeridian crossing resolution.*
+
+---
+
+#### 3. Six-Gate Commercial Charter Readiness Audit
+Rigorous fail-closed validation evaluating proposed fixtures across six sequential evidence gates before commercial recommendations or operational commitments can be authorized.
+
+![Six-Gate Commercial Charter Readiness Audit](docs/media/screenshots/charter_readiness_audit.png)
+
+*Figure 3: Charter Readiness Audit drawer evaluating Gate 1 (Freight Market), Gate 2 (Forecast Edge), Gate 3 (Operational Route), Gate 4 (Physical Particulars), Gate 5 (Open Tonnage), and Gate 6 (Bunker Economics).*
+
+---
+
+#### 4. Candidate Vessel Suitability & Hydrostatic Matching
+Automated screening of candidate bulk carriers against port berth geometry, draft limits, canal dimensions, and fuel consumption curves parameterized from ClassNK surveys and MAN Energy Solutions SFOC load data.
+
+![Candidate Vessel Suitability Matching](docs/media/screenshots/candidate_vessel_suitability.png)
+
+*Figure 4: Candidate vessel suitability matching interface classifying tonnage compatibility, laycan feasibility, and hydrodynamic fuel oil consumption.*
+
+---
+
+#### 5. Multi-Domain Tabular Platform Data Explorer
+Analytical tabular explorer accessible via hash routing (`#/explorer`), powered by DuckDB running sub-second analytical queries over partitioned Apache Parquet datasets and relational SQLite registries.
+
+![Multi-Domain Platform Data Explorer](docs/media/screenshots/platform_data_explorer.png)
+
+*Figure 5: High-performance tabular data explorer inspecting statutory port disbursements (Singapore, Rotterdam, Houston, Yokohama), ACP canal circulars, and multi-decade freight series.*
 
 ---
 
