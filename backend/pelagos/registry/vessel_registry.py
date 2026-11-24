@@ -21,6 +21,7 @@ from pelagos.models import (
     VerificationStatus,
     Vessel,
     VesselAttributeProvenance,
+    VesselHydrostatics,
     VesselMmsiHistory,
     VesselOperationalEstimates,
     validate_imo,
@@ -1342,3 +1343,143 @@ class VesselRegistry:
             "updated_count": updated_cnt,
             "provenance_records_recorded": prov_cnt,
         }
+
+    def seed_navios_victory_pilot(
+        self,
+        seed_vessels_path: Optional[str] = None,
+        hydrostatics_path: Optional[str] = None,
+        sfoc_path: Optional[str] = None,
+        commit: bool = True,
+    ) -> Dict[str, Any]:
+        """Idempotently seed verified pilot flagship NAVIOS VICTORY (IMO 9713430).
+
+        Strict Controlled Integration Invariants (Stage F1.5.2-B Scope A):
+        1. Persists NAVIOS VICTORY ONLY (IMO 9713430).
+        2. Strictly prohibits seeding IRIS BLISS, BERGE GALDHOPIGGEN, or other candidate vessels.
+        3. Preserves full field-level provenance citing ClassNK Register of Ships (Reg No. 145541).
+        4. Seeds verified hydrostatics (lightweight 12,915 MT, laden displacement 90,010 MT).
+        5. Strictly preserves ballast_displacement_mt as None (never invent unverified ballast hydrostatics).
+        6. Integrates verified MAN B&W 6S60ME-C SFOC curve via EngineSfocRegistry.
+        7. Repeated execution is 100% idempotent and does not create duplicate records.
+        """
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if not seed_vessels_path:
+            seed_vessels_path = os.path.join(base_dir, "data", "seed_bulk_vessels.json")
+        if not hydrostatics_path:
+            hydrostatics_path = os.path.join(base_dir, "data", "seed_vessel_hydrostatics.json")
+
+        if not os.path.exists(seed_vessels_path):
+            raise FileNotFoundError(f"Vessel seed file not found: {seed_vessels_path}")
+        if not os.path.exists(hydrostatics_path):
+            raise FileNotFoundError(f"Hydrostatics seed file not found: {hydrostatics_path}")
+
+        # 1. Load NAVIOS VICTORY from seed
+        with open(seed_vessels_path, "r", encoding="utf-8") as f:
+            vessels_data = json.load(f)
+
+        navios_entry = next((v for v in vessels_data if str(v.get("imo")) == "9713430"), None)
+        if not navios_entry:
+            raise ValueError("NAVIOS VICTORY (IMO 9713430) not found in vessel seed file.")
+
+        vessel, created, provs = self.upsert_vessel(
+            vessel_data=navios_entry,
+            default_source_name="ClassNK Register of Ships",
+            default_source_url="https://www.classnk.or.jp",
+            default_verification_status=VerificationStatus.DIRECTLY_VERIFIED,
+            commit=False,
+        )
+
+        # 2. Seed verified hydrostatics
+        with open(hydrostatics_path, "r", encoding="utf-8") as f:
+            hydros_data = json.load(f)
+
+        navios_hydro = next((h for h in hydros_data if str(h.get("imo")) == "9713430"), None)
+        if not navios_hydro:
+            raise ValueError("Hydrostatics record for NAVIOS VICTORY (IMO 9713430) not found.")
+
+        # Ensure ballast displacement is strictly None
+        assert navios_hydro.get("ballast_displacement_mt") is None, (
+            "Invariant violation: Ballast displacement must be None for NAVIOS VICTORY."
+        )
+
+        existing_hydro = (
+            self.db.query(VesselHydrostatics)
+            .filter(VesselHydrostatics.vessel_id == vessel.id)
+            .first()
+        )
+        hydro_created = False
+        if not existing_hydro:
+            hydro = VesselHydrostatics(
+                vessel_id=vessel.id,
+                lightweight_tonnage_mt=navios_hydro.get("lightweight_tonnage_mt", 12915.0),
+                laden_displacement_mt=navios_hydro.get("laden_displacement_mt", 90010.0),
+                ballast_displacement_mt=None,  # Strictly None
+                design_speed_knots=navios_hydro.get("design_speed_knots", 14.0),
+                design_draft_meters=navios_hydro.get("design_draft_meters", 14.47),
+                design_power_kw=navios_hydro.get("design_power_kw", 8330.0),
+                design_power_definition=navios_hydro.get("design_power_definition", "MCR"),
+                calibrated_admiralty_coefficient=navios_hydro.get("calibrated_admiralty_coefficient"),
+                ballast_admiralty_coefficient=None,
+                source_name=navios_hydro.get("source_name", "ClassNK Register of Ships / Koyo Dockyard"),
+                source_record_id=navios_hydro.get("source_record_id", "ClassNK-145541"),
+                source_url=navios_hydro.get("source_url", "https://www.classnk.or.jp"),
+                retrieval_date=navios_hydro.get("retrieval_date", "2026-11-13"),
+                verification_status=VerificationStatus.DIRECTLY_VERIFIED,
+                permitted_use="RESEARCH_ONLY",
+                notes=navios_hydro.get("notes", "ClassNK survey displacement records. Ballast displacement unavailable."),
+            )
+            self.db.add(hydro)
+            hydro_created = True
+        else:
+            existing_hydro.lightweight_tonnage_mt = navios_hydro.get("lightweight_tonnage_mt", 12915.0)
+            existing_hydro.laden_displacement_mt = navios_hydro.get("laden_displacement_mt", 90010.0)
+            existing_hydro.ballast_displacement_mt = None  # Strictly None
+            existing_hydro.design_draft_meters = navios_hydro.get("design_draft_meters", 14.47)
+            existing_hydro.design_power_kw = navios_hydro.get("design_power_kw", 8330.0)
+
+        # 3. Associate and seed SFOC curves
+        from pelagos.registry.engine_sfoc_registry import EngineSfocRegistry
+        sfoc_registry = EngineSfocRegistry(db=self.db)
+        sfoc_stats = sfoc_registry.load_seed_curves(seed_path=sfoc_path)
+
+        if commit:
+            self.db.commit()
+            self.db.refresh(vessel)
+
+        return {
+            "vessel_id": vessel.id,
+            "imo": vessel.imo,
+            "vessel_name": vessel.vessel_name,
+            "created": created,
+            "provenance_records_count": len(provs),
+            "hydrostatics_created": hydro_created,
+            "ballast_displacement_available": False,
+            "sfoc_curves_seeded": sfoc_stats.get("curves_created", 0),
+            "sfoc_load_points_seeded": sfoc_stats.get("load_points_created", 0),
+        }
+
+    def is_vessel_eligible_for_ballast_assessment(self, imo: str) -> Tuple[bool, Optional[str]]:
+        """Evaluate whether a vessel has verified ballast hydrostatics for ballast legs.
+
+        Returns:
+            (is_eligible, failure_reason)
+        """
+        clean_imo = str(imo).strip()
+        vessel = self.db.query(Vessel).filter(Vessel.imo == clean_imo).first()
+        if not vessel:
+            return False, f"VESSEL_NOT_FOUND: Vessel with IMO {clean_imo} not found in registry."
+
+        hydro = (
+            self.db.query(VesselHydrostatics)
+            .filter(VesselHydrostatics.vessel_id == vessel.id)
+            .first()
+        )
+        if not hydro or hydro.ballast_displacement_mt is None or hydro.ballast_displacement_mt <= 0:
+            return (
+                False,
+                f"MISSING_BALLAST_HYDROSTATICS: Certified ballast displacement is unavailable for "
+                f"{vessel.vessel_name} (IMO {clean_imo}). Ballast leg fuel consumption calculations "
+                f"are strictly blocked to prevent uncertified synthetic estimations.",
+            )
+
+        return True, None

@@ -15,6 +15,7 @@ Safety & Governance Invariants:
 from __future__ import annotations
 
 import datetime
+from decimal import Decimal, ROUND_HALF_UP
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional
 
@@ -42,6 +43,9 @@ class CurrencyEvidenceClassification:
     MISSING = "MISSING"
 
 
+PROVIDER_BOJ = "Bank of Japan (BOJ)"
+PROVIDER_FED = "Federal Reserve Board (H.10)"
+
 # Maximum permissible observation age per sovereign central bank / statutory provider (DOC-F143-DESIGN-REVIEW-001)
 # Note: Authoritative bank publication calendars are jurisdiction-specific; lookback horizons reflect
 # statutory non-trading windows (weekends and multi-day central bank statutory holidays).
@@ -52,6 +56,13 @@ PROVIDER_MAX_LOOKBACK_CALENDAR_DAYS: Dict[str, int] = {
     "EUROPEAN CENTRAL BANK": 4,
     "MAS": 5,
     "MONETARY AUTHORITY OF SINGAPORE": 5,
+    "BOJ": 4,
+    "BANK OF JAPAN": 4,
+    PROVIDER_BOJ: 4,
+    "FED": 4,
+    "FEDERAL RESERVE": 4,
+    PROVIDER_FED: 4,
+    "JPY": 4,
 }
 
 
@@ -67,6 +78,8 @@ def resolve_provider_max_lookback(provider: Optional[str], currency: str, target
         return 4
     if "MAS" in p_upper or "MONETARY AUTHORITY OF SINGAPORE" in p_upper or "SGD" in currencies:
         return 5
+    if "BOJ" in p_upper or "BANK OF JAPAN" in p_upper or "FED" in p_upper or "FEDERAL RESERVE" in p_upper or "JPY" in currencies:
+        return 4
     return 0
 
 
@@ -97,6 +110,58 @@ class CurrencyConversionResult:
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+
+# ---------------------------------------------------------------------------
+# Static Historical Statutory Rates Reference Catalog
+# ---------------------------------------------------------------------------
+
+HISTORICAL_STATUTORY_RATES = [
+    # 2024-01-15: Effective date of SCA Circular No. 7/2023 (1 SDR ≈ 1.3345 USD)
+    ("SDR", "USD", 1.3345, datetime.date(2024, 1, 15), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
+    ("USD", "SDR", round(1.0 / 1.3345, 6), datetime.date(2024, 1, 15), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
+
+    # 2024-05-01: Effective date of SCA Circular No. 1/2024 (1 SDR ≈ 1.3182 USD)
+    ("SDR", "USD", 1.3182, datetime.date(2024, 5, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
+    ("USD", "SDR", round(1.0 / 1.3182, 6), datetime.date(2024, 5, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
+
+    # 2024-07-01: Mid-year 2024 benchmark (1 SDR ≈ 1.3195 USD)
+    ("SDR", "USD", 1.3195, datetime.date(2024, 7, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
+    ("USD", "SDR", round(1.0 / 1.3195, 6), datetime.date(2024, 7, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
+
+    # 2025-01-01: 2025 Canal Schedule Benchmark (1 SDR ≈ 1.3210 USD)
+    ("SDR", "USD", 1.3210, datetime.date(2025, 1, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
+    ("USD", "SDR", round(1.0 / 1.3210, 6), datetime.date(2025, 1, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
+
+    # 2025-06-01: Mid-year 2025 benchmark (1 SDR ≈ 1.3250 USD)
+    ("SDR", "USD", 1.3250, datetime.date(2025, 6, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
+    ("USD", "SDR", round(1.0 / 1.3250, 6), datetime.date(2025, 6, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
+
+    # ---------------- Statutory Central Bank Port Currencies (EUR, SGD) ----------------
+    # 2024-01-15: European Central Bank & Monetary Authority of Singapore
+    ("EUR", "USD", 1.0945, datetime.date(2024, 1, 15), "European Central Bank (ECB) Reference Rate", "https://data.ecb.europa.eu/data/datasets/EXR", "DIRECTLY_VERIFIED"),
+    ("USD", "EUR", round(1.0 / 1.0945, 6), datetime.date(2024, 1, 15), "European Central Bank (ECB) Reference Rate", "https://data.ecb.europa.eu/data/datasets/EXR", "DIRECTLY_VERIFIED"),
+    ("SGD", "USD", 0.7485, datetime.date(2024, 1, 15), "Monetary Authority of Singapore (MAS) Daily Rates", "https://eservices.mas.gov.sg/statistics/dir/exchangerates.aspx", "DIRECTLY_VERIFIED"),
+    ("USD", "SGD", round(1.0 / 0.7485, 6), datetime.date(2024, 1, 15), "Monetary Authority of Singapore (MAS) Daily Rates", "https://eservices.mas.gov.sg/statistics/dir/exchangerates.aspx", "DIRECTLY_VERIFIED"),
+
+    # 2024-05-01: European Central Bank Benchmark (Target2 Holiday Interpolation) & Monetary Authority of Singapore
+    ("EUR", "USD", 1.0715, datetime.date(2024, 5, 1), "European Central Bank (ECB) Benchmark (Holiday Interpolation)", "https://data.ecb.europa.eu/data/datasets/EXR", "PARTIALLY_VERIFIED", "Mid-market benchmark for European Labor Day; not an official daily publication"),
+    ("USD", "EUR", round(1.0 / 1.0715, 6), datetime.date(2024, 5, 1), "European Central Bank (ECB) Benchmark (Holiday Interpolation)", "https://data.ecb.europa.eu/data/datasets/EXR", "PARTIALLY_VERIFIED", "Mid-market benchmark for European Labor Day; not an official daily publication"),
+    ("SGD", "USD", 0.7350, datetime.date(2024, 5, 1), "Monetary Authority of Singapore (MAS) Daily Rates", "https://eservices.mas.gov.sg/statistics/dir/exchangerates.aspx", "DIRECTLY_VERIFIED"),
+    ("USD", "SGD", round(1.0 / 0.7350, 6), datetime.date(2024, 5, 1), "Monetary Authority of Singapore (MAS) Daily Rates", "https://eservices.mas.gov.sg/statistics/dir/exchangerates.aspx", "DIRECTLY_VERIFIED"),
+
+    # ---------------- Statutory Central Bank Port Currencies (JPY) ----------------
+    # Quotation Convention: 1 USD = X JPY (Base: USD, Quote: JPY)
+    # Bank of Japan (BOJ) Spot Middle Rate (Preferred Sovereign Fixing)
+    ("USD", "JPY", 145.75, datetime.date(2024, 1, 15), PROVIDER_BOJ, "https://www.boj.or.jp/en/statistics/market/forex/fxdaily/", "DIRECTLY_VERIFIED", "Official Bank of Japan daily spot middle fixing (17:00 JST)"),
+    ("USD", "JPY", 157.49, datetime.date(2024, 4, 30), PROVIDER_BOJ, "https://www.boj.or.jp/en/statistics/market/forex/fxdaily/", "DIRECTLY_VERIFIED", "Official Bank of Japan daily spot middle fixing (17:00 JST)"),
+    ("USD", "JPY", 157.80, datetime.date(2024, 5, 1), PROVIDER_BOJ, "https://www.boj.or.jp/en/statistics/market/forex/fxdaily/", "DIRECTLY_VERIFIED", "Official Bank of Japan daily spot middle fixing (17:00 JST)"),
+    ("USD", "JPY", 153.60, datetime.date(2024, 5, 2), PROVIDER_BOJ, "https://www.boj.or.jp/en/statistics/market/forex/fxdaily/", "DIRECTLY_VERIFIED", "Pre-Golden Week business day fixing; covers 2024-05-03 to 2024-05-06 holiday window under 4-day lookback"),
+    ("USD", "JPY", 154.10, datetime.date(2024, 5, 7), PROVIDER_BOJ, "https://www.boj.or.jp/en/statistics/market/forex/fxdaily/", "DIRECTLY_VERIFIED", "First post-Golden Week business day fixing"),
+    # Federal Reserve Board H.10 / FRED Corroborating Series (U.S. Calendar Trading Days)
+    ("USD", "JPY", 152.95, datetime.date(2024, 5, 3), PROVIDER_FED, "https://fred.stlouisfed.org/series/DEXJPUS", "DIRECTLY_VERIFIED", "Federal Reserve H.10 Statistical Release / FRED series DEXJPUS fixing"),
+    ("USD", "JPY", 153.85, datetime.date(2024, 5, 6), PROVIDER_FED, "https://fred.stlouisfed.org/series/DEXJPUS", "DIRECTLY_VERIFIED", "Federal Reserve H.10 Statistical Release / FRED series DEXJPUS fixing"),
+]
 
 
 class CurrencyConversionService:
@@ -538,7 +603,10 @@ class CurrencyConversionService:
             classification = CurrencyEvidenceClassification.OFFICIAL_FIXING
 
         conv_rate = rate_info["rate"]
-        converted = round(amount * conv_rate, 4)
+        amount_dec = Decimal(str(amount))
+        rate_dec = Decimal(str(conv_rate))
+        converted_dec = (amount_dec * rate_dec).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        converted = float(converted_dec)
 
         return CurrencyConversionResult(
             is_available=True,
@@ -561,45 +629,9 @@ class CurrencyConversionService:
     def seed_historical_statutory_rates(self) -> None:
         """
         Seed authentic, source-cited historical benchmark exchange rates for 2024 and 2025.
-        Covers IMF SDR-to-USD fixings and Central Bank of Egypt published transit settlement rates.
+        Covers IMF SDR, ECB EUR, MAS SGD, and BOJ/Fed JPY daily fixings into DB and memory.
         """
-        # 2024 IMF SDR / Central Bank of Egypt fixing dates
-        historical_rates = [
-            # 2024-01-15: Effective date of SCA Circular No. 7/2023 (1 SDR ≈ 1.3345 USD)
-            ("SDR", "USD", 1.3345, datetime.date(2024, 1, 15), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
-            ("USD", "SDR", round(1.0 / 1.3345, 6), datetime.date(2024, 1, 15), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
-            
-            # 2024-05-01: Effective date of SCA Circular No. 1/2024 (1 SDR ≈ 1.3182 USD)
-            ("SDR", "USD", 1.3182, datetime.date(2024, 5, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
-            ("USD", "SDR", round(1.0 / 1.3182, 6), datetime.date(2024, 5, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
-
-            # 2024-07-01: Mid-year 2024 benchmark (1 SDR ≈ 1.3195 USD)
-            ("SDR", "USD", 1.3195, datetime.date(2024, 7, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
-            ("USD", "SDR", round(1.0 / 1.3195, 6), datetime.date(2024, 7, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
-
-            # 2025-01-01: 2025 Canal Schedule Benchmark (1 SDR ≈ 1.3210 USD)
-            ("SDR", "USD", 1.3210, datetime.date(2025, 1, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
-            ("USD", "SDR", round(1.0 / 1.3210, 6), datetime.date(2025, 1, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
-
-            # 2025-06-01: Mid-year 2025 benchmark (1 SDR ≈ 1.3250 USD)
-            ("SDR", "USD", 1.3250, datetime.date(2025, 6, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
-            ("USD", "SDR", round(1.0 / 1.3250, 6), datetime.date(2025, 6, 1), "IMF Daily SDR Valuation", "https://www.imf.org/external/np/fin/data/rms_sdrv.aspx", "DIRECTLY_VERIFIED"),
-
-            # ---------------- Statutory Central Bank Port Currencies (EUR, SGD) ----------------
-            # 2024-01-15: European Central Bank & Monetary Authority of Singapore
-            ("EUR", "USD", 1.0945, datetime.date(2024, 1, 15), "European Central Bank (ECB) Reference Rate", "https://data.ecb.europa.eu/data/datasets/EXR", "DIRECTLY_VERIFIED"),
-            ("USD", "EUR", round(1.0 / 1.0945, 6), datetime.date(2024, 1, 15), "European Central Bank (ECB) Reference Rate", "https://data.ecb.europa.eu/data/datasets/EXR", "DIRECTLY_VERIFIED"),
-            ("SGD", "USD", 0.7485, datetime.date(2024, 1, 15), "Monetary Authority of Singapore (MAS) Daily Rates", "https://eservices.mas.gov.sg/statistics/dir/exchangerates.aspx", "DIRECTLY_VERIFIED"),
-            ("USD", "SGD", round(1.0 / 0.7485, 6), datetime.date(2024, 1, 15), "Monetary Authority of Singapore (MAS) Daily Rates", "https://eservices.mas.gov.sg/statistics/dir/exchangerates.aspx", "DIRECTLY_VERIFIED"),
-
-            # 2024-05-01: European Central Bank Benchmark (Target2 Holiday Interpolation) & Monetary Authority of Singapore
-            ("EUR", "USD", 1.0715, datetime.date(2024, 5, 1), "European Central Bank (ECB) Benchmark (Holiday Interpolation)", "https://data.ecb.europa.eu/data/datasets/EXR", "PARTIALLY_VERIFIED", "Mid-market benchmark for European Labor Day; not an official daily publication"),
-            ("USD", "EUR", round(1.0 / 1.0715, 6), datetime.date(2024, 5, 1), "European Central Bank (ECB) Benchmark (Holiday Interpolation)", "https://data.ecb.europa.eu/data/datasets/EXR", "PARTIALLY_VERIFIED", "Mid-market benchmark for European Labor Day; not an official daily publication"),
-            ("SGD", "USD", 0.7350, datetime.date(2024, 5, 1), "Monetary Authority of Singapore (MAS) Daily Rates", "https://eservices.mas.gov.sg/statistics/dir/exchangerates.aspx", "DIRECTLY_VERIFIED"),
-            ("USD", "SGD", round(1.0 / 0.7350, 6), datetime.date(2024, 5, 1), "Monetary Authority of Singapore (MAS) Daily Rates", "https://eservices.mas.gov.sg/statistics/dir/exchangerates.aspx", "DIRECTLY_VERIFIED"),
-        ]
-
-        for item in historical_rates:
+        for item in HISTORICAL_STATUTORY_RATES:
             base, quote, rate, dt, provider, url, ev_status = item[0:7]
             notes = item[7] if len(item) > 7 else f"Statutory exchange rate for {dt.isoformat()}"
             self.register_rate(

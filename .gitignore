@@ -24,3 +24,7 @@ dist/
 # Routing local cache and external datasets (D9.4)
 .cache/
 data/routing/
+
+# Scratch & temporary scripts
+scratch/
+no_git.txt

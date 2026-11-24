@@ -346,7 +346,22 @@ class TestCharterRecommendationReadinessAndApi:
         assert analytics["gross_freight_cost_usd"] == 1976000.0
         assert analytics["data_mode"] == "historical"
         assert "commercial_open_tonnage_list" in data["missing_decision_inputs"]
-        assert "verified_vessel_dwt_tonnage" in data["missing_decision_inputs"]
+        # For 52,000 MT cargo, NAVIOS VICTORY (77,000 MT DWT) satisfies cargo capacity,
+        # but vessel physical particulars gate remains insufficient_data due to missing hold cleanliness
+        # and grain cubic capacity
+        assert "verified_hold_cleanliness" in data["missing_decision_inputs"]
+        assert "verified_grain_cubic_capacity" in data["missing_decision_inputs"]
+
+        # When cargo exceeds verified capacity of all candidates (e.g. 80,000 MT),
+        # verified_vessel_dwt_tonnage is explicitly added to missing_decision_inputs
+        resp_heavy = client.post(
+            "/api/v1/charter/recommend",
+            json={"origin": "USSEA", "destination": "JPYOK", "cargo_tonnes": 80000.0},
+        )
+        assert resp_heavy.status_code == 200
+        data_heavy = resp_heavy.json()
+        assert data_heavy["status"] == "insufficient_data"
+        assert "verified_vessel_dwt_tonnage" in data_heavy["missing_decision_inputs"]
 
     def test_genuine_db_usg_flags_panama_rules_in_missing_inputs(self, client: TestClient) -> None:
         """GET /api/v1/charter/recommend for USG-JPN-BULK audits Panama Canal rule gap."""

@@ -3,9 +3,9 @@ title: Pelagos Documentation Index
 document_id: DOC-003
 type: documentation_index
 status: approved
-version: 1.0.47
+version: 1.0.49
 created: 2026-10-10
-updated: 2026-11-16
+updated: 2026-11-17
 tags:
   - index
   - navigation
@@ -86,6 +86,11 @@ N/A
 * [Stage F1.4.3 Phase 2 Remediation Register (REGISTER-F143-PHASE2-001)](./F1_4_3_PHASE2_REMEDIATION_REGISTER.md) (v1.0.0, Status: Approved Remediation Register — Stage F1.4.3 Phase 2)
 * [Stage F1.4.3 Phase 2 Remediation & Closure Verification Report (REPORT-F143-PHASE2-REMED-001)](./F1_4_3_PHASE2_REMEDIATION_REPORT.md) (v1.0.0, Status: Formally Remediated & Verified — Final Stage F1.4.3 Phase 2 Verdict UNCONDITIONAL PASS)
 * [Stage F1.4.3 Phase 2 Controlled Publication Report (GIT-PUBLISH-F143-PHASE2-001)](./GIT_PUBLISH_F143_PHASE2_REPORT.md) (v1.0.0, Status: Approved Publication Report — Published to origin/main)
+* [Stage F1.4.3 Post-Phase 2 Operational Readiness Gap Assessment (GAP-F143-001)](./F1_4_3_NEXT_PHASE_GAP_ASSESSMENT.md) (v1.0.0, Status: Drafting — Level 3 Operational Preconditions Assessment)
+* [Stage F1.4.3 Phase 3 Proposal (PROP-F143-PHASE3-001)](./F1_4_3_NEXT_PHASE_PROPOSAL.md) (v1.0.0, Status: Drafting — Commercial Evidence Verification & Dual-Control Operations Foundation)
+* [Stage F1.5.2-B Controlled Research Pilot Integration Report (REPORT-F152B-001)](./F1_5_2_B_CONTROLLED_RESEARCH_PILOT_INTEGRATION.md) (v1.0.0, Status: Approved Research Pilot Report — Level 2 USG–Japan Bulk Corridor)
+* [Stage F1.5.3-A Research Assessment Remediation & Test Baseline Restoration Report (REPORT-F153A-001)](./F1_5_3_A_REMEDIATION_AND_TEST_RESTORATION.md) (v1.0.0, Status: Approved Remediation Report — Test Baseline 100% Restored)
+* [Stage F1.5.3-B Dedicated Research Voyage Assessment API Specification (SPEC-F153B-001)](./F1_5_3_B_RESEARCH_VOYAGE_ASSESSMENT_API.md) (v1.0.1, Status: Approved API Specification — Level 2 Dedicated Endpoint)
 
 ### Engineering and Operations
 * [Stage E1 Platform Data Overview & Detailed Data Explorer Specification (API-001)](./architecture/platform-data-explorer.md) (v1.0.2, Status: Under Review)
@@ -178,3 +183,8 @@ Links to established, governed documentation within the repository, and maps pla
 | 1.0.45 | 2026-11-16 | Independent Audit Agent | Registered Stage F1.4.3 Phase 2 Independent Audit Report (AUDIT-F143-PHASE2-001, v1.0.0), Test Reconciliation Report (RECON-F143-PHASE2-001, v1.0.0), and Remediation Register (REGISTER-F143-PHASE2-001, v1.0.0); independently audited source code across Areas A–F, reconciled 200 distinct platform tests (38 Phase 2 + 162 expanded predecessor), verified 10 adversarial attack scenarios, confirmed zero database mutations, and cataloged five medium/low findings under CONDITIONAL PASS. Status: approved. |
 | 1.0.46 | 2026-11-16 | Remediation Agent | Registered Stage F1.4.3 Phase 2 Remediation & Closure Verification Report (REPORT-F143-PHASE2-REMED-001, v1.0.0) closing findings P2-001 through P2-006; verified production DB isolation (pelagos.db intact), vessel readiness statutory integration, concurrent token replay handling, Merkle multi-set terminology, and 206 platform tests (100% passing) under UNCONDITIONAL PASS. Status: approved. |
 | 1.0.47 | 2026-11-16 | Publication Agent | Registered Stage F1.4.3 Phase 2 Controlled Publication Report (GIT-PUBLISH-F143-PHASE2-001, v1.0.0) documenting formal verification and publication of Phase 2 implementation, tests, and documentation to origin/main. Status: approved. |
+| 1.0.48 | 2026-11-16 | Planning Agent | Registered Stage F1.4.3 Post-Phase 2 Operational Readiness Gap Assessment (GAP-F143-001, v1.0.0) and Phase 3 Proposal (PROP-F143-PHASE3-001, v1.0.0) under SCOPE-F143-NEXT-001; cataloged 22 Level 3 blockers across 5 domains, proposed Stage F1.4.3 Phase 3 covering dual-control multi-sig, PostgreSQL append-only persistence, top 15 bulk ports, automated statutory ingestion, and real voyage benchmarking; Level 3 activation strictly locked. Status: approved. |
+| 1.0.49 | 2026-11-17 | Implementation Agent | Registered Stage F1.5.2-B Controlled Research Pilot Integration Report (REPORT-F152B-001, v1.0.0) establishing Level 2 research voyage assessment for USG–Japan bulk corridor (USHOU -> Panama -> JPYOK) with NAVIOS VICTORY; Level 3 operational activation strictly locked. Status: approved. |
+| 1.0.50 | 2026-11-17 | Implementation Agent | Registered Stage F1.5.3-A Research Assessment Remediation & Test Baseline Restoration Report (REPORT-F153A-001, v1.0.0) resolving ballast sea days schema/duration, currency service memory seeding isolation, and charter DWT capacity reconciliation; verified 245/245 runnable tests passing across 18 platform suites, zero database mutations; Level 3 activation strictly locked. Status: approved. |
+| 1.0.51 | 2026-11-17 | Implementation Agent | Registered Stage F1.5.3-B Dedicated Research Voyage Assessment API Specification (SPEC-F153B-001, v1.0.0) exposing POST/GET `/api/v1/research/voyage-assessment` decoupled from commercial charter screening; verified 256/256 runnable tests passing (100%), zero database mutations; Level 3 activation strictly locked. Status: approved. |
+| 1.0.52 | 2026-11-17 | Implementation Agent | Stage F1.5.3-B.1 Acceptance Remediation: Updated SPEC-F153B-001 to v1.0.1 with captured live API output ($72,501.08 TCE) and documented error sanitization; sanitized HTTP 500 error shielding in routes/research.py; strengthened test_research_api.py with exact assertions and sensitive detail shielding tests; verified 256/256 runnable tests passing (100%), zero database mutations. Status: approved. |

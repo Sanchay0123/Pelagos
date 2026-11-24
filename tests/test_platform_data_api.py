@@ -478,7 +478,7 @@ def test_live_sqlite_database_counts_parity():
     assert r.status_code == 200
     data = r.json()
     bd = data["global_summary"]["breakdown"]
-    assert data["global_summary"]["total_genuine_records"] == 1424
+    assert data["global_summary"]["total_genuine_records"] == 1425
     assert data["global_summary"]["domains_with_records_count"] == 8
     assert data["global_summary"]["domains_fully_populated_count"] == 7
     assert data["global_summary"]["domains_partial_count"] == 1
@@ -493,7 +493,7 @@ def test_live_sqlite_database_counts_parity():
     assert bd["bunker_observations"] == 5
     assert bd["ais_position_observations"] == 120
     assert bd["canonical_ports"] == 43
-    assert bd["canonical_vessels"] == 120
+    assert bd["canonical_vessels"] == 121
     assert bd["identifier_mappings_port_aliases"] == 77
     assert bd["derived_dataset_rows"] == 2148
 

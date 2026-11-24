@@ -7,6 +7,7 @@ Traces to REQ-FR-DII-005, REQ-FR-FRF-001, and Pelagos Milestone D10.
 from __future__ import annotations
 
 from enum import Enum
+import datetime
 from datetime import date
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, model_validator
@@ -862,3 +863,71 @@ class CharterRecommendationResponse(BaseModel):
     )
     disclaimers: List[str] = Field(default_factory=lambda: list(SUITABILITY_COMMERCIAL_DISCLAIMERS))
     message: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Stage F1.5.3-B: Dedicated Research Voyage Assessment API Schemas
+# ---------------------------------------------------------------------------
+
+from pelagos.optimization.research_voyage_assessment import (
+    ResearchVoyageInput,
+    ResearchVoyageAssessmentResult,
+    ComponentAssessmentItem,
+    EpistemicEvidenceClassification,
+)
+
+
+class ResearchVoyageAssessmentRequest(ResearchVoyageInput):
+    """Dedicated API request contract for Level 2 research voyage assessment.
+
+    Extends ResearchVoyageInput with input normalization and explicit service conversion.
+    """
+
+    origin_unlocode: str = Field(
+        default="USHOU",
+        min_length=5,
+        max_length=5,
+        description="Origin port UN/LOCODE (5 characters, e.g. 'USHOU').",
+    )
+    destination_unlocode: str = Field(
+        default="JPYOK",
+        min_length=5,
+        max_length=5,
+        description="Destination port UN/LOCODE (5 characters, e.g. 'JPYOK').",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_input_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "origin_unlocode" in data and isinstance(data["origin_unlocode"], str):
+                data["origin_unlocode"] = data["origin_unlocode"].upper().strip()
+            if "destination_unlocode" in data and isinstance(data["destination_unlocode"], str):
+                data["destination_unlocode"] = data["destination_unlocode"].upper().strip()
+            if "vessel_imo" in data and data["vessel_imo"] is not None:
+                data["vessel_imo"] = str(data["vessel_imo"]).strip()
+        return data
+
+    def to_service_input(self) -> ResearchVoyageInput:
+        """Convert API request payload into internal service input model."""
+        return ResearchVoyageInput(**self.model_dump())
+
+
+class ResearchVoyageAssessmentResponse(ResearchVoyageAssessmentResult):
+    """Dedicated API response contract for controlled Level 2 research voyage assessments.
+
+    Extends ResearchVoyageAssessmentResult with API metadata and explicit governance disclaimers.
+    Strictly preserves is_ready_for_operations = False and LEVEL_2_RESEARCH_ONLY governance tier.
+    """
+
+    assessment_timestamp: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc),
+        description="UTC timestamp when this assessment was generated.",
+    )
+    api_governance_notice: str = Field(
+        default=(
+            "LEVEL 2 RESEARCH ASSESSMENT ONLY: Analytical assessment for exploratory research and engineering evaluation. "
+            "Strictly barred from commercial charter bidding, owner profitability calculations, or operational execution."
+        ),
+        description="Mandatory API-level governance disclaimer.",
+    )

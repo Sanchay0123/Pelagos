@@ -19,6 +19,7 @@ Enforces strict commercial integrity:
 from __future__ import annotations
 
 import datetime
+from enum import Enum
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
@@ -28,6 +29,189 @@ logger = logging.getLogger(__name__)
 
 PROVIDER_NAME = "Bunker Fuel Prices (bunkerfuelprices.com)"
 PROVIDER_URL = "https://bunkerfuelprices.com/"
+
+
+class BunkerEvidenceClassification(str, Enum):
+    """Four-tier evidence classification for bunker fuel inputs (Stage F1.5.2-B Scope E)."""
+    OBSERVED_PORT_PRICE = "OBSERVED_PORT_PRICE"
+    USER_SUPPLIED_ASSUMPTION = "USER_SUPPLIED_ASSUMPTION"
+    RESEARCH_COMPOSITE_BENCHMARK = "RESEARCH_COMPOSITE_BENCHMARK"
+    UNAVAILABLE = "UNAVAILABLE"
+
+
+class UserSuppliedBunkerAssumption(BaseModel):
+    """Auditable user-supplied bunker fuel price assumption for research voyage modeling."""
+    price_usd_per_mt: float = Field(..., gt=0.0, description="User-specified fuel price in USD/MT")
+    fuel_grade: str = Field(default="VLSFO", description="Fuel grade (e.g. 'VLSFO', 'LSMGO', 'HSFO')")
+    currency: str = Field(default="USD", description="Quotation currency")
+    unit: str = Field(default="USD/MT", description="Pricing unit")
+    as_of_date: datetime.date = Field(..., description="Valuation or assumption observation date")
+    port_unlocode: Optional[str] = Field(default=None, description="Assumed bunkering port LOCODE (e.g. 'USHOU')")
+    user_label: str = Field(default="User Supplied Commercial Assumption", description="User attribution label")
+    evidence_classification: BunkerEvidenceClassification = BunkerEvidenceClassification.USER_SUPPLIED_ASSUMPTION
+    is_operational_approved: bool = False
+    notes: Optional[str] = None
+
+
+class ResearchCompositeBenchmark(BaseModel):
+    """Explicitly labelled macro research composite benchmark (e.g. USDA AgTransport G20).
+
+    STRICT INVARIANT: This benchmark is a global/regional multi-port average.
+    It MUST NEVER be represented or substituted as a port-specific delivered price for
+    Houston, Panama, or Yokohama.
+    """
+    composite_name: str = "USDA AgTransport G20 Daily Global Bunker Composite"
+    price_usd_per_mt: float = Field(..., gt=0.0)
+    fuel_grade: str = Field(default="VLSFO", description="Fuel grade represented in composite")
+    as_of_date: datetime.date
+    currency: str = "USD"
+    unit: str = "USD/MT"
+    dataset_identifier: str = "USDA-AMS-4v3x-mj86"
+    source_url: str = "https://agtransport.usda.gov/resource/4v3x-mj86.json"
+    evidence_classification: BunkerEvidenceClassification = BunkerEvidenceClassification.RESEARCH_COMPOSITE_BENCHMARK
+    is_port_delivered_price: bool = False  # Strictly False: never a port-delivered price
+    is_operational_approved: bool = False
+    disclaimer: str = (
+        "RESEARCH COMPOSITE BENCHMARK ONLY: Global 20-port macro composite average. "
+        "Strictly prohibited from being represented as a Houston, Panama, or Yokohama delivered spot quote. "
+        "Not valid for operational clearance."
+    )
+
+
+class BunkerAssessmentResult(BaseModel):
+    """Comprehensive, evidence-labelled result of a bunker price resolution."""
+    port_unlocode: str
+    port_name: str
+    fuel_grade: str
+    evidence_classification: BunkerEvidenceClassification
+    price_usd_per_mt: Optional[float] = None
+    currency: str = "USD"
+    unit: str = "USD/MT"
+    is_available: bool = False
+    is_operational_approved: bool = False
+    as_of_date: Optional[datetime.date] = None
+    source_name: str
+    source_reference: Optional[str] = None
+    disclaimers: List[str] = Field(default_factory=list)
+    failure_reason: Optional[str] = None
+
+
+def resolve_research_bunker_price(
+    port_unlocode: str,
+    as_of_date: datetime.date,
+    fuel_grade: str = "VLSFO",
+    user_assumption: Optional[UserSuppliedBunkerAssumption] = None,
+    allow_research_composite: bool = False,
+    research_composite: Optional[ResearchCompositeBenchmark] = None,
+    operational_mode: bool = False,
+) -> BunkerAssessmentResult:
+    """Evaluate bunker fuel price under strict epistemic classification.
+
+    Safety & Governance Invariants:
+    1. Operational Calculations Blocked: operational_mode=True returns is_operational_approved=False
+       and fails closed without a certified commercial license (Ship & Bunker).
+    2. Port delivered prices must be backed by actual qualified evidence; port authorities publish $0.
+    3. User-supplied assumptions are clearly labelled as USER_SUPPLIED_ASSUMPTION.
+    4. USDA AgTransport G20 may be used only if allow_research_composite=True, and is strictly
+       classified as RESEARCH_COMPOSITE_BENCHMARK (never as an observed port price).
+    5. Missing bunker prices remain visible as UNAVAILABLE; NO silent fallback to composite.
+    """
+    locode = port_unlocode.upper().strip()
+    port_names = {
+        "USHOU": "Houston",
+        "USMSY": "New Orleans",
+        "PAPAC": "Balboa / Panama Canal",
+        "JPYOK": "Yokohama",
+        "SGSIN": "Singapore",
+        "NLRTM": "Rotterdam",
+    }
+    p_name = port_names.get(locode, f"Port {locode}")
+
+    # Operational mode gate
+    if operational_mode:
+        return BunkerAssessmentResult(
+            port_unlocode=locode,
+            port_name=p_name,
+            fuel_grade=fuel_grade,
+            evidence_classification=BunkerEvidenceClassification.UNAVAILABLE,
+            price_usd_per_mt=None,
+            is_available=False,
+            is_operational_approved=False,
+            as_of_date=as_of_date,
+            source_name="Pelagos Operational Governance Gate",
+            failure_reason=(
+                f"OPERATIONAL_BUNKER_PRICE_BLOCKED: Commercial spot bunker price feeds for {locode} "
+                f"remain unlicensed and pending provider agreement (DOC-F152A-001). "
+                f"Operational clearance is strictly disabled."
+            ),
+            disclaimers=[
+                "Commercial spot bunker feeds require active enterprise licensing before operational activation.",
+            ],
+        )
+
+    # 1. User-supplied assumption (Explicit caller input)
+    if user_assumption is not None:
+        return BunkerAssessmentResult(
+            port_unlocode=locode,
+            port_name=p_name,
+            fuel_grade=user_assumption.fuel_grade,
+            evidence_classification=BunkerEvidenceClassification.USER_SUPPLIED_ASSUMPTION,
+            price_usd_per_mt=user_assumption.price_usd_per_mt,
+            currency=user_assumption.currency,
+            unit=user_assumption.unit,
+            is_available=True,
+            is_operational_approved=False,
+            as_of_date=user_assumption.as_of_date,
+            source_name=f"User Supplied Assumption ({user_assumption.user_label})",
+            source_reference=user_assumption.notes or "Caller supplied voyage assumption",
+            disclaimers=[
+                "USER ASSUMPTION: Bunker price supplied by user for exploratory research; "
+                "not backed by delivered bunker delivery note (BDN) or transacted fixture.",
+            ],
+        )
+
+    # 2. Research Composite Benchmark (Explicit opt-in only)
+    if allow_research_composite and research_composite is not None:
+        return BunkerAssessmentResult(
+            port_unlocode=locode,
+            port_name=p_name,
+            fuel_grade=research_composite.fuel_grade,
+            evidence_classification=BunkerEvidenceClassification.RESEARCH_COMPOSITE_BENCHMARK,
+            price_usd_per_mt=research_composite.price_usd_per_mt,
+            currency=research_composite.currency,
+            unit=research_composite.unit,
+            is_available=True,
+            is_operational_approved=False,
+            as_of_date=research_composite.as_of_date,
+            source_name=research_composite.composite_name,
+            source_reference=f"{research_composite.dataset_identifier} ({research_composite.source_url})",
+            disclaimers=[
+                research_composite.disclaimer,
+                f"BENCHMARK ONLY: Value is a global multi-port average and DOES NOT represent a delivered price at {locode}.",
+            ],
+        )
+
+    # 3. Missing / Unavailable (Fail-Closed default: NO silent fallback!)
+    return BunkerAssessmentResult(
+        port_unlocode=locode,
+        port_name=p_name,
+        fuel_grade=fuel_grade,
+        evidence_classification=BunkerEvidenceClassification.UNAVAILABLE,
+        price_usd_per_mt=None,
+        is_available=False,
+        is_operational_approved=False,
+        as_of_date=as_of_date,
+        source_name="Pelagos Bunker Intelligence Registry",
+        failure_reason=(
+            f"NO_BUNKER_PRICE_AVAILABLE: Verified delivered spot bunker price is unavailable for {locode} "
+            f"on {as_of_date.isoformat()}. Silent fallback to composite benchmarks is strictly disabled. "
+            f"Supply an explicit user_assumption or enable allow_research_composite with an explicit benchmark."
+        ),
+        disclaimers=[
+            f"Port authorities at {locode} publish no bunker sales prices.",
+            "No silent substitution is permitted under Pelagos commercial integrity rules.",
+        ],
+    )
 
 
 class BunkerPriceQuote(BaseModel):

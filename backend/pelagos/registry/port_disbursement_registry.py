@@ -140,6 +140,8 @@ class PortDisbursementRegistry:
     ):
         self.db = db
         self.currency_service = currency_service or CurrencyConversionService(db=db)
+        if currency_service is None and db is None:
+            self.currency_service.seed_historical_statutory_rates()
         self._memory_records: Dict[str, Dict[str, Any]] = {}
         self.tariffs_json_path = tariffs_json_path or (
             Path(__file__).parent.parent / "data" / "f1_4_2_3b_pilot_port_tariffs.json"
@@ -502,6 +504,43 @@ class PortDisbursementRegistry:
                     beam_ft = beam_m * 3.28084
                     pilot_units = (loa_ft * beam_ft) / 100.0
                     amount_local = round(pilot_units * rate, 2)
+
+            elif tid == "JPYOK-PORT-DUES-2024":
+                if vessel_gt is None or vessel_gt <= 0:
+                    item_error = "MISSING_VESSEL_GT: Yokohama port entry dues require verified Gross Tonnage"
+                else:
+                    # Statutory municipal charge: JPY 2.70 per gross ton per entry
+                    amount_local = round(vessel_gt * rate, 2)
+
+            elif tid == "JPYOK-PUBLIC-WHARFAGE-2024":
+                if vessel_gt is None or vessel_gt <= 0:
+                    item_error = "MISSING_VESSEL_GT: Yokohama public wharfage requires verified Gross Tonnage"
+                else:
+                    # Assessed per 12-hour block (or fraction thereof)
+                    blocks_12h = math.ceil(stay_duration_hours / 12.0) if stay_duration_hours > 0 else 1.0
+                    amount_local = round(vessel_gt * rate * blocks_12h, 2)
+
+            elif tid == "JPYOK-TOKYO-BAY-PILOT-2024":
+                if vessel_gt is None or draft_m is None or vessel_gt <= 0 or draft_m <= 0:
+                    item_error = "MISSING_VESSEL_DIMENSIONS: Tokyo Bay pilotage requires verified Gross Tonnage and Draft"
+                else:
+                    # MLIT Statutory formula: Base A + Inc B * (ceil((GRT - 1000)/1000) + ceil((Draft - 3.0)/0.30))
+                    base_a = rate  # 45,800.0 JPY
+                    inc_b = round(base_a * 0.10, 2)  # 4,580.0 JPY
+                    grt_units = max(0, math.ceil((vessel_gt - 1000.0) / 1000.0))
+                    draft_units = max(0, math.ceil((draft_m - 3.0) / 0.30))
+                    amount_local = float(base_a + inc_b * (grt_units + draft_units))
+
+            elif tid == "JPYOK-HARBOR-PILOT-2024":
+                if vessel_gt is None or draft_m is None or vessel_gt <= 0 or draft_m <= 0:
+                    item_error = "MISSING_VESSEL_DIMENSIONS: Yokohama harbor docking pilotage requires verified Gross Tonnage and Draft"
+                else:
+                    # MLIT Statutory formula: Base A + Inc B * (ceil((GRT - 1000)/1000) + ceil((Draft - 3.0)/0.30))
+                    base_a = rate  # 27,500.0 JPY
+                    inc_b = round(base_a * 0.10, 2)  # 2,750.0 JPY
+                    grt_units = max(0, math.ceil((vessel_gt - 1000.0) / 1000.0))
+                    draft_units = max(0, math.ceil((draft_m - 3.0) / 0.30))
+                    amount_local = float(base_a + inc_b * (grt_units + draft_units))
 
             else:
                 # Generic fallback for standard fixed/unit tariffs

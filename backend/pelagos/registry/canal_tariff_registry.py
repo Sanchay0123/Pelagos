@@ -177,6 +177,8 @@ class CanalTariffRegistry:
     def __init__(self, db: Optional[Session] = None, currency_service: Optional[CurrencyConversionService] = None):
         self.db = db
         self.currency_service = currency_service or CurrencyConversionService(db=db)
+        if currency_service is None and db is None:
+            self.currency_service.seed_historical_statutory_rates()
         self._memory_records: Dict[str, Dict[str, Any]] = {}
         self._seed_in_memory_records()
 

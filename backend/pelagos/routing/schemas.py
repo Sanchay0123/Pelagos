@@ -124,7 +124,7 @@ class RoutingRequest(BaseModel):
         description="Provisional maximum permissible snapping distance from coordinates to network grid in NM.",
     )
     supports_segments: bool = Field(
-        default=False,
+        default=True,
         description="Explicit capability assertion declaring that caller supports disjoint geometry_segments rendering.",
     )
 
@@ -212,3 +212,20 @@ class RoutingResult(BaseModel):
     limitations: List[str] = Field(default_factory=list)
     data_provenance: Dict[str, str] = Field(default_factory=dict)
     error_message: Optional[str] = None
+
+    def to_geojson(self) -> Dict[str, Any]:
+        """Emit GeoJSON geometry representation.
+
+        Returns LineString for standard continuous routes,
+        or MultiLineString for antimeridian-crossing routes with disjoint segments.
+        """
+        if self.geometry_segments and len(self.geometry_segments) > 1:
+            return {
+                "type": "MultiLineString",
+                "coordinates": self.geometry_segments,
+            }
+        coords = self.geometry_segments[0] if self.geometry_segments else self.geometry
+        return {
+            "type": "LineString",
+            "coordinates": coords,
+        }
